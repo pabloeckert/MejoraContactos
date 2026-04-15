@@ -15,7 +15,7 @@ interface RawContact {
   email?: string;
 }
 
-type Provider = "lovable" | "groq" | "openrouter";
+type Provider = "lovable" | "groq" | "openrouter" | "pipeline";
 
 interface ProviderConfig {
   url: string;
@@ -24,7 +24,7 @@ interface ProviderConfig {
   name: string;
 }
 
-function getProviderConfig(provider: Provider): ProviderConfig {
+function getProviderConfig(provider: Exclude<Provider, "pipeline">): ProviderConfig {
   switch (provider) {
     case "groq": {
       const key = Deno.env.get("GROQ_API_KEY");
@@ -59,26 +59,167 @@ function getProviderConfig(provider: Provider): ProviderConfig {
   }
 }
 
-const SYSTEM_PROMPT = "Sos un limpiador de datos. Respondé SOLO con JSON válido, sin markdown, sin explicaciones.";
+const SYSTEM_CLEAN = "Sos un limpiador de datos. Responde SOLO con JSON valido, sin markdown, sin explicaciones.";
 
-function buildPrompt(batch: RawContact[]): string {
+const SYSTEM_VERIFY = "Sos un verificador de datos. Revisas contactos limpiados por otra IA y detectas errores. Responde SOLO con JSON valido, sin markdown.";
+
+const SYSTEM_CORRECT = "Sos un corrector final de datos. Recibes contactos con posibles errores marcados y los corriges. Responde SOLO con JSON valido, sin markdown.";
+
+function buildCleanPrompt(batch: RawContact[]): string {
   return `Sos un asistente experto en limpieza de datos de contactos.
-Recibís un array JSON de contactos desordenados. Tu tarea:
+Recibis un array JSON de contactos desordenados. Tu tarea:
 
-1. **Nombre**: Capitalizar correctamente (primera letra mayúscula). Si hay nombre completo en un solo campo, separar en firstName y lastName.
+1. **Nombre**: Capitalizar correctamente. Si hay nombre completo en un solo campo, separar en firstName y lastName.
 2. **Apellido**: Capitalizar correctamente.
-3. **WhatsApp**: Convertir a formato internacional sin espacios ni guiones, solo números con código de país. Si no tiene código de país, asumir +54 (Argentina). Ejemplo: "+5491112345678". Eliminar el 15 si es un celular argentino (ej: 011-15-1234-5678 → +5491112345678).
+3. **WhatsApp**: Formato internacional sin espacios ni guiones, solo numeros con codigo de pais. Sin codigo, asumir +54 (Argentina). Eliminar el 15 si es celular argentino.
 4. **Empresa**: Limpiar y capitalizar. Quitar basura como "N/A", "-", ".", etc.
 5. **Cargo**: Limpiar y capitalizar. Quitar basura.
-6. **Email**: Limpiar, minúsculas, validar formato básico. Si es inválido, dejar vacío.
+6. **Email**: Limpiar, minusculas, validar formato basico. Si es invalido, dejar vacio.
 
 IMPORTANTE:
-- Si un campo tiene basura irreconocible, dejarlo vacío "".
-- NO inventar datos. Si no hay información, dejar vacío.
-- Devolvé SOLO el array JSON limpio, sin explicaciones.
+- Si un campo tiene basura irreconocible, dejarlo vacio "".
+- NO inventar datos.
+- Devuelve SOLO el array JSON limpio.
 
 Contactos a limpiar:
 ${JSON.stringify(batch)}`;
+}
+
+function buildVerifyPrompt(original: RawContact[], cleaned: RawContact[]): string {
+  return `Recibes dos arrays: los datos ORIGINALES y los datos LIMPIADOS por otra IA.
+Tu tarea es verificar que la limpieza fue correcta:
+
+1. Verificar que no se perdio informacion importante
+2. Verificar que los telefonos tienen formato correcto (+codigo pais + numero)
+3. Verificar que los emails son validos
+4. Verificar que los nombres estan bien capitalizados
+5. Verificar que no se invento informacion que no existia en el original
+
+Para cada contacto, agrega un campo "issues" (array de strings) con los problemas encontrados.
+Si no hay problemas, "issues" debe ser un array vacio [].
+
+Devuelve SOLO el array JSON con el campo "issues" agregado.
+
+ORIGINALES:
+${JSON.stringify(original)}
+
+LIMPIADOS:
+${JSON.stringify(cleaned)}`;
+}
+
+function buildCorrectPrompt(verified: (RawContact & { issues?: string[] })[]): string {
+  return `Recibes contactos verificados con posibles "issues" detectadas por otra IA.
+Tu tarea es hacer la correccion final:
+
+1. Corregir todos los issues marcados
+2. Asegurar formato internacional de telefonos (+54 para Argentina si no tiene codigo)
+3. Asegurar emails en minusculas y validos
+4. Asegurar nombres bien capitalizados
+5. Eliminar el campo "issues" del resultado final
+
+Devuelve SOLO el array JSON final limpio y corregido (sin campo "issues").
+
+Contactos a corregir:
+${JSON.stringify(verified)}`;
+}
+
+async function callAI(config: ProviderConfig, systemPrompt: string, userPrompt: string, provider: string): Promise<RawContact[]> {
+  const response = await fetch(config.url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${config.apiKey}`,
+      "Content-Type": "application/json",
+      ...(provider === "openrouter" ? { "HTTP-Referer": "https://lovable.dev" } : {}),
+    },
+    body: JSON.stringify({
+      model: config.model,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+    }),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`${config.name} error ${response.status}: ${errText}`);
+  }
+
+  const data = await response.json();
+  const content = data.choices?.[0]?.message?.content || "";
+  const jsonMatch = content.match(/\[[\s\S]*\]/);
+  if (!jsonMatch) throw new Error(`${config.name}: no JSON array in response`);
+  return JSON.parse(jsonMatch[0]);
+}
+
+async function pipelineBatch(batch: RawContact[]): Promise<{ contacts: RawContact[]; stages: string[] }> {
+  const stages: string[] = [];
+
+  // Stage 1: Groq cleans (fastest)
+  let groqConfig: ProviderConfig;
+  try {
+    groqConfig = getProviderConfig("groq");
+  } catch {
+    groqConfig = getProviderConfig("lovable");
+  }
+
+  let cleaned: RawContact[];
+  try {
+    cleaned = await callAI(groqConfig, SYSTEM_CLEAN, buildCleanPrompt(batch), "groq");
+    stages.push(`Limpieza: ${groqConfig.name} OK`);
+  } catch (e) {
+    console.error("Pipeline stage 1 error:", e);
+    cleaned = batch;
+    stages.push(`Limpieza: ${groqConfig.name} FALLO - usando originales`);
+  }
+
+  // Stage 2: OpenRouter verifies
+  let orConfig: ProviderConfig;
+  try {
+    orConfig = getProviderConfig("openrouter");
+  } catch {
+    orConfig = getProviderConfig("lovable");
+  }
+
+  let verified: (RawContact & { issues?: string[] })[];
+  try {
+    verified = await callAI(orConfig, SYSTEM_VERIFY, buildVerifyPrompt(batch, cleaned), "openrouter") as any;
+    const issueCount = verified.reduce((acc, v) => acc + (v.issues?.length || 0), 0);
+    stages.push(`Verificacion: ${orConfig.name} OK (${issueCount} issues)`);
+  } catch (e) {
+    console.error("Pipeline stage 2 error:", e);
+    verified = cleaned.map(c => ({ ...c, issues: [] }));
+    stages.push(`Verificacion: ${orConfig.name} FALLO - sin verificar`);
+  }
+
+  // Stage 3: Lovable AI corrects
+  let lovableConfig: ProviderConfig;
+  try {
+    lovableConfig = getProviderConfig("lovable");
+  } catch {
+    // All failed, return what we have
+    return { contacts: cleaned, stages };
+  }
+
+  let corrected: RawContact[];
+  const hasIssues = verified.some(v => v.issues && v.issues.length > 0);
+
+  if (hasIssues) {
+    try {
+      corrected = await callAI(lovableConfig, SYSTEM_CORRECT, buildCorrectPrompt(verified), "lovable");
+      stages.push(`Correccion: ${lovableConfig.name} OK`);
+    } catch (e) {
+      console.error("Pipeline stage 3 error:", e);
+      corrected = cleaned;
+      stages.push(`Correccion: ${lovableConfig.name} FALLO - usando limpiados`);
+    }
+  } else {
+    // No issues found, skip correction
+    corrected = cleaned;
+    stages.push(`Correccion: Sin issues, paso omitido`);
+  }
+
+  return { contacts: corrected, stages };
 }
 
 serve(async (req) => {
@@ -100,6 +241,31 @@ serve(async (req) => {
     }
 
     const provider = providerParam || "lovable";
+
+    // Pipeline mode: use all 3 AIs
+    if (provider === "pipeline") {
+      console.log(`Pipeline mode for ${contacts.length} contacts`);
+      const batchSize = 20;
+      const allCleaned: RawContact[] = [];
+      const allStages: string[] = [];
+
+      for (let i = 0; i < contacts.length; i += batchSize) {
+        const batch = contacts.slice(i, i + batchSize);
+        const result = await pipelineBatch(batch);
+        allCleaned.push(...result.contacts);
+        if (i === 0) allStages.push(...result.stages); // Only log stages for first batch
+      }
+
+      return new Response(JSON.stringify({
+        contacts: allCleaned,
+        provider: "Pipeline 3 IAs (Groq + OpenRouter + Lovable)",
+        stages: allStages,
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Single provider mode
     let config: ProviderConfig;
     try {
       config = getProviderConfig(provider);
@@ -118,54 +284,17 @@ serve(async (req) => {
     for (let i = 0; i < contacts.length; i += batchSize) {
       const batch = contacts.slice(i, i + batchSize);
 
-      const response = await fetch(config.url, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${config.apiKey}`,
-          "Content-Type": "application/json",
-          ...(provider === "openrouter" ? { "HTTP-Referer": "https://lovable.dev" } : {}),
-        },
-        body: JSON.stringify({
-          model: config.model,
-          messages: [
-            { role: "system", content: SYSTEM_PROMPT },
-            { role: "user", content: buildPrompt(batch) },
-          ],
-        }),
-      });
-
-      if (!response.ok) {
-        if (response.status === 429) {
+      try {
+        const cleaned = await callAI(config, SYSTEM_CLEAN, buildCleanPrompt(batch), provider);
+        allCleaned.push(...cleaned);
+      } catch (e) {
+        console.error(`Batch error:`, e);
+        if ((e as Error).message.includes("429")) {
           return new Response(
-            JSON.stringify({ error: `Rate limit en ${config.name}. Intentá de nuevo en unos segundos.` }),
+            JSON.stringify({ error: `Rate limit en ${config.name}. Intenta de nuevo en unos segundos.` }),
             { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
-        if (response.status === 402) {
-          return new Response(
-            JSON.stringify({ error: "Créditos agotados." }),
-            { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-        const errText = await response.text();
-        console.error(`${config.name} error:`, response.status, errText);
-        allCleaned.push(...batch);
-        continue;
-      }
-
-      const data = await response.json();
-      const content = data.choices?.[0]?.message?.content || "";
-
-      try {
-        const jsonMatch = content.match(/\[[\s\S]*\]/);
-        if (jsonMatch) {
-          const cleaned = JSON.parse(jsonMatch[0]);
-          allCleaned.push(...cleaned);
-        } else {
-          allCleaned.push(...batch);
-        }
-      } catch {
-        console.error("Failed to parse AI response:", content);
         allCleaned.push(...batch);
       }
     }

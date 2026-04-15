@@ -28,11 +28,10 @@ export function ExportPanel({ contacts }: ExportPanelProps) {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3">
-        <StatCard label="Contactos limpios" value={clean.length} icon="✓" color="text-success" />
-        <StatCard label="Descartados" value={discarded.length} icon="✕" color="text-warning" />
-        <StatCard label="Con teléfono" value={clean.filter((c) => c.phoneValid).length} icon="📱" />
-        <StatCard label="Con email" value={clean.filter((c) => c.email).length} icon="📧" />
+      <div className="grid grid-cols-3 gap-3">
+        <StatCard label="Limpios" value={clean.length} icon="✓" color="text-green-600" />
+        <StatCard label="Descartados" value={discarded.length} icon="✕" color="text-red-500" />
+        <StatCard label="IA Limpiados" value={contacts.filter((c) => c.aiCleaned).length} icon="✨" color="text-blue-500" />
       </div>
 
       <Card>
@@ -44,12 +43,12 @@ export function ExportPanel({ contacts }: ExportPanelProps) {
         </CardHeader>
         <CardContent className="grid grid-cols-2 gap-3">
           <Button variant="outline" className="h-auto py-4 flex-col gap-2" onClick={() => handleExport("csv")}>
-            <FileText className="h-5 w-5 text-success" />
+            <FileText className="h-5 w-5 text-green-600" />
             <span className="text-xs font-semibold">CSV</span>
             <span className="text-[10px] text-muted-foreground">Google Contacts</span>
           </Button>
           <Button variant="outline" className="h-auto py-4 flex-col gap-2" onClick={() => handleExport("excel")}>
-            <FileSpreadsheet className="h-5 w-5 text-secondary" />
+            <FileSpreadsheet className="h-5 w-5 text-blue-500" />
             <span className="text-xs font-semibold">Excel</span>
             <span className="text-[10px] text-muted-foreground">2 hojas</span>
           </Button>
@@ -59,7 +58,7 @@ export function ExportPanel({ contacts }: ExportPanelProps) {
             <span className="text-[10px] text-muted-foreground">vCard 3.0</span>
           </Button>
           <Button variant="outline" className="h-auto py-4 flex-col gap-2" onClick={() => handleExport("json")}>
-            <FileText className="h-5 w-5 text-accent-foreground" />
+            <FileText className="h-5 w-5 text-purple-500" />
             <span className="text-xs font-semibold">JSON</span>
             <span className="text-[10px] text-muted-foreground">Completo</span>
           </Button>
@@ -69,15 +68,15 @@ export function ExportPanel({ contacts }: ExportPanelProps) {
       {discarded.length > 0 && (
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-warning">Duplicados detectados</CardTitle>
+            <CardTitle className="text-sm text-red-500">Duplicados detectados</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-1 max-h-[200px] overflow-y-auto">
               {discarded.slice(0, 50).map((c) => (
                 <div key={c.id} className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <Badge variant="outline" className="text-[9px] text-warning border-warning/40">DUP</Badge>
+                  <Badge variant="outline" className="text-[9px] text-red-500 border-red-300">DUP</Badge>
                   <span className="truncate">{c.firstName} {c.lastName}</span>
-                  <span className="truncate">{c.email || c.phone}</span>
+                  <span className="truncate">{c.email || c.whatsapp}</span>
                 </div>
               ))}
               {discarded.length > 50 && <p className="text-xs text-muted-foreground">...y {discarded.length - 50} más</p>}

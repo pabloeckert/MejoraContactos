@@ -1,16 +1,144 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import { useState, useCallback } from "react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { FileDropzone } from "@/components/FileDropzone";
+import { ProcessingPanel } from "@/components/ProcessingPanel";
+import { ContactsTable } from "@/components/ContactsTable";
+import { ExportPanel } from "@/components/ExportPanel";
+import { DashboardPanel } from "@/components/DashboardPanel";
+import { saveContacts, updateContact, deleteContact } from "@/lib/db";
+import type { ParsedFile, UnifiedContact } from "@/types/contact";
+import { toast } from "sonner";
+import { Upload, Zap, Users, Download, BarChart3 } from "lucide-react";
 
-// IMPORTANT: Fully REPLACE this with your own code
-const PlaceholderIndex = () => {
-  // PLACEHOLDER: Replace this entire return statement with the user's app.
-  // The inline background color is intentionally not part of the design system.
+const Index = () => {
+  const [files, setFiles] = useState<ParsedFile[]>([]);
+  const [contacts, setContacts] = useState<UnifiedContact[]>([]);
+  const [activeTab, setActiveTab] = useState("import");
+
+  const handleFilesAdded = useCallback((newFiles: ParsedFile[]) => {
+    setFiles((prev) => [...prev, ...newFiles]);
+  }, []);
+
+  const handleRemoveFile = useCallback((id: string) => {
+    setFiles((prev) => prev.filter((f) => f.id !== id));
+  }, []);
+
+  const handleProcessingComplete = useCallback(async (processed: UnifiedContact[]) => {
+    setContacts(processed);
+    try {
+      const clean = processed.filter((c) => !c.isDuplicate);
+      await saveContacts(clean);
+    } catch {
+      toast.error("Error guardando en base de datos local");
+    }
+    setActiveTab("results");
+  }, []);
+
+  const handleUpdateContact = useCallback(async (contact: UnifiedContact) => {
+    setContacts((prev) => prev.map((c) => (c.id === contact.id ? contact : c)));
+    await updateContact(contact);
+    toast.success("Contacto actualizado");
+  }, []);
+
+  const handleDeleteContact = useCallback(async (id: string) => {
+    setContacts((prev) => prev.filter((c) => c.id !== id));
+    await deleteContact(id);
+    toast.success("Contacto eliminado");
+  }, []);
+
+  const uniqueCount = contacts.filter((c) => !c.isDuplicate).length;
+
   return (
-    <div className="flex min-h-screen items-center justify-center" style={{ backgroundColor: '#fcfbf8' }}>
-      <img data-lovable-blank-page-placeholder="REMOVE_THIS" src="/placeholder.svg" alt="Your app will live here!" />
+    <div className="min-h-screen flex flex-col">
+      {/* Header */}
+      <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container flex h-14 items-center justify-between px-4">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <div className="h-7 w-7 rounded-md bg-primary flex items-center justify-center">
+                <Users className="h-4 w-4 text-primary-foreground" />
+              </div>
+              <h1 className="text-sm font-bold tracking-tight">ContactUnifier</h1>
+            </div>
+            <Badge variant="outline" className="text-[10px] hidden sm:inline-flex">AI Pro</Badge>
+          </div>
+          <div className="flex items-center gap-3">
+            {contacts.length > 0 && (
+              <Badge variant="secondary" className="text-xs">
+                {uniqueCount.toLocaleString()} contactos
+              </Badge>
+            )}
+            <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse-glow" title="Online" />
+          </div>
+        </div>
+      </header>
+
+      {/* Main */}
+      <main className="flex-1 container px-4 py-4">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+          <TabsList className="w-full grid grid-cols-5 h-10">
+            <TabsTrigger value="import" className="text-xs gap-1">
+              <Upload className="h-3 w-3" />
+              <span className="hidden sm:inline">Importar</span>
+            </TabsTrigger>
+            <TabsTrigger value="process" className="text-xs gap-1">
+              <Zap className="h-3 w-3" />
+              <span className="hidden sm:inline">Procesar</span>
+            </TabsTrigger>
+            <TabsTrigger value="results" className="text-xs gap-1">
+              <Users className="h-3 w-3" />
+              <span className="hidden sm:inline">Resultados</span>
+            </TabsTrigger>
+            <TabsTrigger value="export" className="text-xs gap-1">
+              <Download className="h-3 w-3" />
+              <span className="hidden sm:inline">Exportar</span>
+            </TabsTrigger>
+            <TabsTrigger value="dashboard" className="text-xs gap-1">
+              <BarChart3 className="h-3 w-3" />
+              <span className="hidden sm:inline">Dashboard</span>
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="import">
+            <FileDropzone files={files} onFilesAdded={handleFilesAdded} onRemoveFile={handleRemoveFile} />
+          </TabsContent>
+
+          <TabsContent value="process">
+            {files.length === 0 ? (
+              <div className="flex items-center justify-center h-[200px] text-muted-foreground text-sm">
+                Cargá archivos primero en la pestaña Importar
+              </div>
+            ) : (
+              <ProcessingPanel files={files} onProcessingComplete={handleProcessingComplete} />
+            )}
+          </TabsContent>
+
+          <TabsContent value="results">
+            {contacts.length === 0 ? (
+              <div className="flex items-center justify-center h-[200px] text-muted-foreground text-sm">
+                Procesá tus archivos para ver los resultados
+              </div>
+            ) : (
+              <ContactsTable
+                contacts={contacts}
+                onUpdateContact={handleUpdateContact}
+                onDeleteContact={handleDeleteContact}
+              />
+            )}
+          </TabsContent>
+
+          <TabsContent value="export">
+            <ExportPanel contacts={contacts} />
+          </TabsContent>
+
+          <TabsContent value="dashboard">
+            <DashboardPanel contacts={contacts} />
+          </TabsContent>
+        </Tabs>
+      </main>
     </div>
   );
 };
-
-const Index = PlaceholderIndex;
 
 export default Index;

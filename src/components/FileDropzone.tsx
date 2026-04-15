@@ -1,5 +1,5 @@
-import { useCallback, useState } from "react";
-import { Upload, FileSpreadsheet, FileText, File, X } from "lucide-react";
+import { useCallback, useRef, useState } from "react";
+import { Upload, FolderOpen, FileSpreadsheet, FileText, File, X } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -29,12 +29,28 @@ const typeIcons: Record<string, React.ReactNode> = {
 export function FileDropzone({ files, onFilesAdded, onRemoveFile }: FileDropzoneProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const folderInputRef = useRef<HTMLInputElement>(null);
+
+  const ACCEPTED_EXTENSIONS = [".csv", ".xlsx", ".xls", ".vcf", ".json", ".txt"];
+
+  const filterValidFiles = (fileList: FileList | File[]): File[] => {
+    return Array.from(fileList).filter((f) => {
+      const ext = f.name.slice(f.name.lastIndexOf(".")).toLowerCase();
+      return ACCEPTED_EXTENSIONS.includes(ext) && f.size > 0;
+    });
+  };
 
   const handleFiles = useCallback(
     async (fileList: FileList | File[]) => {
+      const validFiles = filterValidFiles(fileList);
+      if (validFiles.length === 0) {
+        toast.error("No se encontraron archivos válidos (CSV, Excel, VCF, JSON)");
+        return;
+      }
       setIsLoading(true);
+      toast.info(`Procesando ${validFiles.length} archivo(s)...`);
       const parsed: ParsedFile[] = [];
-      for (const file of Array.from(fileList)) {
+      for (const file of validFiles) {
         try {
           const result = await parseFile(file);
           parsed.push(result);
@@ -50,36 +66,128 @@ export function FileDropzone({ files, onFilesAdded, onRemoveFile }: FileDropzone
   );
 
   const onDrop = useCallback(
-    (e: React.DragEvent) => { e.preventDefault(); setIsDragging(false); handleFiles(e.dataTransfer.files); },
+    async (e: React.DragEvent) => {
+      e.preventDefault();
+      setIsDragging(false);
+
+      // Handle folder drops via DataTransferItem webkitGetAsEntry
+      const items = e.dataTransfer.items;
+      if (items && items.length > 0) {
+        const allFiles: File[] = [];
+
+        const readEntry = (entry: FileSystemEntry): Promise<File[]> => {
+          return new Promise((resolve) => {
+            if (entry.isFile) {
+              (entry as FileSystemFileEntry).file((f) => resolve([f]), () => resolve([]));
+            } else if (entry.isDirectory) {
+              const reader = (entry as FileSystemDirectoryEntry).createReader();
+              const readAll = (entries: FileSystemEntry[], accumulated: File[]): Promise<File[]> => {
+                return new Promise((res) => {
+                  reader.readEntries(async (batch) => {
+                    if (batch.length === 0) {
+                      res(accumulated);
+                    } else {
+                      const nested = await Promise.all(batch.map(readEntry));
+                      res(readAll([...entries, ...batch], [...accumulated, ...nested.flat()]));
+                    }
+                  }, () => res(accumulated));
+                });
+              };
+              readAll([], []).then(resolve);
+            } else {
+              resolve([]);
+            }
+          });
+        };
+
+        for (let i = 0; i < items.length; i++) {
+          const entry = items[i].webkitGetAsEntry?.();
+          if (entry) {
+            const found = await readEntry(entry);
+            allFiles.push(...found);
+          }
+        }
+
+        if (allFiles.length > 0) {
+          handleFiles(allFiles);
+          return;
+        }
+      }
+
+      handleFiles(e.dataTransfer.files);
+    },
     [handleFiles]
   );
+
+  const handleFolderSelect = () => {
+    folderInputRef.current?.click();
+  };
+
+  const handleFolderInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      handleFiles(e.target.files);
+    }
+    // Reset so same folder can be selected again
+    e.target.value = "";
+  };
 
   const totalRows = files.reduce((sum, f) => sum + f.rows.length, 0);
 
   return (
     <div className="space-y-4">
+      {/* Hidden folder input */}
+      <input
+        ref={folderInputRef}
+        type="file"
+        className="hidden"
+        // @ts-ignore - webkitdirectory is non-standard but widely supported
+        webkitdirectory=""
+        directory=""
+        multiple
+        onChange={handleFolderInput}
+      />
+
       <div
         onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
         onDragLeave={() => setIsDragging(false)}
         onDrop={onDrop}
-        className={`relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-10 transition-all cursor-pointer ${
+        className={`relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-10 transition-all ${
           isDragging ? "border-primary bg-primary/5 shadow-lg" : "border-border hover:border-primary/50 hover:bg-muted/30"
         }`}
-        onClick={() => {
-          const input = document.createElement("input");
-          input.type = "file"; input.multiple = true;
-          input.accept = ".csv,.xlsx,.xls,.vcf,.json,.txt";
-          input.onchange = (e) => { const t = e.target as HTMLInputElement; if (t.files) handleFiles(t.files); };
-          input.click();
-        }}
       >
         <div className={`h-14 w-14 rounded-full flex items-center justify-center mb-4 ${isDragging ? "bg-primary/10" : "bg-muted"}`}>
           <Upload className={`h-6 w-6 ${isDragging ? "text-primary" : "text-muted-foreground"}`} />
         </div>
         <p className="text-sm font-semibold text-foreground">
-          {isLoading ? "Procesando archivos..." : "Arrastrá archivos aquí o hacé clic"}
+          {isLoading ? "Procesando archivos..." : "Arrastrá archivos o carpetas aquí"}
         </p>
-        <p className="text-xs text-muted-foreground mt-1">CSV, Excel, VCF, JSON</p>
+        <p className="text-xs text-muted-foreground mt-1 mb-4">CSV, Excel, VCF, JSON — recorre subcarpetas automáticamente</p>
+
+        <div className="flex gap-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={(e) => {
+              e.stopPropagation();
+              const input = document.createElement("input");
+              input.type = "file"; input.multiple = true;
+              input.accept = ".csv,.xlsx,.xls,.vcf,.json,.txt";
+              input.onchange = (ev) => { const t = ev.target as HTMLInputElement; if (t.files) handleFiles(t.files); };
+              input.click();
+            }}
+          >
+            <Upload className="h-4 w-4 mr-1" />
+            Archivos
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={(e) => { e.stopPropagation(); handleFolderSelect(); }}
+          >
+            <FolderOpen className="h-4 w-4 mr-1" />
+            Carpeta
+          </Button>
+        </div>
       </div>
 
       {files.length > 0 && (

@@ -61,7 +61,6 @@ export function ProcessingPanel({ files, onProcessingComplete }: ProcessingPanel
       addLog("info", `${mapped}/${allColumns.length} columnas mapeadas automáticamente`);
     }
   }, [filesKey]);
-  }
 
   const handleMappingChange = (index: number, target: ContactField) => {
     setMappings((prev) => prev.map((m, i) => (i === index ? { ...m, target } : m)));

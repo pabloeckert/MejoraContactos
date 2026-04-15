@@ -277,7 +277,6 @@ export function ProcessingPanel({ files, onProcessingComplete }: ProcessingPanel
               </>
             )}
           </div>
-        <CardContent className="space-y-4">
           <Progress value={progress} className="h-2" />
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <StatCard label="Procesadas" value={stats.processedRows} total={stats.totalRows} />

@@ -36,7 +36,7 @@ serve(async (req) => {
     }
 
     // Process in batches of 30 to avoid token limits
-    const batchSize = 30;
+    const batchSize = 25;
     const allCleaned: RawContact[] = [];
 
     for (let i = 0; i < contacts.length; i += batchSize) {

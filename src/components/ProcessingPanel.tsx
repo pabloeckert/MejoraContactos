@@ -63,47 +63,65 @@ export function ProcessingPanel({ files, onProcessingComplete }: ProcessingPanel
     addLog("info", `🤖 Enviando ${contacts.length} contactos a IA para limpieza...`);
     setStats(prev => ({ ...prev, status: "cleaning" }));
 
-    try {
-      const payload = contacts.map(c => ({
-        firstName: c.firstName || "",
-        lastName: c.lastName || "",
-        whatsapp: c.whatsapp || "",
-        company: c.company || "",
-        jobTitle: c.jobTitle || "",
-        email: c.email || "",
-      }));
+    const BATCH_SIZE = 25;
+    const result = [...contacts];
+    let cleanedTotal = 0;
 
-      const { data, error } = await supabase.functions.invoke("clean-contacts", {
-        body: { contacts: payload },
-      });
+    for (let i = 0; i < contacts.length; i += BATCH_SIZE) {
+      if (stopRef.current) break;
 
-      if (error) {
-        addLog("warning", `IA no disponible: ${error.message}. Usando datos sin limpiar.`);
-        return contacts;
+      const batch = contacts.slice(i, i + BATCH_SIZE);
+      const batchNum = Math.floor(i / BATCH_SIZE) + 1;
+      const totalBatches = Math.ceil(contacts.length / BATCH_SIZE);
+      addLog("info", `🤖 Lote ${batchNum}/${totalBatches} (${batch.length} contactos)...`);
+
+      try {
+        const payload = batch.map(c => ({
+          firstName: c.firstName || "",
+          lastName: c.lastName || "",
+          whatsapp: c.whatsapp || "",
+          company: c.company || "",
+          jobTitle: c.jobTitle || "",
+          email: c.email || "",
+        }));
+
+        const { data, error } = await supabase.functions.invoke("clean-contacts", {
+          body: { contacts: payload },
+        });
+
+        if (error || data?.error) {
+          addLog("warning", `Lote ${batchNum}: ${error?.message || data?.error}. Sin limpiar.`);
+          continue;
+        }
+
+        const cleaned = data.contacts || [];
+        for (let j = 0; j < batch.length && j < cleaned.length; j++) {
+          result[i + j] = {
+            ...result[i + j],
+            firstName: cleaned[j]?.firstName || result[i + j].firstName || "",
+            lastName: cleaned[j]?.lastName || result[i + j].lastName || "",
+            whatsapp: cleaned[j]?.whatsapp || result[i + j].whatsapp || "",
+            company: cleaned[j]?.company || result[i + j].company || "",
+            jobTitle: cleaned[j]?.jobTitle || result[i + j].jobTitle || "",
+            email: cleaned[j]?.email || result[i + j].email || "",
+            aiCleaned: true,
+          };
+          cleanedTotal++;
+        }
+
+        setStats(prev => ({ ...prev, aiCleanedCount: cleanedTotal }));
+      } catch (err) {
+        addLog("warning", `Lote ${batchNum} error: ${err}. Sin limpiar.`);
       }
 
-      if (data?.error) {
-        addLog("warning", `IA: ${data.error}. Usando datos sin limpiar.`);
-        return contacts;
+      // Small delay between batches to avoid rate limits
+      if (i + BATCH_SIZE < contacts.length) {
+        await new Promise(r => setTimeout(r, 300));
       }
-
-      const cleaned = data.contacts || [];
-      addLog("success", `✨ IA limpió ${cleaned.length} contactos exitosamente`);
-
-      return contacts.map((original, i) => ({
-        ...original,
-        firstName: cleaned[i]?.firstName || original.firstName || "",
-        lastName: cleaned[i]?.lastName || original.lastName || "",
-        whatsapp: cleaned[i]?.whatsapp || original.whatsapp || "",
-        company: cleaned[i]?.company || original.company || "",
-        jobTitle: cleaned[i]?.jobTitle || original.jobTitle || "",
-        email: cleaned[i]?.email || original.email || "",
-        aiCleaned: true,
-      }));
-    } catch (err) {
-      addLog("warning", `Error de IA: ${err}. Usando datos sin limpiar.`);
-      return contacts;
     }
+
+    addLog("success", `✨ IA limpió ${cleanedTotal} contactos exitosamente`);
+    return result;
   };
 
   const startProcessing = useCallback(async () => {

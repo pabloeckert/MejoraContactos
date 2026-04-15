@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Play, Pause, Square, Loader2, Sparkles, Zap, Globe, Bot, BrainCircuit, CheckCircle2, XCircle, Clock } from "lucide-react";
+import { Play, Pause, Square, Loader2, Sparkles, Zap, Globe, Bot, BrainCircuit, CheckCircle2, XCircle, Clock, Wrench } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -9,6 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { ColumnMapper } from "./ColumnMapper";
 import { autoDetectMappings } from "@/lib/column-mapper";
 import { checkDuplicate } from "@/lib/dedup";
+import { batchRuleClean } from "@/lib/rule-cleaner";
 import { supabase } from "@/integrations/supabase/client";
 import type {
   ParsedFile,

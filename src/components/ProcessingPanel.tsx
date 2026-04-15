@@ -354,10 +354,12 @@ export function ProcessingPanel({ files, onProcessingComplete }: ProcessingPanel
           {isPipeline && (isActive || stats.status === "done") && (
             <div className="rounded-lg border bg-card/50 p-3">
               <p className="text-xs font-medium text-muted-foreground mb-3">Pipeline de procesamiento</p>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1 flex-wrap">
                 <PipelineStep icon={<Play className="h-3 w-3" />} label="Mapeo" state={pipelineState.mapping} />
                 <PipelineConnector active={pipelineState.mapping === "done"} />
-                <PipelineStep icon={<Zap className="h-3 w-3" />} label="Groq" sublabel="Limpieza" state={pipelineState.cleaning} />
+                <PipelineStep icon={<Wrench className="h-3 w-3" />} label="Reglas" sublabel="Limpieza rapida" state={pipelineState.rules} />
+                <PipelineConnector active={pipelineState.rules === "done"} />
+                <PipelineStep icon={<Zap className="h-3 w-3" />} label="Groq" sublabel="IA Limpieza" state={pipelineState.cleaning} />
                 <PipelineConnector active={pipelineState.cleaning === "done"} />
                 <PipelineStep icon={<Globe className="h-3 w-3" />} label="OpenRouter" sublabel="Verificacion" state={pipelineState.verifying} />
                 <PipelineConnector active={pipelineState.verifying === "done"} />

@@ -231,12 +231,40 @@ export function ProcessingPanel({ files, onProcessingComplete }: ProcessingPanel
       return;
     }
 
-    setPipelineState(prev => ({ ...prev, mapping: "done" }));
+    setPipelineState(prev => ({ ...prev, mapping: "done", rules: "active" }));
 
-    // Phase 2: AI cleaning
+    // Phase 2: Rule-based cleaning (fast, no AI)
+    addLog("info", `🔧 Limpieza por reglas de ${rawContacts.length} contactos...`);
+    const { cleaned: ruleCleaned, aiIndices } = batchRuleClean(rawContacts);
+
+    // Apply rule results
+    for (let i = 0; i < rawContacts.length; i++) {
+      rawContacts[i].firstName = ruleCleaned[i].firstName;
+      rawContacts[i].lastName = ruleCleaned[i].lastName;
+      rawContacts[i].email = ruleCleaned[i].email;
+      rawContacts[i].whatsapp = ruleCleaned[i].whatsapp;
+      rawContacts[i].company = ruleCleaned[i].company;
+      rawContacts[i].jobTitle = ruleCleaned[i].jobTitle;
+    }
+
+    const rulesOnly = rawContacts.length - aiIndices.length;
+    addLog("success", `✓ Reglas: ${rulesOnly} contactos limpios, ${aiIndices.length} necesitan IA`);
+    setPipelineState(prev => ({ ...prev, rules: "done" }));
+
+    // Phase 3: AI cleaning (only for contacts that need it)
     let cleanedContacts = rawContacts;
-    if (rawContacts.length > 0) {
-      cleanedContacts = await cleanWithAI(rawContacts);
+    if (aiIndices.length > 0) {
+      const aiContacts = aiIndices.map(i => rawContacts[i]);
+      addLog("info", `🤖 Enviando ${aiContacts.length}/${rawContacts.length} a IA (${Math.round(aiIndices.length/rawContacts.length*100)}%)`);
+      const aiCleaned = await cleanWithAI(aiContacts);
+      // Merge AI results back
+      for (let j = 0; j < aiIndices.length; j++) {
+        rawContacts[aiIndices[j]] = aiCleaned[j];
+      }
+      cleanedContacts = rawContacts;
+    } else {
+      addLog("info", "✓ Todos los contactos se limpiaron con reglas, IA omitida");
+      setPipelineState(prev => ({ ...prev, cleaning: "done", verifying: "done", correcting: "done" }));
     }
 
     // Phase 3: Dedup

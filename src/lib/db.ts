@@ -2,7 +2,7 @@ import { openDB, type IDBPDatabase } from "idb";
 import type { UnifiedContact } from "@/types/contact";
 
 const DB_NAME = "contact-unifier";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 let dbInstance: IDBPDatabase | null = null;
 
@@ -10,13 +10,13 @@ async function getDB() {
   if (dbInstance) return dbInstance;
   dbInstance = await openDB(DB_NAME, DB_VERSION, {
     upgrade(db) {
-      if (!db.objectStoreNames.contains("contacts")) {
-        const store = db.createObjectStore("contacts", { keyPath: "id" });
-        store.createIndex("email", "email", { unique: false });
-        store.createIndex("phone", "phone", { unique: false });
-        store.createIndex("country", "countryCode", { unique: false });
-        store.createIndex("source", "source", { unique: false });
+      if (db.objectStoreNames.contains("contacts")) {
+        db.deleteObjectStore("contacts");
       }
+      const store = db.createObjectStore("contacts", { keyPath: "id" });
+      store.createIndex("email", "email", { unique: false });
+      store.createIndex("whatsapp", "whatsapp", { unique: false });
+      store.createIndex("source", "source", { unique: false });
     },
   });
   return dbInstance;

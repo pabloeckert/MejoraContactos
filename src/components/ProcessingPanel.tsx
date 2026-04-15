@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from "react";
-import { Play, Pause, Square, Loader2 } from "lucide-react";
+import { Play, Pause, Square, Loader2, Sparkles } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -7,8 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ColumnMapper } from "./ColumnMapper";
 import { autoDetectMappings } from "@/lib/column-mapper";
-import { validatePhone } from "@/lib/phone-utils";
 import { checkDuplicate } from "@/lib/dedup";
+import { supabase } from "@/integrations/supabase/client";
 import type {
   ParsedFile,
   ColumnMapping,
@@ -28,7 +28,7 @@ export function ProcessingPanel({ files, onProcessingComplete }: ProcessingPanel
   const [mappings, setMappings] = useState<ColumnMapping[]>([]);
   const [stats, setStats] = useState<ProcessingStats>({
     totalRows: 0, processedRows: 0, uniqueContacts: 0, duplicatesFound: 0,
-    invalidPhones: 0, rowsPerSecond: 0, startTime: 0, status: "idle",
+    aiCleanedCount: 0, rowsPerSecond: 0, startTime: 0, status: "idle",
   });
   const [logs, setLogs] = useState<ProcessingLog[]>([]);
   const pauseRef = useRef(false);
@@ -59,94 +59,150 @@ export function ProcessingPanel({ files, onProcessingComplete }: ProcessingPanel
     setMappings((prev) => prev.map((m, i) => (i === index ? { ...m, target } : m)));
   };
 
+  const cleanWithAI = async (contacts: Partial<UnifiedContact>[]): Promise<Partial<UnifiedContact>[]> => {
+    addLog("info", `🤖 Enviando ${contacts.length} contactos a IA para limpieza...`);
+    setStats(prev => ({ ...prev, status: "cleaning" }));
+
+    try {
+      const payload = contacts.map(c => ({
+        firstName: c.firstName || "",
+        lastName: c.lastName || "",
+        whatsapp: c.whatsapp || "",
+        company: c.company || "",
+        jobTitle: c.jobTitle || "",
+        email: c.email || "",
+      }));
+
+      const { data, error } = await supabase.functions.invoke("clean-contacts", {
+        body: { contacts: payload },
+      });
+
+      if (error) {
+        addLog("warning", `IA no disponible: ${error.message}. Usando datos sin limpiar.`);
+        return contacts;
+      }
+
+      if (data?.error) {
+        addLog("warning", `IA: ${data.error}. Usando datos sin limpiar.`);
+        return contacts;
+      }
+
+      const cleaned = data.contacts || [];
+      addLog("success", `✨ IA limpió ${cleaned.length} contactos exitosamente`);
+
+      return contacts.map((original, i) => ({
+        ...original,
+        firstName: cleaned[i]?.firstName || original.firstName || "",
+        lastName: cleaned[i]?.lastName || original.lastName || "",
+        whatsapp: cleaned[i]?.whatsapp || original.whatsapp || "",
+        company: cleaned[i]?.company || original.company || "",
+        jobTitle: cleaned[i]?.jobTitle || original.jobTitle || "",
+        email: cleaned[i]?.email || original.email || "",
+        aiCleaned: true,
+      }));
+    } catch (err) {
+      addLog("warning", `Error de IA: ${err}. Usando datos sin limpiar.`);
+      return contacts;
+    }
+  };
+
   const startProcessing = useCallback(async () => {
     stopRef.current = false;
     pauseRef.current = false;
     const totalRows = allRows.length;
     const startTime = Date.now();
-    setStats({ totalRows, processedRows: 0, uniqueContacts: 0, duplicatesFound: 0, invalidPhones: 0, rowsPerSecond: 0, startTime, status: "processing" });
+    setStats({ totalRows, processedRows: 0, uniqueContacts: 0, duplicatesFound: 0, aiCleanedCount: 0, rowsPerSecond: 0, startTime, status: "processing" });
     addLog("info", `Iniciando procesamiento de ${totalRows} filas...`);
 
-    const contacts: UnifiedContact[] = [];
+    const rawContacts: Partial<UnifiedContact>[] = [];
     const activeMappings = mappings.filter((m) => m.target !== "ignore");
 
+    // Phase 1: Map columns
     for (let i = 0; i < allRows.length; i++) {
-      if (stopRef.current) { addLog("warning", "Procesamiento detenido por el usuario"); break; }
+      if (stopRef.current) { addLog("warning", "Procesamiento detenido"); break; }
       while (pauseRef.current) { await new Promise((r) => setTimeout(r, 100)); }
 
       const row = allRows[i];
       const contact: Partial<UnifiedContact> = {
         id: crypto.randomUUID(),
         source: files.find((f) => f.rows.includes(row))?.name || "unknown",
+        aiCleaned: false,
       };
 
       for (const mapping of activeMappings) {
         const val = row[mapping.source]?.trim() || "";
-        if (mapping.target === "fullName") {
-          const parts = val.split(/\s+/);
-          contact.firstName = parts[0] || "";
-          contact.lastName = parts.slice(1).join(" ") || "";
-        } else {
-          (contact as any)[mapping.target] = val;
-        }
+        (contact as any)[mapping.target] = val;
       }
 
       contact.firstName = contact.firstName || "";
       contact.lastName = contact.lastName || "";
-      contact.email = contact.email || "";
-      contact.phone = contact.phone || "";
-      contact.phone2 = contact.phone2 || "";
+      contact.whatsapp = contact.whatsapp || "";
       contact.company = contact.company || "";
       contact.jobTitle = contact.jobTitle || "";
-      contact.address = contact.address || "";
-      contact.city = contact.city || "";
-      contact.state = contact.state || "";
-      contact.country = contact.country || "";
-      contact.zip = contact.zip || "";
-      contact.notes = contact.notes || "";
-      contact.website = contact.website || "";
-      contact.birthday = contact.birthday || "";
+      contact.email = contact.email || "";
 
-      if (!contact.firstName && !contact.lastName && !contact.email && !contact.phone) continue;
+      // Skip completely empty rows
+      if (!contact.firstName && !contact.lastName && !contact.email && !contact.whatsapp) continue;
 
-      const phoneResult = validatePhone(contact.phone);
-      contact.phoneValid = phoneResult.valid;
-      contact.phoneFormatted = phoneResult.formatted;
-      contact.countryCode = phoneResult.country;
+      rawContacts.push(contact);
 
+      if (i % 50 === 0 || i === allRows.length - 1) {
+        const elapsed = (Date.now() - startTime) / 1000;
+        setStats(prev => ({
+          ...prev, processedRows: i + 1,
+          rowsPerSecond: Math.round((i + 1) / elapsed),
+        }));
+      }
+      if (i % 100 === 0) await new Promise((r) => setTimeout(r, 0));
+    }
+
+    if (stopRef.current) {
+      setStats(prev => ({ ...prev, status: "idle" }));
+      return;
+    }
+
+    // Phase 2: AI cleaning
+    let cleanedContacts = rawContacts;
+    if (rawContacts.length > 0) {
+      cleanedContacts = await cleanWithAI(rawContacts);
+    }
+
+    // Phase 3: Dedup
+    addLog("info", "Detectando duplicados...");
+    const contacts: UnifiedContact[] = [];
+    for (const raw of cleanedContacts) {
+      const contact = raw as UnifiedContact;
       const dedupResult = checkDuplicate(
-        { firstName: contact.firstName, lastName: contact.lastName, email: contact.email, phone: contact.phone },
+        { firstName: contact.firstName, lastName: contact.lastName, email: contact.email, whatsapp: contact.whatsapp },
         contacts
       );
       contact.isDuplicate = dedupResult.isDuplicate;
       contact.duplicateOf = dedupResult.duplicateOf;
       contact.confidence = dedupResult.confidence;
-
-      contacts.push(contact as UnifiedContact);
-
-      if (i % 50 === 0 || i === allRows.length - 1) {
-        const elapsed = (Date.now() - startTime) / 1000;
-        setStats({
-          totalRows, processedRows: i + 1,
-          uniqueContacts: contacts.filter((c) => !c.isDuplicate).length,
-          duplicatesFound: contacts.filter((c) => c.isDuplicate).length,
-          invalidPhones: contacts.filter((c) => !c.phoneValid && c.phone).length,
-          rowsPerSecond: Math.round((i + 1) / elapsed),
-          startTime, status: pauseRef.current ? "paused" : "processing",
-        });
-      }
-      if (i % 100 === 0) await new Promise((r) => setTimeout(r, 0));
+      contacts.push(contact);
     }
 
     const unique = contacts.filter((c) => !c.isDuplicate);
     const dupes = contacts.filter((c) => c.isDuplicate);
-    setStats((prev) => ({ ...prev, status: "done", processedRows: totalRows }));
-    addLog("success", `✓ Completado: ${unique.length} únicos, ${dupes.length} duplicados`);
+    const aiCount = contacts.filter((c) => c.aiCleaned).length;
+
+    setStats({
+      totalRows, processedRows: totalRows,
+      uniqueContacts: unique.length, duplicatesFound: dupes.length,
+      aiCleanedCount: aiCount,
+      rowsPerSecond: Math.round(totalRows / ((Date.now() - startTime) / 1000)),
+      startTime, status: "done",
+    });
+    addLog("success", `✓ Completado: ${unique.length} únicos, ${dupes.length} duplicados, ${aiCount} limpiados por IA`);
     toast.success(`Procesamiento completado: ${unique.length} contactos únicos`);
     onProcessingComplete(contacts);
   }, [allRows, files, mappings, addLog, onProcessingComplete]);
 
   const progress = stats.totalRows > 0 ? (stats.processedRows / stats.totalRows) * 100 : 0;
+  const statusLabel = {
+    idle: "Iniciar", processing: "Procesando...", cleaning: "🤖 IA limpiando...",
+    paused: "Pausado", done: "Reprocesar", error: "Error",
+  };
 
   return (
     <div className="space-y-4">
@@ -155,11 +211,16 @@ export function ProcessingPanel({ files, onProcessingComplete }: ProcessingPanel
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-sm flex items-center justify-between">
-            <span>Procesamiento</span>
+            <span className="flex items-center gap-2">
+              Procesamiento
+              <Badge variant="outline" className="text-[10px] gap-1">
+                <Sparkles className="h-3 w-3" /> IA integrada
+              </Badge>
+            </span>
             <div className="flex gap-2">
-              <Button size="sm" onClick={startProcessing} disabled={stats.status === "processing" || files.length === 0}>
-                {stats.status === "processing" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-                {stats.status === "idle" ? "Iniciar" : stats.status === "done" ? "Reprocesar" : "Procesando..."}
+              <Button size="sm" onClick={startProcessing} disabled={stats.status === "processing" || stats.status === "cleaning" || files.length === 0}>
+                {(stats.status === "processing" || stats.status === "cleaning") ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+                {statusLabel[stats.status]}
               </Button>
               {stats.status === "processing" && (
                 <>
@@ -178,9 +239,9 @@ export function ProcessingPanel({ files, onProcessingComplete }: ProcessingPanel
           <Progress value={progress} className="h-2" />
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <StatCard label="Procesadas" value={stats.processedRows} total={stats.totalRows} />
-            <StatCard label="Únicos" value={stats.uniqueContacts} color="text-success" />
-            <StatCard label="Duplicados" value={stats.duplicatesFound} color="text-accent-foreground" />
-            <StatCard label="Vel." value={`${stats.rowsPerSecond}/s`} />
+            <StatCard label="Únicos" value={stats.uniqueContacts} color="text-green-600" />
+            <StatCard label="Duplicados" value={stats.duplicatesFound} color="text-red-500" />
+            <StatCard label="IA Limpiados" value={stats.aiCleanedCount} color="text-blue-500" />
           </div>
         </CardContent>
       </Card>
@@ -201,8 +262,8 @@ export function ProcessingPanel({ files, onProcessingComplete }: ProcessingPanel
                     </Badge>
                     <span className={
                       log.type === "error" ? "text-destructive" :
-                      log.type === "success" ? "text-success" :
-                      log.type === "warning" ? "text-warning" : ""
+                      log.type === "success" ? "text-green-600" :
+                      log.type === "warning" ? "text-yellow-600" : ""
                     }>
                       {log.message}
                     </span>

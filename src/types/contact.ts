@@ -20,39 +20,19 @@ export interface ColumnMapping {
 export type ContactField =
   | "firstName"
   | "lastName"
-  | "fullName"
-  | "email"
-  | "phone"
-  | "phone2"
+  | "whatsapp"
   | "company"
   | "jobTitle"
-  | "address"
-  | "city"
-  | "state"
-  | "country"
-  | "zip"
-  | "notes"
-  | "website"
-  | "birthday"
+  | "email"
   | "ignore";
 
 export const CONTACT_FIELDS: { value: ContactField; label: string }[] = [
   { value: "firstName", label: "Nombre" },
   { value: "lastName", label: "Apellido" },
-  { value: "fullName", label: "Nombre completo" },
-  { value: "email", label: "Email" },
-  { value: "phone", label: "Teléfono" },
-  { value: "phone2", label: "Teléfono 2" },
+  { value: "whatsapp", label: "WhatsApp" },
   { value: "company", label: "Empresa" },
   { value: "jobTitle", label: "Cargo" },
-  { value: "address", label: "Dirección" },
-  { value: "city", label: "Ciudad" },
-  { value: "state", label: "Estado/Provincia" },
-  { value: "country", label: "País" },
-  { value: "zip", label: "Código postal" },
-  { value: "notes", label: "Notas" },
-  { value: "website", label: "Sitio web" },
-  { value: "birthday", label: "Cumpleaños" },
+  { value: "email", label: "Email" },
   { value: "ignore", label: "⊘ Ignorar" },
 ];
 
@@ -60,26 +40,15 @@ export interface UnifiedContact {
   id: string;
   firstName: string;
   lastName: string;
-  email: string;
-  phone: string;
-  phone2: string;
+  whatsapp: string;
   company: string;
   jobTitle: string;
-  address: string;
-  city: string;
-  state: string;
-  country: string;
-  zip: string;
-  notes: string;
-  website: string;
-  birthday: string;
+  email: string;
   source: string;
-  confidence: number; // 0-100
   isDuplicate: boolean;
   duplicateOf?: string;
-  phoneValid: boolean;
-  phoneFormatted: string;
-  countryCode: string;
+  confidence: number;
+  aiCleaned: boolean;
 }
 
 export interface ProcessingStats {
@@ -87,10 +56,10 @@ export interface ProcessingStats {
   processedRows: number;
   uniqueContacts: number;
   duplicatesFound: number;
-  invalidPhones: number;
+  aiCleanedCount: number;
   rowsPerSecond: number;
   startTime: number;
-  status: "idle" | "processing" | "paused" | "done" | "error";
+  status: "idle" | "processing" | "cleaning" | "paused" | "done" | "error";
 }
 
 export interface ProcessingLog {

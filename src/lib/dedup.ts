@@ -1,4 +1,3 @@
-// Jaro-Winkler similarity for fuzzy dedup
 function jaroWinkler(s1: string, s2: string): number {
   if (s1 === s2) return 1;
   if (!s1.length || !s2.length) return 0;
@@ -59,8 +58,8 @@ export interface DedupResult {
 }
 
 export function checkDuplicate(
-  contact: { firstName: string; lastName: string; email: string; phone: string },
-  existing: Array<{ id: string; firstName: string; lastName: string; email: string; phone: string }>,
+  contact: { firstName: string; lastName: string; email: string; whatsapp: string },
+  existing: Array<{ id: string; firstName: string; lastName: string; email: string; whatsapp: string }>,
   threshold = 0.88
 ): DedupResult {
   // Exact email match
@@ -73,12 +72,12 @@ export function checkDuplicate(
     }
   }
 
-  // Exact phone match
-  if (contact.phone) {
-    const cleanPhone = contact.phone.replace(/[^\d]/g, "");
+  // Exact WhatsApp match
+  if (contact.whatsapp) {
+    const cleanPhone = contact.whatsapp.replace(/[^\d]/g, "");
     if (cleanPhone.length >= 7) {
       const phoneMatch = existing.find((e) => {
-        const ep = e.phone.replace(/[^\d]/g, "");
+        const ep = e.whatsapp.replace(/[^\d]/g, "");
         return ep.length >= 7 && (ep.endsWith(cleanPhone.slice(-7)) || cleanPhone.endsWith(ep.slice(-7)));
       });
       if (phoneMatch) {

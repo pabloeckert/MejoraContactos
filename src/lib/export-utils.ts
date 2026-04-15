@@ -3,21 +3,12 @@ import type { UnifiedContact } from "@/types/contact";
 
 function contactToRow(c: UnifiedContact) {
   return {
-    "First Name": c.firstName,
-    "Last Name": c.lastName,
-    "E-mail 1 - Value": c.email,
-    "Phone 1 - Value": c.phoneFormatted || c.phone,
-    "Phone 2 - Value": c.phone2,
-    "Organization 1 - Name": c.company,
-    "Organization 1 - Title": c.jobTitle,
-    Address: c.address,
-    City: c.city,
-    State: c.state,
-    Country: c.country,
-    "Postal Code": c.zip,
-    Notes: c.notes,
-    Website: c.website,
-    Birthday: c.birthday,
+    Nombre: c.firstName,
+    Apellido: c.lastName,
+    WhatsApp: c.whatsapp,
+    Empresa: c.company,
+    Cargo: c.jobTitle,
+    Email: c.email,
   };
 }
 
@@ -57,12 +48,9 @@ export function exportVCF(contacts: UnifiedContact[]): string {
         `FN:${c.firstName} ${c.lastName}`.trim(),
       ];
       if (c.email) lines.push(`EMAIL;TYPE=INTERNET:${c.email}`);
-      if (c.phone) lines.push(`TEL;TYPE=CELL:${c.phoneFormatted || c.phone}`);
-      if (c.phone2) lines.push(`TEL;TYPE=WORK:${c.phone2}`);
+      if (c.whatsapp) lines.push(`TEL;TYPE=CELL:${c.whatsapp}`);
       if (c.company) lines.push(`ORG:${c.company}`);
       if (c.jobTitle) lines.push(`TITLE:${c.jobTitle}`);
-      if (c.notes) lines.push(`NOTE:${c.notes}`);
-      if (c.website) lines.push(`URL:${c.website}`);
       lines.push("END:VCARD");
       return lines.join("\r\n");
     })

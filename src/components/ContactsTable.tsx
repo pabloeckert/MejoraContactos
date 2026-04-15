@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { Search, Filter, Edit, Trash2 } from "lucide-react";
+import { Search, Edit, Trash2, Sparkles } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -18,23 +18,23 @@ interface ContactsTableProps {
 
 export function ContactsTable({ contacts, onUpdateContact, onDeleteContact }: ContactsTableProps) {
   const [search, setSearch] = useState("");
-  const [filterDupes, setFilterDupes] = useState<string>("all");
+  const [filterType, setFilterType] = useState<string>("unique");
   const [editContact, setEditContact] = useState<UnifiedContact | null>(null);
   const parentRef = useRef<HTMLDivElement>(null);
 
   const filtered = useMemo(() => {
     let result = contacts;
-    if (filterDupes === "unique") result = result.filter((c) => !c.isDuplicate);
-    else if (filterDupes === "dupes") result = result.filter((c) => c.isDuplicate);
+    if (filterType === "unique") result = result.filter((c) => !c.isDuplicate);
+    else if (filterType === "dupes") result = result.filter((c) => c.isDuplicate);
+    else if (filterType === "ai") result = result.filter((c) => c.aiCleaned);
     if (search) {
       const q = search.toLowerCase();
       result = result.filter((c) =>
-        c.firstName.toLowerCase().includes(q) || c.lastName.toLowerCase().includes(q) ||
-        c.email.toLowerCase().includes(q) || c.phone.includes(q) || c.company.toLowerCase().includes(q)
+        `${c.firstName} ${c.lastName} ${c.email} ${c.whatsapp} ${c.company} ${c.jobTitle}`.toLowerCase().includes(q)
       );
     }
     return result;
-  }, [contacts, search, filterDupes]);
+  }, [contacts, search, filterType]);
 
   const virtualizer = useVirtualizer({
     count: filtered.length,
@@ -43,12 +43,6 @@ export function ContactsTable({ contacts, onUpdateContact, onDeleteContact }: Co
     overscan: 20,
   });
 
-  const confidenceBadge = (score: number) => {
-    if (score >= 90) return <Badge className="bg-success/15 text-success border-success/30 text-[10px]">{score}%</Badge>;
-    if (score >= 70) return <Badge className="bg-warning/15 text-warning border-warning/30 text-[10px]">{score}%</Badge>;
-    return <Badge className="bg-destructive/15 text-destructive border-destructive/30 text-[10px]">{score}%</Badge>;
-  };
-
   return (
     <div className="space-y-3">
       <div className="flex flex-col sm:flex-row gap-2">
@@ -56,15 +50,15 @@ export function ContactsTable({ contacts, onUpdateContact, onDeleteContact }: Co
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input placeholder="Buscar contactos..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 h-9" />
         </div>
-        <Select value={filterDupes} onValueChange={setFilterDupes}>
-          <SelectTrigger className="w-[140px] h-9 text-xs">
-            <Filter className="h-3 w-3 mr-1" />
+        <Select value={filterType} onValueChange={setFilterType}>
+          <SelectTrigger className="w-[160px] h-9 text-xs">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todos ({contacts.length})</SelectItem>
             <SelectItem value="unique">Únicos ({contacts.filter((c) => !c.isDuplicate).length})</SelectItem>
             <SelectItem value="dupes">Duplicados ({contacts.filter((c) => c.isDuplicate).length})</SelectItem>
+            <SelectItem value="ai">IA Limpiados ({contacts.filter((c) => c.aiCleaned).length})</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -74,11 +68,13 @@ export function ContactsTable({ contacts, onUpdateContact, onDeleteContact }: Co
           <CardTitle className="text-sm">{filtered.length.toLocaleString()} contactos</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="grid grid-cols-[1fr_1fr_1fr_80px_60px] gap-2 px-4 py-2 text-xs font-medium text-muted-foreground border-b bg-muted/30">
+          <div className="grid grid-cols-[1fr_1fr_1fr_1fr_1fr_1fr_60px] gap-2 px-4 py-2 text-xs font-medium text-muted-foreground border-b bg-muted/30">
             <span>Nombre</span>
-            <span>Email / Teléfono</span>
+            <span>Apellido</span>
+            <span>WhatsApp</span>
             <span>Empresa</span>
-            <span>Score</span>
+            <span>Cargo</span>
+            <span>Email</span>
             <span></span>
           </div>
           <div ref={parentRef} className="h-[400px] overflow-auto">
@@ -89,21 +85,17 @@ export function ContactsTable({ contacts, onUpdateContact, onDeleteContact }: Co
                   <div
                     key={c.id}
                     style={{ position: "absolute", top: 0, left: 0, width: "100%", height: `${vItem.size}px`, transform: `translateY(${vItem.start}px)` }}
-                    className={`grid grid-cols-[1fr_1fr_1fr_80px_60px] gap-2 px-4 items-center text-sm border-b border-border/50 hover:bg-muted/40 ${c.isDuplicate ? "opacity-50" : ""}`}
+                    className={`grid grid-cols-[1fr_1fr_1fr_1fr_1fr_1fr_60px] gap-2 px-4 items-center text-xs border-b border-border/50 hover:bg-muted/40 ${c.isDuplicate ? "opacity-50" : ""}`}
                   >
-                    <div className="truncate">
-                      <span className="font-medium text-foreground">{c.firstName} {c.lastName}</span>
-                      {c.isDuplicate && <Badge variant="outline" className="ml-1 text-[9px] text-warning border-warning/40">DUP</Badge>}
-                    </div>
-                    <div className="truncate text-xs">
-                      <div className="truncate text-foreground">{c.email}</div>
-                      <div className="text-muted-foreground truncate">
-                        {c.phoneFormatted || c.phone}
-                        {c.phone && !c.phoneValid && <span className="text-destructive ml-1">⚠</span>}
-                      </div>
-                    </div>
-                    <div className="truncate text-xs text-muted-foreground">{c.company}</div>
-                    <div>{confidenceBadge(c.confidence)}</div>
+                    <span className="truncate font-medium flex items-center gap-1">
+                      {c.firstName}
+                      {c.aiCleaned && <Sparkles className="h-3 w-3 text-blue-500 shrink-0" />}
+                    </span>
+                    <span className="truncate">{c.lastName}</span>
+                    <span className="truncate font-mono text-[11px]">{c.whatsapp}</span>
+                    <span className="truncate">{c.company}</span>
+                    <span className="truncate">{c.jobTitle}</span>
+                    <span className="truncate">{c.email}</span>
                     <div className="flex gap-1">
                       <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setEditContact(c)}>
                         <Edit className="h-3 w-3" />
@@ -121,7 +113,7 @@ export function ContactsTable({ contacts, onUpdateContact, onDeleteContact }: Co
       </Card>
 
       <Dialog open={!!editContact} onOpenChange={() => setEditContact(null)}>
-        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Editar contacto</DialogTitle>
           </DialogHeader>
@@ -135,12 +127,12 @@ export function ContactsTable({ contacts, onUpdateContact, onDeleteContact }: Co
 function EditForm({ contact, onSave }: { contact: UnifiedContact; onSave: (c: UnifiedContact) => void }) {
   const [form, setForm] = useState(contact);
   const fields: Array<{ key: keyof UnifiedContact; label: string }> = [
-    { key: "firstName", label: "Nombre" }, { key: "lastName", label: "Apellido" },
-    { key: "email", label: "Email" }, { key: "phone", label: "Teléfono" },
-    { key: "phone2", label: "Teléfono 2" }, { key: "company", label: "Empresa" },
-    { key: "jobTitle", label: "Cargo" }, { key: "address", label: "Dirección" },
-    { key: "city", label: "Ciudad" }, { key: "country", label: "País" },
-    { key: "notes", label: "Notas" },
+    { key: "firstName", label: "Nombre" },
+    { key: "lastName", label: "Apellido" },
+    { key: "whatsapp", label: "WhatsApp" },
+    { key: "company", label: "Empresa" },
+    { key: "jobTitle", label: "Cargo" },
+    { key: "email", label: "Email" },
   ];
   return (
     <div className="space-y-3">

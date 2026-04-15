@@ -26,7 +26,7 @@ interface ProcessingPanelProps {
 }
 
 export function ProcessingPanel({ files, onProcessingComplete }: ProcessingPanelProps) {
-  const [aiProvider, setAiProvider] = useState<string>("groq");
+  const [aiProvider, setAiProvider] = useState<string>("pipeline");
   const [mappings, setMappings] = useState<ColumnMapping[]>([]);
   const [stats, setStats] = useState<ProcessingStats>({
     totalRows: 0, processedRows: 0, uniqueContacts: 0, duplicatesFound: 0,

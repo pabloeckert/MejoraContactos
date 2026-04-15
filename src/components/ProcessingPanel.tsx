@@ -88,7 +88,7 @@ export function ProcessingPanel({ files, onProcessingComplete }: ProcessingPanel
         }));
 
         const { data, error } = await supabase.functions.invoke("clean-contacts", {
-          body: { contacts: payload },
+          body: { contacts: payload, provider: aiProvider },
         });
 
         if (error || data?.error) {

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Play, Pause, Square, Loader2, Sparkles, Zap, Globe, Bot, BrainCircuit } from "lucide-react";
+import { Play, Pause, Square, Loader2, Sparkles, Zap, Globe, Bot, BrainCircuit, CheckCircle2, XCircle, Clock } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -25,9 +25,28 @@ interface ProcessingPanelProps {
   onProcessingComplete: (contacts: UnifiedContact[]) => void;
 }
 
+type PipelineStage = "idle" | "active" | "done" | "error";
+
+interface PipelineState {
+  mapping: PipelineStage;
+  cleaning: PipelineStage;
+  verifying: PipelineStage;
+  correcting: PipelineStage;
+  dedup: PipelineStage;
+}
+
+const INITIAL_PIPELINE: PipelineState = {
+  mapping: "idle",
+  cleaning: "idle",
+  verifying: "idle",
+  correcting: "idle",
+  dedup: "idle",
+};
+
 export function ProcessingPanel({ files, onProcessingComplete }: ProcessingPanelProps) {
   const [aiProvider, setAiProvider] = useState<string>("pipeline");
   const [mappings, setMappings] = useState<ColumnMapping[]>([]);
+  const [pipelineState, setPipelineState] = useState<PipelineState>(INITIAL_PIPELINE);
   const [stats, setStats] = useState<ProcessingStats>({
     totalRows: 0, processedRows: 0, uniqueContacts: 0, duplicatesFound: 0,
     aiCleanedCount: 0, rowsPerSecond: 0, startTime: 0, status: "idle",
@@ -39,7 +58,6 @@ export function ProcessingPanel({ files, onProcessingComplete }: ProcessingPanel
   const allColumns = useMemo(() => [...new Set(files.flatMap((f) => f.columns))], [files]);
   const allRowsRef = useRef<Record<string, string>[]>([]);
   
-  // Only rebuild allRowsRef.current when files change (avoid 200k+ array on every render)
   const filesKey = useMemo(() => files.map(f => f.id).join(","), [files]);
   useMemo(() => {
     allRowsRef.current = files.flatMap((f) => f.rows);
@@ -52,13 +70,12 @@ export function ProcessingPanel({ files, onProcessingComplete }: ProcessingPanel
     ]);
   }, []);
 
-  // Auto-detect mappings when files change
   useEffect(() => {
     if (files.length > 0 && mappings.length === 0) {
       const detected = autoDetectMappings(allColumns);
       setMappings(detected);
       const mapped = detected.filter((m) => m.target !== "ignore").length;
-      addLog("info", `${mapped}/${allColumns.length} columnas mapeadas automáticamente`);
+      addLog("info", `${mapped}/${allColumns.length} columnas mapeadas automaticamente`);
     }
   }, [filesKey]);
 
@@ -70,7 +87,12 @@ export function ProcessingPanel({ files, onProcessingComplete }: ProcessingPanel
     addLog("info", `🤖 Enviando ${contacts.length} contactos a IA para limpieza...`);
     setStats(prev => ({ ...prev, status: "cleaning" }));
 
-    const BATCH_SIZE = 25;
+    const isPipeline = aiProvider === "pipeline";
+    if (isPipeline) {
+      setPipelineState(prev => ({ ...prev, cleaning: "active" }));
+    }
+
+    const BATCH_SIZE = isPipeline ? 20 : 25;
     const result = [...contacts];
     let cleanedTotal = 0;
 
@@ -101,10 +123,22 @@ export function ProcessingPanel({ files, onProcessingComplete }: ProcessingPanel
           continue;
         }
 
-        // Show pipeline stages if available
+        // Show pipeline stages visually
         if (data.stages && Array.isArray(data.stages)) {
           for (const stage of data.stages) {
             addLog("info", `   ⚙️ ${stage}`);
+            // Update pipeline visual based on stage content
+            if (stage.includes("Limpieza")) {
+              setPipelineState(prev => ({ ...prev, cleaning: stage.includes("FALLO") ? "error" : "done" }));
+              if (!stage.includes("FALLO")) setPipelineState(prev => ({ ...prev, verifying: "active" }));
+            }
+            if (stage.includes("Verificacion")) {
+              setPipelineState(prev => ({ ...prev, verifying: stage.includes("FALLO") ? "error" : "done" }));
+              if (!stage.includes("FALLO")) setPipelineState(prev => ({ ...prev, correcting: "active" }));
+            }
+            if (stage.includes("Correccion")) {
+              setPipelineState(prev => ({ ...prev, correcting: stage.includes("FALLO") ? "error" : "done" }));
+            }
           }
         }
 
@@ -128,13 +162,12 @@ export function ProcessingPanel({ files, onProcessingComplete }: ProcessingPanel
         addLog("warning", `Lote ${batchNum} error: ${err}. Sin limpiar.`);
       }
 
-      // Small delay between batches to avoid rate limits
       if (i + BATCH_SIZE < contacts.length) {
         await new Promise(r => setTimeout(r, 300));
       }
     }
 
-    addLog("success", `✨ IA limpió ${cleanedTotal} contactos exitosamente`);
+    addLog("success", `✨ IA limpio ${cleanedTotal} contactos exitosamente`);
     return result;
   };
 
@@ -143,6 +176,7 @@ export function ProcessingPanel({ files, onProcessingComplete }: ProcessingPanel
     pauseRef.current = false;
     const totalRows = allRowsRef.current.length;
     const startTime = Date.now();
+    setPipelineState({ ...INITIAL_PIPELINE, mapping: "active" });
     setStats({ totalRows, processedRows: 0, uniqueContacts: 0, duplicatesFound: 0, aiCleanedCount: 0, rowsPerSecond: 0, startTime, status: "processing" });
     addLog("info", `Iniciando procesamiento de ${totalRows} filas...`);
 
@@ -162,7 +196,8 @@ export function ProcessingPanel({ files, onProcessingComplete }: ProcessingPanel
       };
 
       for (const mapping of activeMappings) {
-        const val = row[mapping.source]?.trim() || "";
+        const rawVal = row[mapping.source];
+        const val = typeof rawVal === "string" ? rawVal.trim() : String(rawVal ?? "");
         (contact as any)[mapping.target] = val;
       }
 
@@ -173,7 +208,6 @@ export function ProcessingPanel({ files, onProcessingComplete }: ProcessingPanel
       contact.jobTitle = contact.jobTitle || "";
       contact.email = contact.email || "";
 
-      // Skip completely empty rows
       if (!contact.firstName && !contact.lastName && !contact.email && !contact.whatsapp) continue;
 
       rawContacts.push(contact);
@@ -190,8 +224,11 @@ export function ProcessingPanel({ files, onProcessingComplete }: ProcessingPanel
 
     if (stopRef.current) {
       setStats(prev => ({ ...prev, status: "idle" }));
+      setPipelineState(INITIAL_PIPELINE);
       return;
     }
+
+    setPipelineState(prev => ({ ...prev, mapping: "done" }));
 
     // Phase 2: AI cleaning
     let cleanedContacts = rawContacts;
@@ -200,6 +237,7 @@ export function ProcessingPanel({ files, onProcessingComplete }: ProcessingPanel
     }
 
     // Phase 3: Dedup
+    setPipelineState(prev => ({ ...prev, dedup: "active" }));
     addLog("info", "Detectando duplicados...");
     const contacts: UnifiedContact[] = [];
     for (const raw of cleanedContacts) {
@@ -214,6 +252,8 @@ export function ProcessingPanel({ files, onProcessingComplete }: ProcessingPanel
       contacts.push(contact);
     }
 
+    setPipelineState(prev => ({ ...prev, dedup: "done" }));
+
     const unique = contacts.filter((c) => !c.isDuplicate);
     const dupes = contacts.filter((c) => c.isDuplicate);
     const aiCount = contacts.filter((c) => c.aiCleaned).length;
@@ -225,8 +265,8 @@ export function ProcessingPanel({ files, onProcessingComplete }: ProcessingPanel
       rowsPerSecond: Math.round(totalRows / ((Date.now() - startTime) / 1000)),
       startTime, status: "done",
     });
-    addLog("success", `✓ Completado: ${unique.length} únicos, ${dupes.length} duplicados, ${aiCount} limpiados por IA`);
-    toast.success(`Procesamiento completado: ${unique.length} contactos únicos`);
+    addLog("success", `✓ Completado: ${unique.length} unicos, ${dupes.length} duplicados, ${aiCount} limpiados por IA`);
+    toast.success(`Procesamiento completado: ${unique.length} contactos unicos`);
     onProcessingComplete(contacts);
   }, [files, mappings, addLog, onProcessingComplete, aiProvider]);
 
@@ -235,6 +275,9 @@ export function ProcessingPanel({ files, onProcessingComplete }: ProcessingPanel
     idle: "Iniciar", processing: "Procesando...", cleaning: "🤖 IA limpiando...",
     paused: "Pausado", done: "Reprocesar", error: "Error",
   };
+
+  const isActive = stats.status === "processing" || stats.status === "cleaning";
+  const isPipeline = aiProvider === "pipeline";
 
   return (
     <div className="space-y-4">
@@ -276,9 +319,42 @@ export function ProcessingPanel({ files, onProcessingComplete }: ProcessingPanel
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Pipeline visual tracker */}
+          {isPipeline && (isActive || stats.status === "done") && (
+            <div className="rounded-lg border bg-card/50 p-3">
+              <p className="text-xs font-medium text-muted-foreground mb-3">Pipeline de procesamiento</p>
+              <div className="flex items-center gap-1">
+                <PipelineStep icon={<Play className="h-3 w-3" />} label="Mapeo" state={pipelineState.mapping} />
+                <PipelineConnector active={pipelineState.mapping === "done"} />
+                <PipelineStep icon={<Zap className="h-3 w-3" />} label="Groq" sublabel="Limpieza" state={pipelineState.cleaning} />
+                <PipelineConnector active={pipelineState.cleaning === "done"} />
+                <PipelineStep icon={<Globe className="h-3 w-3" />} label="OpenRouter" sublabel="Verificacion" state={pipelineState.verifying} />
+                <PipelineConnector active={pipelineState.verifying === "done"} />
+                <PipelineStep icon={<Bot className="h-3 w-3" />} label="Lovable" sublabel="Correccion" state={pipelineState.correcting} />
+                <PipelineConnector active={pipelineState.correcting === "done"} />
+                <PipelineStep icon={<CheckCircle2 className="h-3 w-3" />} label="Dedup" state={pipelineState.dedup} />
+              </div>
+            </div>
+          )}
+
+          {/* Single provider visual */}
+          {!isPipeline && isActive && (
+            <div className="rounded-lg border bg-card/50 p-3">
+              <div className="flex items-center gap-2 text-xs">
+                <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                <span className="text-muted-foreground">
+                  {stats.status === "cleaning" ? "IA procesando contactos..." : "Mapeando columnas..."}
+                </span>
+                {stats.aiCleanedCount > 0 && (
+                  <Badge variant="outline" className="text-[10px]">{stats.aiCleanedCount} limpiados</Badge>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="flex gap-2 justify-end">
-            <Button size="sm" onClick={startProcessing} disabled={stats.status === "processing" || stats.status === "cleaning" || files.length === 0}>
-              {(stats.status === "processing" || stats.status === "cleaning") ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+            <Button size="sm" onClick={startProcessing} disabled={isActive || files.length === 0}>
+              {isActive ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
               {statusLabel[stats.status]}
             </Button>
             {stats.status === "processing" && (
@@ -295,7 +371,7 @@ export function ProcessingPanel({ files, onProcessingComplete }: ProcessingPanel
           <Progress value={progress} className="h-2" />
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <StatCard label="Procesadas" value={stats.processedRows} total={stats.totalRows} />
-            <StatCard label="Únicos" value={stats.uniqueContacts} color="text-green-600" />
+            <StatCard label="Unicos" value={stats.uniqueContacts} color="text-green-600" />
             <StatCard label="Duplicados" value={stats.duplicatesFound} color="text-red-500" />
             <StatCard label="IA Limpiados" value={stats.aiCleanedCount} color="text-blue-500" />
           </div>
@@ -331,6 +407,36 @@ export function ProcessingPanel({ files, onProcessingComplete }: ProcessingPanel
         </Card>
       )}
     </div>
+  );
+}
+
+function PipelineStep({ icon, label, sublabel, state }: { icon: React.ReactNode; label: string; sublabel?: string; state: PipelineStage }) {
+  const stateStyles: Record<PipelineStage, string> = {
+    idle: "border-muted bg-muted/30 text-muted-foreground",
+    active: "border-primary bg-primary/10 text-primary ring-2 ring-primary/30 animate-pulse",
+    done: "border-green-500 bg-green-500/10 text-green-500",
+    error: "border-red-500 bg-red-500/10 text-red-500",
+  };
+
+  const stateIcon = state === "done" ? <CheckCircle2 className="h-3 w-3" /> :
+                    state === "error" ? <XCircle className="h-3 w-3" /> :
+                    state === "active" ? <Loader2 className="h-3 w-3 animate-spin" /> :
+                    <Clock className="h-3 w-3" />;
+
+  return (
+    <div className={`flex flex-col items-center gap-1 px-1.5 py-1.5 rounded-lg border transition-all duration-300 min-w-[52px] ${stateStyles[state]}`}>
+      <div className="flex items-center gap-1">
+        {stateIcon}
+      </div>
+      <span className="text-[9px] font-medium leading-none">{label}</span>
+      {sublabel && <span className="text-[8px] opacity-70 leading-none">{sublabel}</span>}
+    </div>
+  );
+}
+
+function PipelineConnector({ active }: { active: boolean }) {
+  return (
+    <div className={`h-0.5 w-3 shrink-0 rounded-full transition-colors duration-500 ${active ? "bg-green-500" : "bg-muted"}`} />
   );
 }
 

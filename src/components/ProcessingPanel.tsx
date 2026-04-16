@@ -186,6 +186,14 @@ export function ProcessingPanel({ files, onProcessingComplete }: ProcessingPanel
     const rawContacts: Partial<UnifiedContact>[] = [];
     const activeMappings = mappings.filter((m) => m.target !== "ignore");
 
+    // Build a lookup map: row reference → file name (avoids O(n) find per row)
+    const rowSourceMap = new WeakMap<Record<string, string>, string>();
+    for (const f of files) {
+      for (const row of f.rows) {
+        rowSourceMap.set(row, f.name);
+      }
+    }
+
     // Phase 1: Map columns — yield every 500 rows to prevent browser hang
     const CHUNK_SIZE = 500;
     for (let i = 0; i < allRowsRef.current.length; i++) {

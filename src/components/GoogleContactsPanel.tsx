@@ -48,7 +48,8 @@ export function GoogleContactsPanel({ onContactsImported }: GoogleContactsPanelP
       const { data, error } = await supabase.functions.invoke("google-contacts-auth", {
         body: { action: "auth_url", redirectUri: REDIRECT_URI },
       });
-      if (error || data?.error) throw new Error(data?.error || error?.message);
+      if (error) throw new Error(error.message);
+      if (!data?.ok) throw new Error(data?.error || "Failed to get auth URL");
       window.location.href = data.authUrl;
     } catch (err: any) {
       toast.error(`Error: ${err.message}`);

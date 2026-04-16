@@ -25,6 +25,7 @@ import { toast } from "sonner";
 interface ProcessingPanelProps {
   files: ParsedFile[];
   onProcessingComplete: (contacts: UnifiedContact[]) => void;
+  onResetAll?: () => void;
 }
 
 type PipelineStage = "idle" | "active" | "done" | "error";

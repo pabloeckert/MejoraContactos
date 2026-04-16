@@ -9,8 +9,9 @@ import { DashboardPanel } from "@/components/DashboardPanel";
 import { saveContacts, updateContact, deleteContact, clearContacts } from "@/lib/db";
 import type { ParsedFile, UnifiedContact } from "@/types/contact";
 import { toast } from "sonner";
-import { Upload, Zap, Users, Download, BarChart3 } from "lucide-react";
+import { Upload, Zap, Users, Download, BarChart3, Settings } from "lucide-react";
 import { GoogleContactsPanel } from "@/components/GoogleContactsPanel";
+import { ApiKeysPanel } from "@/components/ApiKeysPanel";
 
 const Index = () => {
   const [files, setFiles] = useState<ParsedFile[]>([]);
@@ -90,7 +91,7 @@ const Index = () => {
       {/* Main */}
       <main className="flex-1 container px-4 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="w-full grid grid-cols-5 h-11 bg-muted/50">
+          <TabsList className="w-full grid grid-cols-6 h-11 bg-muted/50">
             <TabsTrigger value="import" className="text-xs gap-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Upload className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">Importar</span>
@@ -110,6 +111,10 @@ const Index = () => {
             <TabsTrigger value="dashboard" className="text-xs gap-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <BarChart3 className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">Dashboard</span>
+            </TabsTrigger>
+            <TabsTrigger value="settings" className="text-xs gap-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Settings className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Config</span>
             </TabsTrigger>
           </TabsList>
 
@@ -150,6 +155,10 @@ const Index = () => {
 
           <TabsContent value="dashboard">
             <DashboardPanel contacts={contacts} />
+          </TabsContent>
+
+          <TabsContent value="settings">
+            <ApiKeysPanel />
           </TabsContent>
         </Tabs>
       </main>

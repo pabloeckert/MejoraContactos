@@ -15,7 +15,7 @@ interface RawContact {
   email?: string;
 }
 
-type Provider = "lovable" | "groq" | "openrouter" | "pipeline";
+type Provider = "lovable" | "groq" | "openrouter" | "together" | "cerebras" | "deepinfra" | "sambanova" | "mistral" | "deepseek" | "pipeline";
 
 interface ProviderConfig {
   url: string;
@@ -24,45 +24,60 @@ interface ProviderConfig {
   name: string;
 }
 
-function getProviderConfig(provider: Exclude<Provider, "pipeline">): ProviderConfig {
+function getProviderConfig(provider: Exclude<Provider, "pipeline">, customKeys?: Record<string, string>): ProviderConfig {
+  const customKey = customKeys?.[provider];
+
   switch (provider) {
     case "groq": {
-      const key = Deno.env.get("GROQ_API_KEY");
-      if (!key) throw new Error("GROQ_API_KEY no configurada");
-      return {
-        url: "https://api.groq.com/openai/v1/chat/completions",
-        apiKey: key,
-        model: "llama-3.3-70b-versatile",
-        name: "Groq (Llama 3.3 70B)",
-      };
+      const key = customKey || Deno.env.get("GROQ_API_KEY");
+      if (!key) throw new Error("GROQ_API_KEY no configurada. Agregá tu key en Configuración.");
+      return { url: "https://api.groq.com/openai/v1/chat/completions", apiKey: key, model: "llama-3.3-70b-versatile", name: "Groq (Llama 3.3 70B)" };
     }
     case "openrouter": {
-      const key = Deno.env.get("OPENROUTER_API_KEY");
+      const key = customKey || Deno.env.get("OPENROUTER_API_KEY");
       if (!key) throw new Error("OPENROUTER_API_KEY no configurada");
-      return {
-        url: "https://openrouter.ai/api/v1/chat/completions",
-        apiKey: key,
-        model: "mistralai/mistral-small-3.2-24b-instruct:free",
-        name: "OpenRouter (Mistral Small Free)",
-      };
+      return { url: "https://openrouter.ai/api/v1/chat/completions", apiKey: key, model: "mistralai/mistral-small-3.2-24b-instruct:free", name: "OpenRouter (Mistral Small Free)" };
+    }
+    case "together": {
+      const key = customKey;
+      if (!key) throw new Error("TOGETHER_API_KEY no configurada. Agregá tu key en Configuración.");
+      return { url: "https://api.together.xyz/v1/chat/completions", apiKey: key, model: "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free", name: "Together AI (Llama 3.3)" };
+    }
+    case "cerebras": {
+      const key = customKey;
+      if (!key) throw new Error("CEREBRAS_API_KEY no configurada. Agregá tu key en Configuración.");
+      return { url: "https://api.cerebras.ai/v1/chat/completions", apiKey: key, model: "llama-3.3-70b", name: "Cerebras (Llama 3.3)" };
+    }
+    case "deepinfra": {
+      const key = customKey;
+      if (!key) throw new Error("DEEPINFRA_API_KEY no configurada. Agregá tu key en Configuración.");
+      return { url: "https://api.deepinfra.com/v1/openai/chat/completions", apiKey: key, model: "meta-llama/Llama-3.3-70B-Instruct", name: "DeepInfra (Llama 3.3)" };
+    }
+    case "sambanova": {
+      const key = customKey;
+      if (!key) throw new Error("SAMBANOVA_API_KEY no configurada. Agregá tu key en Configuración.");
+      return { url: "https://api.sambanova.ai/v1/chat/completions", apiKey: key, model: "Meta-Llama-3.3-70B-Instruct", name: "SambaNova (Llama 3.3)" };
+    }
+    case "mistral": {
+      const key = customKey;
+      if (!key) throw new Error("MISTRAL_API_KEY no configurada. Agregá tu key en Configuración.");
+      return { url: "https://api.mistral.ai/v1/chat/completions", apiKey: key, model: "mistral-small-latest", name: "Mistral AI (Small)" };
+    }
+    case "deepseek": {
+      const key = customKey;
+      if (!key) throw new Error("DEEPSEEK_API_KEY no configurada. Agregá tu key en Configuración.");
+      return { url: "https://api.deepseek.com/v1/chat/completions", apiKey: key, model: "deepseek-chat", name: "DeepSeek Chat" };
     }
     default: {
       const key = Deno.env.get("LOVABLE_API_KEY");
       if (!key) throw new Error("LOVABLE_API_KEY no configurada");
-      return {
-        url: "https://ai.gateway.lovable.dev/v1/chat/completions",
-        apiKey: key,
-        model: "google/gemini-3-flash-preview",
-        name: "Lovable AI (Gemini Flash)",
-      };
+      return { url: "https://ai.gateway.lovable.dev/v1/chat/completions", apiKey: key, model: "google/gemini-3-flash-preview", name: "Lovable AI (Gemini Flash)" };
     }
   }
 }
 
 const SYSTEM_CLEAN = "Sos un limpiador de datos. Responde SOLO con JSON valido, sin markdown, sin explicaciones.";
-
 const SYSTEM_VERIFY = "Sos un verificador de datos. Revisas contactos limpiados por otra IA y detectas errores. Responde SOLO con JSON valido, sin markdown.";
-
 const SYSTEM_CORRECT = "Sos un corrector final de datos. Recibes contactos con posibles errores marcados y los corriges. Responde SOLO con JSON valido, sin markdown.";
 
 function buildCleanPrompt(batch: RawContact[]): string {
@@ -142,6 +157,12 @@ async function callAI(config: ProviderConfig, systemPrompt: string, userPrompt: 
 
   if (!response.ok) {
     const errText = await response.text();
+    if (response.status === 429) {
+      throw new Error(`RATE_LIMIT:${config.name} agotó su límite. Rotando...`);
+    }
+    if (response.status === 402) {
+      throw new Error(`CREDITS_EXHAUSTED:${config.name} sin créditos.`);
+    }
     throw new Error(`${config.name} error ${response.status}: ${errText}`);
   }
 
@@ -152,69 +173,85 @@ async function callAI(config: ProviderConfig, systemPrompt: string, userPrompt: 
   return JSON.parse(jsonMatch[0]);
 }
 
-async function pipelineBatch(batch: RawContact[]): Promise<{ contacts: RawContact[]; stages: string[] }> {
-  const stages: string[] = [];
-
-  // Stage 1: Groq cleans (fastest)
-  let groqConfig: ProviderConfig;
-  try {
-    groqConfig = getProviderConfig("groq");
-  } catch {
-    groqConfig = getProviderConfig("lovable");
+// Try a provider, if it fails with rate limit, try fallbacks
+async function callAIWithFallback(
+  primaryProvider: Exclude<Provider, "pipeline">,
+  systemPrompt: string,
+  userPrompt: string,
+  customKeys?: Record<string, string>
+): Promise<{ contacts: RawContact[]; usedProvider: string }> {
+  // Build fallback order: primary first, then others with keys available
+  const fallbackOrder: Exclude<Provider, "pipeline">[] = [primaryProvider];
+  const allProviders: Exclude<Provider, "pipeline">[] = ["groq", "openrouter", "together", "cerebras", "deepinfra", "sambanova", "mistral", "deepseek", "lovable"];
+  
+  for (const p of allProviders) {
+    if (!fallbackOrder.includes(p)) fallbackOrder.push(p);
   }
 
+  for (const provider of fallbackOrder) {
+    try {
+      const config = getProviderConfig(provider, customKeys);
+      const contacts = await callAI(config, systemPrompt, userPrompt, provider);
+      return { contacts, usedProvider: config.name };
+    } catch (e) {
+      const msg = (e as Error).message;
+      if (msg.includes("no configurada")) continue; // No key, skip
+      if (msg.includes("RATE_LIMIT") || msg.includes("CREDITS_EXHAUSTED")) {
+        console.log(`${provider} exhausted, trying next...`);
+        continue;
+      }
+      // Other error, still try next
+      console.error(`${provider} failed:`, msg);
+      continue;
+    }
+  }
+
+  throw new Error("Todos los proveedores fallaron. Revisá tus API keys en Configuración.");
+}
+
+async function pipelineBatch(batch: RawContact[], customKeys?: Record<string, string>): Promise<{ contacts: RawContact[]; stages: string[] }> {
+  const stages: string[] = [];
+
+  // Stage 1: Clean
   let cleaned: RawContact[];
   try {
-    cleaned = await callAI(groqConfig, SYSTEM_CLEAN, buildCleanPrompt(batch), "groq");
-    stages.push(`Limpieza: ${groqConfig.name} OK`);
+    const result = await callAIWithFallback("groq", SYSTEM_CLEAN, buildCleanPrompt(batch), customKeys);
+    cleaned = result.contacts;
+    stages.push(`Limpieza: ${result.usedProvider} OK`);
   } catch (e) {
     console.error("Pipeline stage 1 error:", e);
     cleaned = batch;
-    stages.push(`Limpieza: ${groqConfig.name} FALLO - usando originales`);
+    stages.push(`Limpieza: FALLO - ${(e as Error).message}`);
   }
 
-  // Stage 2: OpenRouter verifies
-  let orConfig: ProviderConfig;
-  try {
-    orConfig = getProviderConfig("openrouter");
-  } catch {
-    orConfig = getProviderConfig("lovable");
-  }
-
+  // Stage 2: Verify
   let verified: (RawContact & { issues?: string[] })[];
   try {
-    verified = await callAI(orConfig, SYSTEM_VERIFY, buildVerifyPrompt(batch, cleaned), "openrouter") as any;
+    const result = await callAIWithFallback("openrouter", SYSTEM_VERIFY, buildVerifyPrompt(batch, cleaned), customKeys);
+    verified = result.contacts as any;
     const issueCount = verified.reduce((acc, v) => acc + (v.issues?.length || 0), 0);
-    stages.push(`Verificacion: ${orConfig.name} OK (${issueCount} issues)`);
+    stages.push(`Verificacion: ${result.usedProvider} OK (${issueCount} issues)`);
   } catch (e) {
     console.error("Pipeline stage 2 error:", e);
     verified = cleaned.map(c => ({ ...c, issues: [] }));
-    stages.push(`Verificacion: ${orConfig.name} FALLO - sin verificar`);
+    stages.push(`Verificacion: FALLO - ${(e as Error).message}`);
   }
 
-  // Stage 3: Lovable AI corrects
-  let lovableConfig: ProviderConfig;
-  try {
-    lovableConfig = getProviderConfig("lovable");
-  } catch {
-    // All failed, return what we have
-    return { contacts: cleaned, stages };
-  }
-
-  let corrected: RawContact[];
+  // Stage 3: Correct
   const hasIssues = verified.some(v => v.issues && v.issues.length > 0);
+  let corrected: RawContact[];
 
   if (hasIssues) {
     try {
-      corrected = await callAI(lovableConfig, SYSTEM_CORRECT, buildCorrectPrompt(verified), "lovable");
-      stages.push(`Correccion: ${lovableConfig.name} OK`);
+      const result = await callAIWithFallback("lovable", SYSTEM_CORRECT, buildCorrectPrompt(verified), customKeys);
+      corrected = result.contacts;
+      stages.push(`Correccion: ${result.usedProvider} OK`);
     } catch (e) {
       console.error("Pipeline stage 3 error:", e);
       corrected = cleaned;
-      stages.push(`Correccion: ${lovableConfig.name} FALLO - usando limpiados`);
+      stages.push(`Correccion: FALLO - ${(e as Error).message}`);
     }
   } else {
-    // No issues found, skip correction
     corrected = cleaned;
     stages.push(`Correccion: Sin issues, paso omitido`);
   }
@@ -228,9 +265,10 @@ serve(async (req) => {
   }
 
   try {
-    const { contacts, provider: providerParam } = await req.json() as {
+    const { contacts, provider: providerParam, customKeys } = await req.json() as {
       contacts: RawContact[];
       provider?: Provider;
+      customKeys?: Record<string, string>;
     };
 
     if (!contacts || !Array.isArray(contacts) || contacts.length === 0) {
@@ -242,7 +280,7 @@ serve(async (req) => {
 
     const provider = providerParam || "lovable";
 
-    // Pipeline mode: use all 3 AIs
+    // Pipeline mode
     if (provider === "pipeline") {
       console.log(`Pipeline mode for ${contacts.length} contacts`);
       const batchSize = 20;
@@ -251,47 +289,38 @@ serve(async (req) => {
 
       for (let i = 0; i < contacts.length; i += batchSize) {
         const batch = contacts.slice(i, i + batchSize);
-        const result = await pipelineBatch(batch);
+        const result = await pipelineBatch(batch, customKeys);
         allCleaned.push(...result.contacts);
-        if (i === 0) allStages.push(...result.stages); // Only log stages for first batch
+        if (i === 0) allStages.push(...result.stages);
       }
 
       return new Response(JSON.stringify({
         contacts: allCleaned,
-        provider: "Pipeline 3 IAs (Groq + OpenRouter + Lovable)",
+        provider: "Pipeline (con rotación automática)",
         stages: allStages,
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Single provider mode
-    let config: ProviderConfig;
-    try {
-      config = getProviderConfig(provider);
-    } catch (e) {
-      return new Response(JSON.stringify({ error: (e as Error).message }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    console.log(`Using provider: ${config.name} for ${contacts.length} contacts`);
-
+    // Single provider mode with fallback
+    console.log(`Using provider: ${provider} for ${contacts.length} contacts`);
     const batchSize = 25;
     const allCleaned: RawContact[] = [];
+    let usedProvider = "";
 
     for (let i = 0; i < contacts.length; i += batchSize) {
       const batch = contacts.slice(i, i + batchSize);
-
       try {
-        const cleaned = await callAI(config, SYSTEM_CLEAN, buildCleanPrompt(batch), provider);
-        allCleaned.push(...cleaned);
+        const result = await callAIWithFallback(provider as Exclude<Provider, "pipeline">, SYSTEM_CLEAN, buildCleanPrompt(batch), customKeys);
+        allCleaned.push(...result.contacts);
+        usedProvider = result.usedProvider;
       } catch (e) {
         console.error(`Batch error:`, e);
-        if ((e as Error).message.includes("429")) {
+        const msg = (e as Error).message;
+        if (msg.includes("Todos los proveedores")) {
           return new Response(
-            JSON.stringify({ error: `Rate limit en ${config.name}. Intenta de nuevo en unos segundos.` }),
+            JSON.stringify({ error: msg, exhausted: true }),
             { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
@@ -299,7 +328,7 @@ serve(async (req) => {
       }
     }
 
-    return new Response(JSON.stringify({ contacts: allCleaned, provider: config.name }), {
+    return new Response(JSON.stringify({ contacts: allCleaned, provider: usedProvider }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {

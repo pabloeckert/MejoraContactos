@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Play, Pause, Square, Loader2, Sparkles, Zap, Globe, Bot, BrainCircuit, CheckCircle2, XCircle, Clock, Wrench, Trash2, RotateCcw } from "lucide-react";
+import { Play, Pause, Square, Loader2, Sparkles, Zap, Globe, Bot, BrainCircuit, CheckCircle2, XCircle, Clock, Wrench, Trash2, RotateCcw, FlameKindling, Cpu, Server, Wind, Search } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -12,6 +12,7 @@ import { checkDuplicate } from "@/lib/dedup";
 import { batchRuleClean } from "@/lib/rule-cleaner";
 import { clearContacts } from "@/lib/db";
 import { supabase } from "@/integrations/supabase/client";
+import { getActiveKeys } from "./ApiKeysPanel";
 import type {
   ParsedFile,
   ColumnMapping,
@@ -120,11 +121,17 @@ export function ProcessingPanel({ files, onProcessingComplete, onResetAll }: Pro
         }));
 
         const { data, error } = await supabase.functions.invoke("clean-contacts", {
-          body: { contacts: payload, provider: aiProvider },
+          body: { contacts: payload, provider: aiProvider, customKeys: getActiveKeys() },
         });
 
         if (error || data?.error) {
-          addLog("warning", `Lote ${batchNum}: ${error?.message || data?.error}. Sin limpiar.`);
+          const errMsg = error?.message || data?.error;
+          if (data?.exhausted) {
+            toast.error("🔴 Todas las API keys agotadas. Agregá más keys en la pestaña Config.", { duration: 10000 });
+          } else {
+            toast.warning(`⚠️ Lote ${batchNum}: ${errMsg}`);
+          }
+          addLog("warning", `Lote ${batchNum}: ${errMsg}. Sin limpiar.`);
           continue;
         }
 
@@ -341,7 +348,7 @@ export function ProcessingPanel({ files, onProcessingComplete, onResetAll }: Pro
             </div>
             <div className="flex items-center gap-2">
               <span className="text-xs text-muted-foreground whitespace-nowrap">Motor IA:</span>
-              <Select value={aiProvider} onValueChange={setAiProvider}>
+               <Select value={aiProvider} onValueChange={setAiProvider}>
                 <SelectTrigger className="h-8 text-xs w-[280px]">
                   <SelectValue />
                 </SelectTrigger>
@@ -350,13 +357,31 @@ export function ProcessingPanel({ files, onProcessingComplete, onResetAll }: Pro
                     <span className="flex items-center gap-1.5"><BrainCircuit className="h-3 w-3 text-orange-500" /> Pipeline 3 IAs — Mejor calidad</span>
                   </SelectItem>
                   <SelectItem value="groq">
-                    <span className="flex items-center gap-1.5"><Zap className="h-3 w-3 text-yellow-500" /> Groq (Llama 3.3) — Rapido</span>
+                    <span className="flex items-center gap-1.5"><Zap className="h-3 w-3 text-yellow-500" /> Groq (Llama 3.3) — Rápido</span>
                   </SelectItem>
                   <SelectItem value="openrouter">
                     <span className="flex items-center gap-1.5"><Globe className="h-3 w-3 text-purple-500" /> OpenRouter (Mistral) — Free</span>
                   </SelectItem>
                   <SelectItem value="lovable">
                     <span className="flex items-center gap-1.5"><Bot className="h-3 w-3 text-blue-500" /> Lovable AI (Gemini Flash)</span>
+                  </SelectItem>
+                  <SelectItem value="together">
+                    <span className="flex items-center gap-1.5"><Server className="h-3 w-3 text-emerald-500" /> Together AI (Llama 3.3)</span>
+                  </SelectItem>
+                  <SelectItem value="cerebras">
+                    <span className="flex items-center gap-1.5"><Cpu className="h-3 w-3 text-cyan-500" /> Cerebras — Ultra rápido</span>
+                  </SelectItem>
+                  <SelectItem value="deepinfra">
+                    <span className="flex items-center gap-1.5"><FlameKindling className="h-3 w-3 text-red-500" /> DeepInfra (Llama 3.3)</span>
+                  </SelectItem>
+                  <SelectItem value="sambanova">
+                    <span className="flex items-center gap-1.5"><Zap className="h-3 w-3 text-green-500" /> SambaNova (Llama 3.3)</span>
+                  </SelectItem>
+                  <SelectItem value="mistral">
+                    <span className="flex items-center gap-1.5"><Wind className="h-3 w-3 text-indigo-500" /> Mistral AI (Small)</span>
+                  </SelectItem>
+                  <SelectItem value="deepseek">
+                    <span className="flex items-center gap-1.5"><Search className="h-3 w-3 text-teal-500" /> DeepSeek Chat</span>
                   </SelectItem>
                 </SelectContent>
               </Select>

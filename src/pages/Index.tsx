@@ -126,7 +126,7 @@ const Index = () => {
                 Cargá archivos primero en la pestaña Importar
               </div>
             ) : (
-              <ProcessingPanel files={files} onProcessingComplete={handleProcessingComplete} />
+              <ProcessingPanel files={files} onProcessingComplete={handleProcessingComplete} onResetAll={handleResetAll} />
             )}
           </TabsContent>
 

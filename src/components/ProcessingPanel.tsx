@@ -48,7 +48,7 @@ const INITIAL_PIPELINE: PipelineState = {
   dedup: "idle",
 };
 
-export function ProcessingPanel({ files, onProcessingComplete }: ProcessingPanelProps) {
+export function ProcessingPanel({ files, onProcessingComplete, onResetAll }: ProcessingPanelProps) {
   const [aiProvider, setAiProvider] = useState<string>("pipeline");
   const [mappings, setMappings] = useState<ColumnMapping[]>([]);
   const [pipelineState, setPipelineState] = useState<PipelineState>(INITIAL_PIPELINE);

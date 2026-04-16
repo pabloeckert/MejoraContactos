@@ -63,7 +63,8 @@ export function GoogleContactsPanel({ onContactsImported }: GoogleContactsPanelP
       const { data, error } = await supabase.functions.invoke("google-contacts-auth", {
         body: { action: "exchange", code, redirectUri: REDIRECT_URI },
       });
-      if (error || data?.error) throw new Error(data?.error || error?.message);
+      if (error) throw new Error(error.message);
+      if (!data?.ok) throw new Error(data?.error || "Token exchange failed");
       setAccessToken(data.access_token);
       setIsConnected(true);
       toast.success("Conectado a Google Contacts");
@@ -83,7 +84,8 @@ export function GoogleContactsPanel({ onContactsImported }: GoogleContactsPanelP
       const { data, error } = await supabase.functions.invoke("google-contacts-auth", {
         body: { action: "fetch_contacts", code: tk, redirectUri: REDIRECT_URI },
       });
-      if (error || data?.error) throw new Error(data?.error || error?.message);
+      if (error) throw new Error(error.message);
+      if (!data?.ok) throw new Error(data?.error || "Failed to fetch contacts");
       setContacts(data.contacts || []);
       toast.success(`${data.total} contactos obtenidos de Google`);
     } catch (err: any) {

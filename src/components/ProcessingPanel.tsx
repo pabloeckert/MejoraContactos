@@ -125,7 +125,13 @@ export function ProcessingPanel({ files, onProcessingComplete, onResetAll }: Pro
         });
 
         if (error || data?.error) {
-          addLog("warning", `Lote ${batchNum}: ${error?.message || data?.error}. Sin limpiar.`);
+          const errMsg = error?.message || data?.error;
+          if (data?.exhausted) {
+            toast.error("🔴 Todas las API keys agotadas. Agregá más keys en la pestaña Config.", { duration: 10000 });
+          } else {
+            toast.warning(`⚠️ Lote ${batchNum}: ${errMsg}`);
+          }
+          addLog("warning", `Lote ${batchNum}: ${errMsg}. Sin limpiar.`);
           continue;
         }
 

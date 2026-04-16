@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Play, Pause, Square, Loader2, Sparkles, Zap, Globe, Bot, BrainCircuit, CheckCircle2, XCircle, Clock, Wrench, Trash2, RotateCcw } from "lucide-react";
+import { Play, Pause, Square, Loader2, Sparkles, Zap, Globe, Bot, BrainCircuit, CheckCircle2, XCircle, Clock, Wrench, Trash2, RotateCcw, FlameKindling, Cpu, Server, Wind, Search } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -12,6 +12,7 @@ import { checkDuplicate } from "@/lib/dedup";
 import { batchRuleClean } from "@/lib/rule-cleaner";
 import { clearContacts } from "@/lib/db";
 import { supabase } from "@/integrations/supabase/client";
+import { getActiveKeys } from "./ApiKeysPanel";
 import type {
   ParsedFile,
   ColumnMapping,
@@ -120,7 +121,7 @@ export function ProcessingPanel({ files, onProcessingComplete, onResetAll }: Pro
         }));
 
         const { data, error } = await supabase.functions.invoke("clean-contacts", {
-          body: { contacts: payload, provider: aiProvider },
+          body: { contacts: payload, provider: aiProvider, customKeys: getActiveKeys() },
         });
 
         if (error || data?.error) {

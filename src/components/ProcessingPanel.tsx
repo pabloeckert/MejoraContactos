@@ -10,6 +10,7 @@ import { ColumnMapper } from "./ColumnMapper";
 import { autoDetectMappings } from "@/lib/column-mapper";
 import { checkDuplicate } from "@/lib/dedup";
 import { batchRuleClean } from "@/lib/rule-cleaner";
+import { clearContacts } from "@/lib/db";
 import { supabase } from "@/integrations/supabase/client";
 import type {
   ParsedFile,

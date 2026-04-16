@@ -6,7 +6,7 @@ import { ProcessingPanel } from "@/components/ProcessingPanel";
 import { ContactsTable } from "@/components/ContactsTable";
 import { ExportPanel } from "@/components/ExportPanel";
 import { DashboardPanel } from "@/components/DashboardPanel";
-import { saveContacts, updateContact, deleteContact } from "@/lib/db";
+import { saveContacts, updateContact, deleteContact, clearContacts } from "@/lib/db";
 import type { ParsedFile, UnifiedContact } from "@/types/contact";
 import { toast } from "sonner";
 import { Upload, Zap, Users, Download, BarChart3 } from "lucide-react";
@@ -46,6 +46,14 @@ const Index = () => {
     setContacts((prev) => prev.filter((c) => c.id !== id));
     await deleteContact(id);
     toast.success("Contacto eliminado");
+  }, []);
+
+  const handleResetAll = useCallback(async () => {
+    setFiles([]);
+    setContacts([]);
+    await clearContacts();
+    setActiveTab("import");
+    toast.success("Todo reiniciado");
   }, []);
 
   const uniqueCount = contacts.filter((c) => !c.isDuplicate).length;
@@ -118,7 +126,7 @@ const Index = () => {
                 Cargá archivos primero en la pestaña Importar
               </div>
             ) : (
-              <ProcessingPanel files={files} onProcessingComplete={handleProcessingComplete} />
+              <ProcessingPanel files={files} onProcessingComplete={handleProcessingComplete} onResetAll={handleResetAll} />
             )}
           </TabsContent>
 

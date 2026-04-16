@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Play, Pause, Square, Loader2, Sparkles, Zap, Globe, Bot, BrainCircuit, CheckCircle2, XCircle, Clock, Wrench } from "lucide-react";
+import { Play, Pause, Square, Loader2, Sparkles, Zap, Globe, Bot, BrainCircuit, CheckCircle2, XCircle, Clock, Wrench, Trash2, RotateCcw } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -10,6 +10,7 @@ import { ColumnMapper } from "./ColumnMapper";
 import { autoDetectMappings } from "@/lib/column-mapper";
 import { checkDuplicate } from "@/lib/dedup";
 import { batchRuleClean } from "@/lib/rule-cleaner";
+import { clearContacts } from "@/lib/db";
 import { supabase } from "@/integrations/supabase/client";
 import type {
   ParsedFile,
@@ -24,6 +25,7 @@ import { toast } from "sonner";
 interface ProcessingPanelProps {
   files: ParsedFile[];
   onProcessingComplete: (contacts: UnifiedContact[]) => void;
+  onResetAll?: () => void;
 }
 
 type PipelineStage = "idle" | "active" | "done" | "error";
@@ -46,7 +48,7 @@ const INITIAL_PIPELINE: PipelineState = {
   dedup: "idle",
 };
 
-export function ProcessingPanel({ files, onProcessingComplete }: ProcessingPanelProps) {
+export function ProcessingPanel({ files, onProcessingComplete, onResetAll }: ProcessingPanelProps) {
   const [aiProvider, setAiProvider] = useState<string>("pipeline");
   const [mappings, setMappings] = useState<ColumnMapping[]>([]);
   const [pipelineState, setPipelineState] = useState<PipelineState>(INITIAL_PIPELINE);
@@ -186,7 +188,16 @@ export function ProcessingPanel({ files, onProcessingComplete }: ProcessingPanel
     const rawContacts: Partial<UnifiedContact>[] = [];
     const activeMappings = mappings.filter((m) => m.target !== "ignore");
 
-    // Phase 1: Map columns
+    // Build a lookup map: row reference → file name (avoids O(n) find per row)
+    const rowSourceMap = new WeakMap<Record<string, string>, string>();
+    for (const f of files) {
+      for (const row of f.rows) {
+        rowSourceMap.set(row, f.name);
+      }
+    }
+
+    // Phase 1: Map columns — yield every 500 rows to prevent browser hang
+    const CHUNK_SIZE = 500;
     for (let i = 0; i < allRowsRef.current.length; i++) {
       if (stopRef.current) { addLog("warning", "Procesamiento detenido"); break; }
       while (pauseRef.current) { await new Promise((r) => setTimeout(r, 100)); }
@@ -194,7 +205,7 @@ export function ProcessingPanel({ files, onProcessingComplete }: ProcessingPanel
       const row = allRowsRef.current[i];
       const contact: Partial<UnifiedContact> = {
         id: crypto.randomUUID(),
-        source: files.find((f) => f.rows.includes(row))?.name || "unknown",
+        source: rowSourceMap.get(row) || "unknown",
         aiCleaned: false,
       };
 
@@ -215,14 +226,15 @@ export function ProcessingPanel({ files, onProcessingComplete }: ProcessingPanel
 
       rawContacts.push(contact);
 
-      if (i % 50 === 0 || i === allRowsRef.current.length - 1) {
+      if (i % CHUNK_SIZE === 0 || i === allRowsRef.current.length - 1) {
         const elapsed = (Date.now() - startTime) / 1000;
         setStats(prev => ({
           ...prev, processedRows: i + 1,
           rowsPerSecond: Math.round((i + 1) / elapsed),
         }));
+        // Yield to main thread to prevent RESULT_CODE_HUNG
+        await new Promise((r) => setTimeout(r, 0));
       }
-      if (i % 100 === 0) await new Promise((r) => setTimeout(r, 0));
     }
 
     if (stopRef.current) {
@@ -271,8 +283,8 @@ export function ProcessingPanel({ files, onProcessingComplete }: ProcessingPanel
     setPipelineState(prev => ({ ...prev, dedup: "active" }));
     addLog("info", "Detectando duplicados...");
     const contacts: UnifiedContact[] = [];
-    for (const raw of cleanedContacts) {
-      const contact = raw as UnifiedContact;
+    for (let i = 0; i < cleanedContacts.length; i++) {
+      const contact = cleanedContacts[i] as UnifiedContact;
       const dedupResult = checkDuplicate(
         { firstName: contact.firstName, lastName: contact.lastName, email: contact.email, whatsapp: contact.whatsapp },
         contacts
@@ -281,6 +293,8 @@ export function ProcessingPanel({ files, onProcessingComplete }: ProcessingPanel
       contact.duplicateOf = dedupResult.duplicateOf;
       contact.confidence = dedupResult.confidence;
       contacts.push(contact);
+      // Yield every 1000 rows to keep browser responsive
+      if (i % 1000 === 0) await new Promise((r) => setTimeout(r, 0));
     }
 
     setPipelineState(prev => ({ ...prev, dedup: "done" }));
@@ -385,21 +399,49 @@ export function ProcessingPanel({ files, onProcessingComplete }: ProcessingPanel
             </div>
           )}
 
-          <div className="flex gap-2 justify-end">
-            <Button size="sm" onClick={startProcessing} disabled={isActive || files.length === 0}>
-              {isActive ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-              {statusLabel[stats.status]}
-            </Button>
-            {stats.status === "processing" && (
-              <>
-                <Button size="sm" variant="outline" onClick={() => { pauseRef.current = !pauseRef.current; setStats((p) => ({ ...p, status: pauseRef.current ? "paused" : "processing" })); }}>
-                  <Pause className="h-4 w-4" />
+          <div className="flex gap-2 justify-between">
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={async () => {
+                await clearContacts();
+                setLogs([]);
+                setStats({ totalRows: 0, processedRows: 0, uniqueContacts: 0, duplicatesFound: 0, aiCleanedCount: 0, rowsPerSecond: 0, startTime: 0, status: "idle" });
+                setPipelineState(INITIAL_PIPELINE);
+                addLog("info", "🧹 Limpieza completada — logs y estado reiniciados");
+                toast.success("Estado limpiado");
+              }}>
+                <Trash2 className="h-4 w-4" />
+                Clean Up
+              </Button>
+              {onResetAll && (
+                <Button size="sm" variant="destructive" onClick={() => {
+                  stopRef.current = true;
+                  onResetAll();
+                  setLogs([]);
+                  setStats({ totalRows: 0, processedRows: 0, uniqueContacts: 0, duplicatesFound: 0, aiCleanedCount: 0, rowsPerSecond: 0, startTime: 0, status: "idle" });
+                  setPipelineState(INITIAL_PIPELINE);
+                  toast.success("Todo reiniciado");
+                }}>
+                  <RotateCcw className="h-4 w-4" />
+                  Reset All
                 </Button>
-                <Button size="sm" variant="destructive" onClick={() => { stopRef.current = true; }}>
-                  <Square className="h-4 w-4" />
-                </Button>
-              </>
-            )}
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" onClick={startProcessing} disabled={isActive || files.length === 0}>
+                {isActive ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+                {statusLabel[stats.status]}
+              </Button>
+              {stats.status === "processing" && (
+                <>
+                  <Button size="sm" variant="outline" onClick={() => { pauseRef.current = !pauseRef.current; setStats((p) => ({ ...p, status: pauseRef.current ? "paused" : "processing" })); }}>
+                    <Pause className="h-4 w-4" />
+                  </Button>
+                  <Button size="sm" variant="destructive" onClick={() => { stopRef.current = true; }}>
+                    <Square className="h-4 w-4" />
+                  </Button>
+                </>
+              )}
+            </div>
           </div>
           <Progress value={progress} className="h-2" />
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

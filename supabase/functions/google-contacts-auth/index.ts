@@ -6,6 +6,13 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+function respond(ok: boolean, payload: Record<string, unknown>): Response {
+  return new Response(JSON.stringify({ ok, ...payload }), {
+    status: 200, // always 200 so client SDK doesn't swallow the body
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -18,10 +25,7 @@ serve(async (req) => {
     const clientSecret = Deno.env.get("GOOGLE_CLIENT_SECRET");
 
     if (!clientId || !clientSecret) {
-      return new Response(
-        JSON.stringify({ error: "Google OAuth credentials not configured" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return respond(false, { error: "Google OAuth credentials not configured" });
     }
 
     // Action: get auth URL
@@ -40,19 +44,16 @@ serve(async (req) => {
       });
 
       const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
-      return new Response(JSON.stringify({ authUrl }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return respond(true, { authUrl });
     }
 
     // Action: exchange code for token
     if (action === "exchange") {
       if (!code) {
-        return new Response(JSON.stringify({ error: "No code provided" }), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return respond(false, { error: "No code provided" });
       }
+
+      console.log("Exchanging code, redirectUri:", redirectUri);
 
       const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
         method: "POST",
@@ -68,18 +69,17 @@ serve(async (req) => {
 
       const tokenData = await tokenRes.json();
       if (!tokenRes.ok) {
-        return new Response(JSON.stringify({ error: tokenData.error_description || "Token exchange failed" }), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        console.error("Token exchange failed:", JSON.stringify(tokenData));
+        return respond(false, {
+          error: tokenData.error_description || tokenData.error || "Token exchange failed",
+          details: tokenData,
         });
       }
 
-      return new Response(JSON.stringify({
+      return respond(true, {
         access_token: tokenData.access_token,
         expires_in: tokenData.expires_in,
         refresh_token: tokenData.refresh_token,
-      }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -87,16 +87,13 @@ serve(async (req) => {
     if (action === "fetch_contacts") {
       const accessToken = code; // reusing 'code' field for access_token
       if (!accessToken) {
-        return new Response(JSON.stringify({ error: "No access token" }), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return respond(false, { error: "No access token" });
       }
 
       const allContacts: any[] = [];
       let nextPageToken: string | undefined;
       let page = 0;
-      const maxPages = 30; // ~30k contacts max
+      const maxPages = 30;
 
       do {
         const params = new URLSearchParams({
@@ -112,10 +109,7 @@ serve(async (req) => {
 
         if (!res.ok) {
           const err = await res.text();
-          return new Response(JSON.stringify({ error: `Google API error: ${err}` }), {
-            status: res.status,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
+          return respond(false, { error: `Google API error: ${err}` });
         }
 
         const data = await res.json();
@@ -142,23 +136,17 @@ serve(async (req) => {
         page++;
       } while (nextPageToken && page < maxPages);
 
-      return new Response(JSON.stringify({
+      return respond(true, {
         contacts: allContacts,
         total: allContacts.length,
-      }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    return new Response(JSON.stringify({ error: "Invalid action" }), {
-      status: 400,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return respond(false, { error: "Invalid action" });
   } catch (e) {
     console.error("google-contacts-auth error:", e);
-    return new Response(
-      JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return respond(false, {
+      error: e instanceof Error ? e.message : "Unknown error",
+    });
   }
 });

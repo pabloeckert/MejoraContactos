@@ -83,6 +83,14 @@ const Index = () => {
                 {uniqueCount.toLocaleString()} contactos
               </Badge>
             )}
+            <button
+              onClick={() => setActiveTab("settings")}
+              className="h-6 w-6 rounded-md flex items-center justify-center text-primary-foreground/30 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-all opacity-40 hover:opacity-100"
+              title="Administrador"
+              aria-label="Administrador"
+            >
+              <Settings className="h-3.5 w-3.5" />
+            </button>
             <div className="h-2 w-2 rounded-full bg-success animate-pulse-glow" title="Online" />
           </div>
         </div>

@@ -70,7 +70,7 @@ const Index = () => {
                 <Users className="h-4 w-4 text-accent-foreground" />
               </div>
               <div>
-                <h1 className="text-sm font-bold tracking-tight text-primary-foreground">ContactUnifier</h1>
+                <h1 className="text-sm font-bold tracking-tight text-primary-foreground">MejoraApp</h1>
               </div>
             </div>
             <Badge className="text-[10px] hidden sm:inline-flex bg-accent text-accent-foreground border-0 font-semibold">

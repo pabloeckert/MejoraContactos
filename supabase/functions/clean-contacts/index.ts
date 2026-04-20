@@ -217,28 +217,37 @@ async function callAIWithFallback(
   throw new Error(`Todos los proveedores y keys fallaron. Detalles: ${errors.slice(0, 3).join(" | ")}`);
 }
 
-async function pipelineBatch(batch: RawContact[], customKeys?: CustomKeysInput): Promise<{ contacts: RawContact[]; stages: string[] }> {
-  const stages: string[] = [];
+interface PipelineStages {
+  clean?: string;
+  verify?: string;
+  correct?: string;
+}
+
+async function pipelineBatch(batch: RawContact[], customKeys?: CustomKeysInput, stages?: PipelineStages): Promise<{ contacts: RawContact[]; stages: string[] }> {
+  const log: string[] = [];
+  const cleanProvider = (stages?.clean || "groq") as Exclude<Provider, "pipeline">;
+  const verifyProvider = (stages?.verify || "openrouter") as Exclude<Provider, "pipeline">;
+  const correctProvider = (stages?.correct || "lovable") as Exclude<Provider, "pipeline">;
 
   let cleaned: RawContact[];
   try {
-    const result = await callAIWithFallback("groq", SYSTEM_CLEAN, buildCleanPrompt(batch), customKeys);
+    const result = await callAIWithFallback(cleanProvider, SYSTEM_CLEAN, buildCleanPrompt(batch), customKeys);
     cleaned = result.contacts;
-    stages.push(`Limpieza: ${result.usedProvider} OK`);
+    log.push(`Limpieza: ${result.usedProvider} OK`);
   } catch (e) {
     cleaned = batch;
-    stages.push(`Limpieza: FALLO - ${(e as Error).message}`);
+    log.push(`Limpieza: FALLO - ${(e as Error).message}`);
   }
 
   let verified: (RawContact & { issues?: string[] })[];
   try {
-    const result = await callAIWithFallback("openrouter", SYSTEM_VERIFY, buildVerifyPrompt(batch, cleaned), customKeys);
+    const result = await callAIWithFallback(verifyProvider, SYSTEM_VERIFY, buildVerifyPrompt(batch, cleaned), customKeys);
     verified = result.contacts as any;
     const issueCount = verified.reduce((acc, v) => acc + (v.issues?.length || 0), 0);
-    stages.push(`Verificacion: ${result.usedProvider} OK (${issueCount} issues)`);
+    log.push(`Verificacion: ${result.usedProvider} OK (${issueCount} issues)`);
   } catch (e) {
     verified = cleaned.map(c => ({ ...c, issues: [] }));
-    stages.push(`Verificacion: FALLO - ${(e as Error).message}`);
+    log.push(`Verificacion: FALLO - ${(e as Error).message}`);
   }
 
   const hasIssues = verified.some(v => v.issues && v.issues.length > 0);
@@ -246,29 +255,30 @@ async function pipelineBatch(batch: RawContact[], customKeys?: CustomKeysInput):
 
   if (hasIssues) {
     try {
-      const result = await callAIWithFallback("lovable", SYSTEM_CORRECT, buildCorrectPrompt(verified), customKeys);
+      const result = await callAIWithFallback(correctProvider, SYSTEM_CORRECT, buildCorrectPrompt(verified), customKeys);
       corrected = result.contacts;
-      stages.push(`Correccion: ${result.usedProvider} OK`);
+      log.push(`Correccion: ${result.usedProvider} OK`);
     } catch (e) {
       corrected = cleaned;
-      stages.push(`Correccion: FALLO - ${(e as Error).message}`);
+      log.push(`Correccion: FALLO - ${(e as Error).message}`);
     }
   } else {
     corrected = cleaned;
-    stages.push(`Correccion: Sin issues, paso omitido`);
+    log.push(`Correccion: Sin issues, paso omitido`);
   }
 
-  return { contacts: corrected, stages };
+  return { contacts: corrected, stages: log };
 }
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { contacts, provider: providerParam, customKeys } = await req.json() as {
+    const { contacts, provider: providerParam, customKeys, pipelineStages } = await req.json() as {
       contacts: RawContact[];
       provider?: Provider;
       customKeys?: CustomKeysInput;
+      pipelineStages?: PipelineStages;
     };
 
     if (!contacts || !Array.isArray(contacts) || contacts.length === 0) {
@@ -287,13 +297,18 @@ serve(async (req) => {
 
       for (let i = 0; i < contacts.length; i += batchSize) {
         const batch = contacts.slice(i, i + batchSize);
-        const result = await pipelineBatch(batch, customKeys);
+        const result = await pipelineBatch(batch, customKeys, pipelineStages);
         allCleaned.push(...result.contacts);
         if (i === 0) allStages.push(...result.stages);
       }
 
+      const stageNames = [
+        pipelineStages?.clean || "groq",
+        pipelineStages?.verify || "openrouter",
+        pipelineStages?.correct || "lovable",
+      ];
       return new Response(JSON.stringify({
-        contacts: allCleaned, provider: "Pipeline (con rotación automática)", stages: allStages,
+        contacts: allCleaned, provider: `Pipeline (${stageNames.join(" → ")})`, stages: allStages,
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 

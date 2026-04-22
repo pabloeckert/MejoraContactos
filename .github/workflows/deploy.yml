@@ -22,13 +22,24 @@ jobs:
       - run: npm ci
       - run: npm run build
 
-      - name: Deploy via SFTP
-        uses: wlixcc/SFTP-Deploy-Action@v1.2.4
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.0
         with:
+          host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
-          server: ${{ secrets.SSH_HOST }}
-          port: ${{ secrets.SSH_PORT }}
           password: ${{ secrets.SSH_PASS }}
-          local_path: ./dist/*
-          remote_path: /home/u846064658/domains/mejoraok.com/public_html/util/mejoracontactos
-          delete_remote_files: false
+          port: ${{ secrets.SSH_PORT }}
+          script_stop: true
+          script: |
+            rm -rf /home/u846064658/domains/mejoraok.com/public_html/util/mejoracontactos/assets/*
+
+      - name: Upload dist via SCP
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          password: ${{ secrets.SSH_PASS }}
+          port: ${{ secrets.SSH_PORT }}
+          source: "dist/*"
+          target: /home/u846064658/domains/mejoraok.com/public_html/util/mejoracontactos
+          strip_components: 1

@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ColumnMapper } from "./ColumnMapper";
 import { autoDetectMappings } from "@/lib/column-mapper";
-import { checkDuplicate } from "@/lib/dedup";
+import { DedupIndex } from "@/lib/dedup";
 import { batchRuleClean } from "@/lib/rule-cleaner";
 import { clearContacts } from "@/lib/db";
 import { supabase } from "@/integrations/supabase/client";
@@ -313,13 +313,13 @@ export function ProcessingPanel({ files, onProcessingComplete, onResetAll }: Pro
     }
 
     setPipelineState(prev => ({ ...prev, dedup: "active" }));
-    addLog("info", "Detectando duplicados...");
+    addLog("info", "Detectando duplicados con índice hash O(n)...");
     const contacts: UnifiedContact[] = [];
+    const dedupIndex = new DedupIndex();
     for (let i = 0; i < cleanedContacts.length; i++) {
       const contact = cleanedContacts[i] as UnifiedContact;
-      const dedupResult = checkDuplicate(
-        { firstName: contact.firstName, lastName: contact.lastName, email: contact.email, whatsapp: contact.whatsapp },
-        contacts
+      const dedupResult = dedupIndex.add(
+        { id: contact.id, firstName: contact.firstName, lastName: contact.lastName, email: contact.email, whatsapp: contact.whatsapp }
       );
       contact.isDuplicate = dedupResult.isDuplicate;
       contact.duplicateOf = dedupResult.duplicateOf;

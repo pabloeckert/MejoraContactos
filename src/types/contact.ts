@@ -49,6 +49,28 @@ export interface UnifiedContact {
   duplicateOf?: string;
   confidence: number;
   aiCleaned: boolean;
+  // Phone validation metadata
+  phoneValid?: boolean;
+  phoneWhatsApp?: boolean;
+  phoneCountry?: string;
+  // Field validation scores
+  validationScore?: number;
+  fieldValidations?: FieldValidation[];
+}
+
+export interface FieldValidation {
+  field: 'firstName' | 'lastName' | 'whatsapp' | 'email' | 'company' | 'jobTitle';
+  isValid: boolean;
+  score: number; // 0-100
+  correctedValue?: string;
+  reason?: string;
+}
+
+export interface ContactValidationResult {
+  contactId: string;
+  validations: FieldValidation[];
+  overallScore: number; // 0-100
+  needsReview: boolean;
 }
 
 export interface ProcessingStats {

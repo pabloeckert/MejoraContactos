@@ -95,7 +95,7 @@ const Index = () => {
       {/* Main */}
       <main className="flex-1 container px-4 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="w-full grid grid-cols-6 h-11 bg-muted/50">
+          <TabsList className="w-full flex overflow-x-auto flex-nowrap h-11 bg-muted/50 justify-start sm:grid sm:grid-cols-6">
             <TabsTrigger value="import" className="text-xs gap-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Upload className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">Importar</span>

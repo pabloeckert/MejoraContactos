@@ -3,6 +3,8 @@
  * Handles 80%+ of cleaning for high-volume data.
  */
 
+import { validatePhone } from './phone-validator';
+
 // Capitalize first letter of each word
 function titleCase(s: string): string {
   return s
@@ -32,31 +34,45 @@ function cleanEmail(email: string): string {
   return "";
 }
 
-// Clean phone: remove non-digit chars (keep +), normalize Argentine numbers
+/**
+ * Clean and validate phone using libphonenumber-js.
+ * Replaces the old regex-based approach.
+ */
 function cleanPhone(phone: string): string {
-  let cleaned = phone.replace(/[^\d+]/g, "");
-  if (!cleaned || cleaned.replace(/\D/g, "").length < 6) return "";
+  if (!phone) return "";
+  const validation = validatePhone(phone, 'AR');
+  return validation.isValid ? validation.e164 : "";
+}
 
-  // If starts with 15 and is 10 digits, assume Argentine mobile
-  if (/^15\d{8}$/.test(cleaned)) {
-    cleaned = "+549" + cleaned.slice(2);
-  }
-  // If no + prefix, try to add country code
-  if (!cleaned.startsWith("+")) {
-    // 10 digits starting with area code → Argentine
-    if (/^\d{10}$/.test(cleaned)) {
-      cleaned = "+54" + cleaned;
+/**
+ * Auto-split: if firstName contains a full name and lastName is empty,
+ * split into firstName + lastName.
+ */
+function autoSplitName(firstName: string, lastName: string): { firstName: string; lastName: string } {
+  if (firstName && !lastName && firstName.includes(' ')) {
+    const parts = firstName.trim().split(/\s+/);
+    if (parts.length === 2) {
+      return { firstName: parts[0], lastName: parts[1] };
     }
-    // 11 digits starting with 0 → strip 0, add +54
-    else if (/^0\d{10}$/.test(cleaned)) {
-      cleaned = "+54" + cleaned.slice(1);
-    }
-    // 13 digits starting with 54 → add +
-    else if (/^54\d{10,11}$/.test(cleaned)) {
-      cleaned = "+" + cleaned;
+    // 3+ parts: first word = firstName, rest = lastName
+    if (parts.length > 2) {
+      return { firstName: parts[0], lastName: parts.slice(1).join(' ') };
     }
   }
-  return cleaned;
+  return { firstName, lastName };
+}
+
+/**
+ * Extract honorific prefix from name.
+ * E.g., "Dr. Juan García" → prefix: "Dr.", name: "Juan García"
+ */
+function extractHonorific(name: string): { prefix: string; cleanName: string } {
+  const honorifics = /^(Dr|Dra|Ing|Lic|Prof|Sr|Sra|Srta|Mr|Mrs|Ms|Don|Doña)\.?\s+/i;
+  const match = name.match(honorifics);
+  if (match) {
+    return { prefix: match[1] + '.', cleanName: name.slice(match[0].length) };
+  }
+  return { prefix: '', cleanName: name };
 }
 
 export interface CleanResult {
@@ -66,6 +82,9 @@ export interface CleanResult {
   whatsapp: string;
   company: string;
   jobTitle: string;
+  phoneValid: boolean;
+  phoneWhatsApp: boolean;
+  phoneCountry: string;
   rulesCleaned: boolean;
   needsAI: boolean;
 }
@@ -78,20 +97,34 @@ export function ruleClean(contact: {
   company?: string;
   jobTitle?: string;
 }): CleanResult {
-  const firstName = cleanJunk(contact.firstName || "");
-  const lastName = cleanJunk(contact.lastName || "");
+  // Clean raw values
+  let firstName = cleanJunk(contact.firstName || "");
+  let lastName = cleanJunk(contact.lastName || "");
   const email = cleanEmail(contact.email || "");
-  const phone = cleanPhone(contact.whatsapp || "");
+
+  // Phone validation with libphonenumber-js
+  const phoneValidation = validatePhone(contact.whatsapp || "", 'AR');
+  const phone = phoneValidation.isValid ? phoneValidation.e164 : "";
+
   const company = cleanJunk(contact.company || "");
   const jobTitle = cleanJunk(contact.jobTitle || "");
+
+  // Auto-split full name if needed
+  const split = autoSplitName(firstName, lastName);
+  firstName = split.firstName;
+  lastName = split.lastName;
+
+  // Extract honorific from name
+  if (firstName) {
+    const { cleanName } = extractHonorific(firstName);
+    firstName = cleanName;
+  }
 
   // Detect if AI is needed (ambiguous cases)
   let needsAI = false;
 
   // Name has numbers or weird chars → AI should handle
   if (/\d/.test(firstName + lastName)) needsAI = true;
-  // Full name in one field (has space)
-  if (firstName.includes(" ") && !lastName) needsAI = true;
   // Phone format unclear after rules
   if (contact.whatsapp && !phone) needsAI = true;
   // Company looks like a person name or vice versa
@@ -104,6 +137,9 @@ export function ruleClean(contact: {
     whatsapp: phone,
     company: company ? titleCase(company) : "",
     jobTitle: jobTitle ? titleCase(jobTitle) : "",
+    phoneValid: phoneValidation.isValid,
+    phoneWhatsApp: phoneValidation.isWhatsAppCompatible,
+    phoneCountry: phoneValidation.country,
     rulesCleaned: true,
     needsAI,
   };

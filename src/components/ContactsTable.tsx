@@ -77,7 +77,7 @@ export function ContactsTable({ contacts, onUpdateContact, onDeleteContact }: Co
             <span>Email</span>
             <span></span>
           </div>
-          <div ref={parentRef} className="h-[400px] overflow-auto">
+          <div ref={parentRef} className="overflow-auto" style={{ height: 'calc(100vh - 340px)', minHeight: '300px' }}>
             <div style={{ height: `${virtualizer.getTotalSize()}px`, position: "relative" }}>
               {virtualizer.getVirtualItems().map((vItem) => {
                 const c = filtered[vItem.index];

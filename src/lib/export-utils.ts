@@ -1,7 +1,16 @@
 import * as XLSX from "xlsx";
 import type { UnifiedContact } from "@/types/contact";
 
-function contactToRow(c: UnifiedContact) {
+interface ContactRow {
+  Nombre: string;
+  Apellido: string;
+  WhatsApp: string;
+  Empresa: string;
+  Cargo: string;
+  Email: string;
+}
+
+function contactToRow(c: UnifiedContact): ContactRow {
   return {
     Nombre: c.firstName,
     Apellido: c.lastName,
@@ -19,7 +28,7 @@ export function exportCSV(contacts: UnifiedContact[]): string {
     headers.join(","),
     ...rows.map((r) =>
       headers.map((h) => {
-        const val = String((r as any)[h] || "");
+        const val = String((r as Record<string, string>)[h] || "");
         return val.includes(",") || val.includes('"') ? `"${val.replace(/"/g, '""')}"` : val;
       }).join(",")
     ),

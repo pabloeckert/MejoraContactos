@@ -128,7 +128,7 @@ function preprocessSpanishFormat(phone: string): string {
  * Intenta pre-procesar el teléfono según formatos locales conocidos.
  */
 function preprocessPhone(phone: string, defaultCountry?: CountryCode): string {
-  let cleaned = phone.trim();
+  const cleaned = phone.trim();
 
   // Si ya tiene +, parsear directamente
   if (cleaned.startsWith('+')) return cleaned;
@@ -241,7 +241,7 @@ export function validatePhone(
       country: countryCode,
       countryName: COUNTRY_NAMES[countryCode] || countryCode,
       nationalNumber: parsed.formatNational(),
-      type: waCompatible ? 'mobile' : typeStr === 'FIXED_LINE' ? 'landline' : typeStr === 'VOIP' ? 'voip' : 'unknown',
+      type: (waCompatible ? 'mobile' : typeStr === 'FIXED_LINE' ? 'landline' : typeStr === 'VOIP' ? 'voip' : 'unknown') as PhoneValidation['type'],
       whatsappUrl: waCompatible ? `https://wa.me/${parsed.countryCallingCode}${digits}` : '',
       originalInput,
     };

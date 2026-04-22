@@ -35,12 +35,9 @@ function parseAIResponse(response: string, contact: UnifiedContact): FieldValida
 
   try {
     // Limpiar markdown si lo hay
-    let jsonStr = response.trim();
-    if (jsonStr.startsWith('```')) {
-      jsonStr = jsonStr.replace(/^```\w*\n?/, '').replace(/\n?```$/, '');
-    }
+    const jsonStr = response.trim().replace(/^```\w*\n?/, '').replace(/\n?```$/, '');
 
-    const parsed = JSON.parse(jsonStr);
+    const parsed = JSON.parse(jsonStr) as Record<string, unknown> & { correcciones?: Record<string, string | null> };
 
     const fieldMap: Array<{ key: string; field: FieldValidation['field']; original: string }> = [
       { key: 'nombre', field: 'firstName', original: contact.firstName },
@@ -96,7 +93,7 @@ export async function validateContactWithAI(
 
   try {
     const keys = getActiveKeysMulti();
-    const body: Record<string, any> = {
+    const body: Record<string, unknown> = {
       contacts: [{ 
         firstName: prompt,  // Reusamos el campo firstName para enviar el prompt
         lastName: "", whatsapp: "", company: "", jobTitle: "", email: "" 
@@ -123,7 +120,6 @@ export async function validateContactWithAI(
     }
 
     // Extraer la respuesta
-    let responseText = '';
     if (data.contacts && data.contacts[0]) {
       // Si la función devolvió contactos, no tenemos la respuesta cruda
       // Usar las reglas determinísticas como fallback

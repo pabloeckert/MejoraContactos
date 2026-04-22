@@ -56,14 +56,14 @@ const LEGACY_KEY = "contactunifier_api_keys";
 export function loadProviderKeys(): ProviderKeys[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) return JSON.parse(raw) as ProviderKeys[];
     // Migration from v1
     const legacy = localStorage.getItem(LEGACY_KEY);
     if (legacy) {
       const old = JSON.parse(legacy) as Array<{ providerId: string; apiKey: string; status?: string; lastTested?: string }>;
       const migrated: ProviderKeys[] = old.map(o => ({
         providerId: o.providerId,
-        keys: [{ id: crypto.randomUUID(), apiKey: o.apiKey, status: (o.status as any) || "untested", lastTested: o.lastTested }],
+        keys: [{ id: crypto.randomUUID(), apiKey: o.apiKey, status: (o.status as KeyEntry["status"]) || "untested", lastTested: o.lastTested }],
       }));
       localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
       return migrated;
@@ -181,7 +181,8 @@ export function ApiKeysPanel() {
           : p
       ));
       toast.success(`✅ ${provider.name} (${key.label || "key"}): funcionando correctamente`);
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Error de conexión";
       updateProviders(prev => prev.map(p =>
         p.providerId === provider.id
           ? { ...p, keys: p.keys.map(k => k.id === keyId
@@ -189,7 +190,7 @@ export function ApiKeysPanel() {
               : k) }
           : p
       ));
-      toast.error(`❌ ${provider.name}: ${err.message || "Error de conexión"}`);
+      toast.error(`❌ ${provider.name}: ${message}`);
     } finally {
       setTesting(null);
     }

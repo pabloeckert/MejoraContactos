@@ -125,11 +125,12 @@ export function ProcessingPanel({ files, onProcessingComplete, onResetAll }: Pro
   const allColumns = useMemo(() => [...new Set(files.flatMap((f) => f.columns))], [files]);
   const allRowsRef = useRef<Record<string, string>[]>([]);
   const filesKey = useMemo(() => files.map(f => f.id).join(","), [files]);
-  useMemo(() => { allRowsRef.current = files.flatMap((f) => f.rows); }, [filesKey]);
+  useMemo(() => { allRowsRef.current = files.flatMap((f) => f.rows); }, [files]);
 
   // Detect active providers and suggest optimal config
   const activeKeys = useMemo(() => getActiveKeysMulti(), []);
   const activeProviders = useMemo(() => Object.keys(activeKeys).filter(k => activeKeys[k].length > 0), [activeKeys]);
+  const activeProvidersKey = activeProviders.join(",");
 
   // Auto-suggest on first load or when providers change
   useEffect(() => {
@@ -137,7 +138,7 @@ export function ProcessingPanel({ files, onProcessingComplete, onResetAll }: Pro
       const suggested = suggestOptimalConfig(activeProviders);
       setStageConfig(suggested);
     }
-  }, [activeProviders.join(",")]);
+  }, [activeProvidersKey, activeProviders]);
 
   const addLog = useCallback((type: ProcessingLog["type"], message: string) => {
     setLogs((prev) => [{ id: crypto.randomUUID(), timestamp: new Date(), type, message }, ...prev.slice(0, 199)]);
@@ -150,13 +151,13 @@ export function ProcessingPanel({ files, onProcessingComplete, onResetAll }: Pro
       const mapped = detected.filter((m) => m.target !== "ignore").length;
       addLog("info", `${mapped}/${allColumns.length} columnas mapeadas automaticamente`);
     }
-  }, [filesKey]);
+  }, [filesKey, files.length, mappings.length, allColumns, addLog]);
 
   const handleMappingChange = (index: number, target: ContactField) => {
     setMappings((prev) => prev.map((m, i) => (i === index ? { ...m, target } : m)));
   };
 
-  const cleanWithAI = async (contacts: Partial<UnifiedContact>[]): Promise<Partial<UnifiedContact>[]> => {
+  const cleanWithAI = useCallback(async (contacts: Partial<UnifiedContact>[]): Promise<Partial<UnifiedContact>[]> => {
     addLog("info", `🤖 Enviando ${contacts.length} contactos a IA...`);
     setStats(prev => ({ ...prev, status: "cleaning" }));
 
@@ -181,7 +182,7 @@ export function ProcessingPanel({ files, onProcessingComplete, onResetAll }: Pro
           jobTitle: c.jobTitle || "", email: c.email || "",
         }));
 
-        const body: Record<string, any> = {
+        const body: Record<string, unknown> = {
           contacts: payload,
           provider: isPipeline ? "pipeline" : singleProvider,
           customKeys: getActiveKeysMulti(),
@@ -244,7 +245,7 @@ export function ProcessingPanel({ files, onProcessingComplete, onResetAll }: Pro
 
     addLog("success", `✨ IA limpio ${cleanedTotal} contactos exitosamente`);
     return result;
-  };
+  }, [mode, singleProvider, stageConfig, addLog]);
 
   const startProcessing = useCallback(async () => {
     stopRef.current = false;
@@ -269,7 +270,7 @@ export function ProcessingPanel({ files, onProcessingComplete, onResetAll }: Pro
       const contact: Partial<UnifiedContact> = { id: crypto.randomUUID(), source: rowSourceMap.get(row) || "unknown", aiCleaned: false };
       for (const mapping of activeMappings) {
         const rawVal = row[mapping.source];
-        (contact as any)[mapping.target] = typeof rawVal === "string" ? rawVal.trim() : String(rawVal ?? "");
+        (contact as Record<string, string>)[mapping.target] = typeof rawVal === "string" ? rawVal.trim() : String(rawVal ?? "");
       }
       contact.firstName = contact.firstName || "";
       contact.lastName = contact.lastName || "";
@@ -390,7 +391,7 @@ export function ProcessingPanel({ files, onProcessingComplete, onResetAll }: Pro
     addLog("success", `✓ Completado: ${unique.length} unicos, ${dupes.length} duplicados, ${aiCount} limpiados por IA`);
     toast.success(`Procesamiento completado: ${unique.length} contactos unicos`);
     onProcessingComplete(contacts);
-  }, [files, mappings, addLog, onProcessingComplete, mode, singleProvider, stageConfig]);
+  }, [files, mappings, addLog, onProcessingComplete, mode, singleProvider, stageConfig, cleanWithAI]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const progress = stats.totalRows > 0 ? (stats.processedRows / stats.totalRows) * 100 : 0;
   const isActive = stats.status === "processing" || stats.status === "cleaning";

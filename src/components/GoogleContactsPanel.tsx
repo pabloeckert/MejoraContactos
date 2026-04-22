@@ -45,8 +45,8 @@ const REDIRECT_URI = typeof window !== "undefined" ? window.location.origin : ""
 function loadAccounts(): GoogleAccount[] {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) return JSON.parse(stored);
-  } catch {}
+    if (stored) return JSON.parse(stored) as GoogleAccount[];
+  } catch { /* localStorage unavailable */ }
   return [];
 }
 
@@ -56,7 +56,7 @@ function saveAccounts(accounts: GoogleAccount[]) {
     // Don't store contacts in localStorage (too large)
     const toStore = accounts.map(a => ({ ...a, contacts: [] }));
     localStorage.setItem(STORAGE_KEY, JSON.stringify(toStore));
-  } catch {}
+  } catch { /* localStorage unavailable */ }
 }
 
 export function GoogleContactsPanel({ onContactsImported }: GoogleContactsPanelProps) {
@@ -78,18 +78,43 @@ export function GoogleContactsPanel({ onContactsImported }: GoogleContactsPanelP
     }
   }, []);
 
-  // Check for OAuth callback
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const code = params.get("code");
-    const state = params.get("state"); // account index for adding to existing
-    if (code) {
-      window.history.replaceState({}, "", window.location.pathname);
-      handleOAuthCallback(code, state ? parseInt(state) : undefined);
-    }
-  }, []);
+  const fetchAccountContacts = useCallback(async (accountId: string) => {
+    const account = accounts.find(a => a.id === accountId);
+    if (!account) return;
+    setIsLoading(accountId);
+    try {
+      const { data, error } = await supabase.functions.invoke("google-contacts-auth", {
+        body: { action: "fetch_contacts", code: account.accessToken, redirectUri: REDIRECT_URI },
+      });
+      if (error) throw new Error(error.message);
+      if (!data?.ok) throw new Error(data?.error || "Failed to fetch contacts");
 
-  const handleOAuthCallback = async (code: string, accountIndex?: number) => {
+      const fetchedContacts: GoogleContact[] = ((data.contacts ?? []) as GoogleContact[]).map((c) => ({
+        ...c,
+        source: `Google (${account.email})`,
+      }));
+
+      const updated = accounts.map(a =>
+        a.id === accountId
+          ? { ...a, contacts: fetchedContacts, contactsCount: fetchedContacts.length, lastSync: new Date(), status: 'connected' as const }
+          : a
+      );
+      setAccounts(updated);
+      saveAccounts(updated);
+      toast.success(`${fetchedContacts.length} contactos de ${account.email}`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Error desconocido";
+      toast.error(`Error: ${message}`);
+      const updated = accounts.map(a =>
+        a.id === accountId ? { ...a, status: 'error' as const } : a
+      );
+      setAccounts(updated);
+    } finally {
+      setIsLoading(null);
+    }
+  }, [accounts]);
+
+  const handleOAuthCallback = useCallback(async (code: string, accountIndex?: number) => {
     setIsLoading('new');
     try {
       const { data, error } = await supabase.functions.invoke("google-contacts-auth", {
@@ -100,10 +125,10 @@ export function GoogleContactsPanel({ onContactsImported }: GoogleContactsPanelP
 
       const newAccount: GoogleAccount = {
         id: crypto.randomUUID(),
-        email: data.email || `cuenta${accounts.length + 1}@gmail.com`,
-        displayName: data.name || `Cuenta ${accounts.length + 1}`,
-        accessToken: data.access_token,
-        avatarUrl: data.avatar,
+        email: (data.email as string) || `cuenta${accounts.length + 1}@gmail.com`,
+        displayName: (data.name as string) || `Cuenta ${accounts.length + 1}`,
+        accessToken: data.access_token as string,
+        avatarUrl: data.avatar as string | undefined,
         contactsCount: 0,
         lastSync: null,
         status: 'connected',
@@ -118,12 +143,24 @@ export function GoogleContactsPanel({ onContactsImported }: GoogleContactsPanelP
 
       // Auto-fetch contacts
       fetchAccountContacts(newAccount.id);
-    } catch (err: any) {
-      toast.error(`Error: ${err.message}`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Error desconocido";
+      toast.error(`Error: ${message}`);
     } finally {
       setIsLoading(null);
     }
-  };
+  }, [accounts]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Check for OAuth callback
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("code");
+    const state = params.get("state"); // account index for adding to existing
+    if (code) {
+      window.history.replaceState({}, "", window.location.pathname);
+      handleOAuthCallback(code, state ? parseInt(state) : undefined);
+    }
+  }, [handleOAuthCallback]);
 
   const startAuth = async () => {
     if (accounts.length >= MAX_ACCOUNTS) {
@@ -138,43 +175,9 @@ export function GoogleContactsPanel({ onContactsImported }: GoogleContactsPanelP
       if (error) throw new Error(error.message);
       if (!data?.ok) throw new Error(data?.error || "Failed to get auth URL");
       window.location.href = data.authUrl;
-    } catch (err: any) {
-      toast.error(`Error: ${err.message}`);
-      setIsLoading(null);
-    }
-  };
-
-  const fetchAccountContacts = async (accountId: string) => {
-    const account = accounts.find(a => a.id === accountId);
-    if (!account) return;
-    setIsLoading(accountId);
-    try {
-      const { data, error } = await supabase.functions.invoke("google-contacts-auth", {
-        body: { action: "fetch_contacts", code: account.accessToken, redirectUri: REDIRECT_URI },
-      });
-      if (error) throw new Error(error.message);
-      if (!data?.ok) throw new Error(data?.error || "Failed to fetch contacts");
-
-      const fetchedContacts: GoogleContact[] = (data.contacts || []).map((c: any) => ({
-        ...c,
-        source: `Google (${account.email})`,
-      }));
-
-      const updated = accounts.map(a =>
-        a.id === accountId
-          ? { ...a, contacts: fetchedContacts, contactsCount: fetchedContacts.length, lastSync: new Date(), status: 'connected' as const }
-          : a
-      );
-      setAccounts(updated);
-      saveAccounts(updated);
-      toast.success(`${fetchedContacts.length} contactos de ${account.email}`);
-    } catch (err: any) {
-      toast.error(`Error: ${err.message}`);
-      const updated = accounts.map(a =>
-        a.id === accountId ? { ...a, status: 'error' as const } : a
-      );
-      setAccounts(updated);
-    } finally {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Error desconocido";
+      toast.error(`Error: ${message}`);
       setIsLoading(null);
     }
   };

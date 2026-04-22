@@ -26,19 +26,19 @@ const typeIcons: Record<string, React.ReactNode> = {
   JSON: <FileText className="h-4 w-4 text-accent-foreground" />,
 };
 
+const ACCEPTED_EXTENSIONS = [".csv", ".xlsx", ".xls", ".vcf", ".json", ".txt"];
+
+function filterValidFiles(fileList: FileList | File[]): File[] {
+  return Array.from(fileList).filter((f) => {
+    const ext = f.name.slice(f.name.lastIndexOf(".")).toLowerCase();
+    return ACCEPTED_EXTENSIONS.includes(ext) && f.size > 0;
+  });
+}
+
 export function FileDropzone({ files, onFilesAdded, onRemoveFile }: FileDropzoneProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const folderInputRef = useRef<HTMLInputElement>(null);
-
-  const ACCEPTED_EXTENSIONS = [".csv", ".xlsx", ".xls", ".vcf", ".json", ".txt"];
-
-  const filterValidFiles = (fileList: FileList | File[]): File[] => {
-    return Array.from(fileList).filter((f) => {
-      const ext = f.name.slice(f.name.lastIndexOf(".")).toLowerCase();
-      return ACCEPTED_EXTENSIONS.includes(ext) && f.size > 0;
-    });
-  };
 
   const handleFiles = useCallback(
     async (fileList: FileList | File[]) => {
@@ -55,8 +55,9 @@ export function FileDropzone({ files, onFilesAdded, onRemoveFile }: FileDropzone
           const result = await parseFile(file);
           parsed.push(result);
           toast.success(`${file.name}: ${result.rows.length} filas cargadas`);
-        } catch (err: any) {
-          toast.error(`Error en ${file.name}: ${err.message}`);
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : "Error desconocido";
+          toast.error(`Error en ${file.name}: ${message}`);
         }
       }
       if (parsed.length > 0) onFilesAdded(parsed);
@@ -140,7 +141,7 @@ export function FileDropzone({ files, onFilesAdded, onRemoveFile }: FileDropzone
         ref={folderInputRef}
         type="file"
         className="hidden"
-        // @ts-ignore - webkitdirectory is non-standard but widely supported
+        // @ts-expect-error - webkitdirectory is non-standard but widely supported
         webkitdirectory=""
         directory=""
         multiple

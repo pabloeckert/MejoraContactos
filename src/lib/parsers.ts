@@ -129,13 +129,13 @@ export function parseJSON(file: File): Promise<ParsedFile> {
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
-        let data = JSON.parse(e.target!.result as string);
+        let data: unknown = JSON.parse(e.target!.result as string);
         if (!Array.isArray(data)) {
-          data = Object.values(data).find(Array.isArray) || [data];
+          data = Object.values(data as Record<string, unknown>).find(Array.isArray) || [data];
         }
-        const rows: RawContact[] = data.map((item: any) => {
+        const rows: RawContact[] = (data as unknown[]).map((item) => {
           const row: RawContact = {};
-          for (const [k, v] of Object.entries(item)) {
+          for (const [k, v] of Object.entries(item as Record<string, unknown>)) {
             row[k] = typeof v === "object" ? JSON.stringify(v) : String(v ?? "");
           }
           return row;

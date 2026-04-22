@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Play, Pause, Square, Loader2, Sparkles, Zap, Globe, Bot, BrainCircuit, CheckCircle2, XCircle, Clock, Wrench, Trash2, RotateCcw, FlameKindling, Cpu, Server, Wind, Search, Shuffle } from "lucide-react";
+import { Play, Pause, Square, Loader2, Sparkles, Zap, Globe, Bot, BrainCircuit, CheckCircle2, XCircle, Clock, Wrench, Trash2, RotateCcw, FlameKindling, Cpu, Server, Wind, Search, Shuffle, Shield } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -10,6 +10,8 @@ import { ColumnMapper } from "./ColumnMapper";
 import { autoDetectMappings } from "@/lib/column-mapper";
 import { DedupIndex } from "@/lib/dedup";
 import { batchRuleClean } from "@/lib/rule-cleaner";
+import { validateBatchWithAI, clearValidationCache } from "@/lib/ai-validator";
+import { validateContactFields } from "@/lib/field-validator";
 import { clearContacts } from "@/lib/db";
 import { supabase } from "@/integrations/supabase/client";
 import { getActiveKeysMulti, PROVIDERS } from "./ApiKeysPanel";
@@ -37,6 +39,7 @@ interface PipelineState {
   cleaning: PipelineStage;
   verifying: PipelineStage;
   correcting: PipelineStage;
+  validation: PipelineStage;
   dedup: PipelineStage;
 }
 
@@ -48,7 +51,7 @@ interface StageConfig {
 
 const INITIAL_PIPELINE: PipelineState = {
   mapping: "idle", rules: "idle", cleaning: "idle",
-  verifying: "idle", correcting: "idle", dedup: "idle",
+  verifying: "idle", correcting: "idle", validation: "idle", dedup: "idle",
 };
 
 const STAGE_INFO = {
@@ -312,6 +315,57 @@ export function ProcessingPanel({ files, onProcessingComplete, onResetAll }: Pro
       setPipelineState(prev => ({ ...prev, cleaning: "done", verifying: "done", correcting: "done" }));
     }
 
+    // ── Validation step (deterministic + AI for ambiguous cases) ──
+    setPipelineState(prev => ({ ...prev, validation: "active" }));
+    addLog("info", "🔍 Validando campos con reglas determinísticas...");
+    let validatedCount = 0;
+    let aiValidationCount = 0;
+    const typedContacts = cleanedContacts as UnifiedContact[];
+
+    // Deterministic validation for all contacts
+    for (const contact of typedContacts) {
+      const validation = validateContactFields(contact);
+      contact.validationScore = validation.overallScore;
+      contact.fieldValidations = validation.validations;
+      validatedCount++;
+    }
+
+    // Find contacts that still need AI validation
+    const needsAIValidation = typedContacts.filter(c => {
+      const v = c.fieldValidations;
+      return v && v.some(f => !f.isValid || f.score < 50);
+    });
+
+    if (needsAIValidation.length > 0) {
+      addLog("info", `🤖 ${needsAIValidation.length} contactos necesitan validación con IA...`);
+      clearValidationCache();
+
+      const aiValidations = await validateBatchWithAI(
+        needsAIValidation,
+        (processed, total) => {
+          if (processed % 20 === 0) {
+            addLog("info", `🤖 Validación IA: ${processed}/${total}`);
+          }
+        }
+      );
+
+      for (const contact of needsAIValidation) {
+        const aiResult = aiValidations.get(contact.id);
+        if (aiResult) {
+          contact.fieldValidations = aiResult;
+          const totalScore = aiResult.reduce((sum, f) => sum + f.score, 0);
+          contact.validationScore = Math.round(totalScore / aiResult.length);
+          aiValidationCount++;
+        }
+      }
+      addLog("success", `✓ Validación IA completada: ${aiValidationCount} contactos validados`);
+    } else {
+      addLog("info", "✓ Todos los contactos pasaron validación determinística");
+    }
+
+    setPipelineState(prev => ({ ...prev, validation: "done" }));
+
+    // ── Dedup step ──
     setPipelineState(prev => ({ ...prev, dedup: "active" }));
     addLog("info", "Detectando duplicados con índice hash O(n)...");
     const contacts: UnifiedContact[] = [];
@@ -478,6 +532,8 @@ export function ProcessingPanel({ files, onProcessingComplete, onResetAll }: Pro
                 <PipelineConnector active={pipelineState.verifying === "done"} />
                 <PipelineStep icon={PROVIDER_ICONS[stageConfig.correct] || <Bot className="h-3 w-3" />} label={stageLabels.correct} sublabel="Corrección" state={pipelineState.correcting} />
                 <PipelineConnector active={pipelineState.correcting === "done"} />
+                <PipelineStep icon={<Shield className="h-3 w-3" />} label="Validar" sublabel="Score + IA" state={pipelineState.validation} />
+                <PipelineConnector active={pipelineState.validation === "done"} />
                 <PipelineStep icon={<CheckCircle2 className="h-3 w-3" />} label="Dedup" state={pipelineState.dedup} />
               </div>
             </div>

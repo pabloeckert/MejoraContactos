@@ -106,31 +106,31 @@
 
 ---
 
-## Fase 8 — Validación semántica con IA (⏱ ~1 día)
+## Fase 8 — Validación semántica con IA (✅ COMPLETADO)
 
-| # | Tarea | Detalle | Prioridad |
-|---|-------|---------|-----------|
-| 8.1 | Prompt de validación optimizado | JSON compacto, mínimo de tokens, un request por contacto | 🟢 Media |
-| 8.2 | Integración con pipeline existente | La IA valida solo los campos que las reglas determinísticas no pudieron resolver | 🟢 Media |
-| 8.3 | Selección automática por campo | Usar el proveedor más preciso para cada tipo de dato | 🟢 Media |
+| # | Tarea | Detalle | Estado |
+|---|-------|---------|--------|
+| 8.1 | Prompt de validación optimizado | JSON compacto, mínimo de tokens, un request por contacto | ✅ |
+| 8.2 | Integración con pipeline existente | La IA valida solo los campos que las reglas determinísticas no pudieron resolver | ✅ |
+| 8.3 | Cache de validaciones IA | Evita re-validar el mismo dato dos veces | ✅ |
 
-**Entregable:** Los casos ambiguos que las reglas no resuelven se validan con IA automáticamente.
+**Entregable:** Los casos ambiguos que las reglas no resuelven se validan con IA automáticamente. Pipeline visual actualizado.
 
 ---
 
 ## Resumen de tiempos estimados
 
-| Fase | Duración | Impacto |
-|------|----------|---------|
-| Fase 1 — Deploy | ~1 hora | 🔴 Crítico |
-| Fase 2 — Teléfonos | ~3 horas | 🔴 Alto |
-| Fase 3 — Validación determinística | ~1 día | 🔴 Alto |
-| Fase 4 — Performance | ~1 día | 🔴 Alto |
-| Fase 5 — Google multi-cuenta | ~1 día | 🟡 Medio |
-| Fase 6 — Logs e informes | ~1 día | 🟡 Medio |
-| Fase 7 — UX/UI | ~1 día | 🟡 Medio |
-| Fase 8 — Validación IA | ~1 día | 🟢 Bajo |
-| **Total estimado** | **~6-7 días** | |
+| Fase | Duración estimada | Estado | Commit |
+|------|----------|--------|--------|
+| Fase 1 — Deploy | ~1 hora | ✅ Completado | 95ab556 |
+| Fase 2 — Teléfonos | ~3 horas | ✅ Completado | 95ab556 |
+| Fase 3 — Validación determinística | ~1 día | ✅ Completado | 95ab556 |
+| Fase 4 — Performance | ~1 día | ✅ Completado | 95ab556 |
+| Fase 5 — Google multi-cuenta | ~1 día | ✅ Completado | 273c3a3 |
+| Fase 6 — Logs e informes | ~1 día | ✅ Completado | 273c3a3 |
+| Fase 7 — UX/UI | ~1 día | ✅ Completado | 273c3a3 |
+| Fase 8 — Validación IA | ~1 día | ✅ Completado | b5f1579 |
+| **Total** | **~6-7 días** | **8/8 completadas** | **3 commits** |
 
 ---
 

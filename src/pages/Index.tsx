@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { useTheme } from "next-themes";
 import { FileDropzone } from "@/components/FileDropzone";
 import { ProcessingPanel } from "@/components/ProcessingPanel";
 import { ContactsTable } from "@/components/ContactsTable";
@@ -9,7 +10,7 @@ import { DashboardPanel } from "@/components/DashboardPanel";
 import { saveContacts, updateContact, deleteContact, clearContacts } from "@/lib/db";
 import type { ParsedFile, UnifiedContact } from "@/types/contact";
 import { toast } from "sonner";
-import { Upload, Zap, Users, Download, BarChart3, Settings } from "lucide-react";
+import { Upload, Zap, Users, Download, BarChart3, Settings, Moon, Sun } from "lucide-react";
 import { GoogleContactsPanel } from "@/components/GoogleContactsPanel";
 import { ApiKeysPanel } from "@/components/ApiKeysPanel";
 
@@ -17,6 +18,7 @@ const Index = () => {
   const [files, setFiles] = useState<ParsedFile[]>([]);
   const [contacts, setContacts] = useState<UnifiedContact[]>([]);
   const [activeTab, setActiveTab] = useState("import");
+  const { theme, setTheme } = useTheme();
 
   const handleFilesAdded = useCallback((newFiles: ParsedFile[]) => {
     setFiles((prev) => [...prev, ...newFiles]);
@@ -79,6 +81,15 @@ const Index = () => {
                 {uniqueCount.toLocaleString()}
               </Badge>
             )}
+            {/* Dark mode toggle */}
+            <button
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              className="h-7 w-7 rounded-full flex items-center justify-center text-primary-foreground/50 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-all"
+              title="Cambiar tema"
+              aria-label="Cambiar tema"
+            >
+              {theme === 'dark' ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
+            </button>
             {/* Admin icon — tiny, semi-transparent, corner placement */}
             <button
               onClick={() => setActiveTab("settings")}

@@ -1,8 +1,8 @@
-import { Download, FileSpreadsheet, FileText, File } from "lucide-react";
+import { Download, FileSpreadsheet, FileText, File, BarChart3, Brain } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { exportCSV, exportExcel, exportVCF, exportJSON, downloadFile } from "@/lib/export-utils";
+import { exportCSV, exportExcel, exportVCF, exportJSON, exportJSONL, generateHTMLReport, downloadFile } from "@/lib/export-utils";
 import type { UnifiedContact } from "@/types/contact";
 import { toast } from "sonner";
 
@@ -18,12 +18,39 @@ export function ExportPanel({ contacts }: ExportPanelProps) {
     if (clean.length === 0) { toast.error("No hay contactos para exportar"); return; }
     const timestamp = new Date().toISOString().slice(0, 10);
     switch (format) {
-      case "csv": { const data = exportCSV(clean); downloadFile(data, `contactos_${timestamp}.csv`, "text/csv;charset=utf-8"); break; }
-      case "excel": { const data = exportExcel(clean, discarded); downloadFile(data, `contactos_${timestamp}.xlsx`, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"); break; }
-      case "vcf": { const data = exportVCF(clean); downloadFile(data, `contactos_${timestamp}.vcf`, "text/vcard"); break; }
-      case "json": { const data = exportJSON(clean); downloadFile(data, `contactos_${timestamp}.json`, "application/json"); break; }
+      case "csv": {
+        const data = exportCSV(clean);
+        downloadFile(data, `contactos_${timestamp}.csv`, "text/csv;charset=utf-8");
+        break;
+      }
+      case "excel": {
+        const data = exportExcel(clean, discarded);
+        downloadFile(data, `contactos_${timestamp}.xlsx`, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        break;
+      }
+      case "vcf": {
+        const data = exportVCF(clean);
+        downloadFile(data, `contactos_${timestamp}.vcf`, "text/vcard");
+        break;
+      }
+      case "json": {
+        const data = exportJSON(clean);
+        downloadFile(data, `contactos_${timestamp}.json`, "application/json");
+        break;
+      }
+      case "jsonl": {
+        const data = exportJSONL(clean);
+        downloadFile(data, `entrenamiento_${timestamp}.jsonl`, "application/jsonl");
+        break;
+      }
+      case "report": {
+        const data = generateHTMLReport(contacts);
+        downloadFile(data, `informe_${timestamp}.html`, "text/html");
+        break;
+      }
     }
-    toast.success(`Exportado ${clean.length} contactos en formato ${format.toUpperCase()}`);
+    const label = { csv: 'CSV', excel: 'Excel', vcf: 'VCF', json: 'JSON', jsonl: 'JSONL', report: 'HTML' }[format] || format;
+    toast.success(`Exportado ${clean.length} contactos en formato ${label}`);
   };
 
   return (
@@ -34,6 +61,7 @@ export function ExportPanel({ contacts }: ExportPanelProps) {
         <StatCard label="IA Limpiados" value={contacts.filter((c) => c.aiCleaned).length} icon="✨" color="text-blue-500" />
       </div>
 
+      {/* Contact export */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-sm flex items-center gap-2">
@@ -61,6 +89,28 @@ export function ExportPanel({ contacts }: ExportPanelProps) {
             <FileText className="h-5 w-5 text-purple-500" />
             <span className="text-xs font-semibold">JSON</span>
             <span className="text-[10px] text-muted-foreground">Completo</span>
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Training & Reports */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Brain className="h-4 w-4" />
+            Entrenamiento e informes
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="grid grid-cols-2 gap-3">
+          <Button variant="outline" className="h-auto py-4 flex-col gap-2" onClick={() => handleExport("jsonl")}>
+            <Brain className="h-5 w-5 text-orange-500" />
+            <span className="text-xs font-semibold">JSONL</span>
+            <span className="text-[10px] text-muted-foreground">Fine-tuning IA</span>
+          </Button>
+          <Button variant="outline" className="h-auto py-4 flex-col gap-2" onClick={() => handleExport("report")}>
+            <BarChart3 className="h-5 w-5 text-teal-500" />
+            <span className="text-xs font-semibold">Informe</span>
+            <span className="text-[10px] text-muted-foreground">HTML imprimible</span>
           </Button>
         </CardContent>
       </Card>

@@ -2,12 +2,12 @@
 
 > **⚡ Instrucción de actualización:** Cuando el usuario diga **"documentar"**, actualizar este archivo con el estado actual del proyecto, trabajos realizados, pendientes y cualquier cambio relevante.
 
-**Última actualización:** 2026-04-24 05:30 GMT+8  
-**Versión:** v4.2 (fix CORS + deploy)  
-**Commit HEAD:** `3f9f665` + fixes CORS  
+**Última actualización:** 2026-04-24 05:52 GMT+8  
+**Versión:** v4.3 (migración Supabase + CORS fix + deploy completo)  
+**Commit HEAD:** `d75e9b3`  
 **Repo:** [pabloeckert/MejoraContactos](https://github.com/pabloeckert/MejoraContactos)  
 **Live:** https://util.mejoraok.com/mejoracontactos/  
-**Deploy status:** 🔄 Pendiente deploy Edge Functions CORS fix
+**Deploy status:** ✅ Frontend + Edge Functions desplegados
 
 ---
 
@@ -29,8 +29,8 @@ MejoraContactos es una aplicación web para consolidar, limpiar y deduplicar bas
 | Temas | `next-themes` (dark/light) |
 | Gráficos | Recharts |
 | Deploy frontend | GitHub Actions → SSH+SCP → Hostinger |
-| Deploy Edge Functions | Supabase CLI (`supabase functions deploy`) |
-| DB Supabase | `jurmgatcyxjkutmzweey` (solo para Edge Functions, no tablas) |
+| Deploy Edge Functions | Supabase CLI (`npx supabase functions deploy`) |
+| Supabase project | `tzatuvxatsduuslxqdtm` (propio del usuario) |
 
 ## 3. Arquitectura
 
@@ -73,11 +73,11 @@ src/
 │   └── NotFound.tsx             # 404
 └── integrations/
     └── supabase/
-        ├── client.ts            # Cliente Supabase (URL + anon key)
+        ├── client.ts            # Cliente Supabase (URL + publishable key)
         └── types.ts             # Tipos de DB
 
 supabase/
-├── config.toml                  # project_id: jurmgatcyxjkutmzweey
+├── config.toml                  # project_id: tzatuvxatsduuslxqdtm
 └── functions/
     ├── clean-contacts/index.ts  # Edge Function: limpieza IA (12 proveedores)
     └── google-contacts-auth/    # Edge Function: OAuth Google Contacts
@@ -135,6 +135,8 @@ supabase/
 - Soporta múltiples keys por proveedor
 - Orden de fallback configurable en el hook `suggestOptimalConfig()`
 
+**⚠️ Nota:** El proveedor "lovable" usa la API interna de Lovable.dev y NO funciona en hosting externo (Hostinger). Está como fallback del fallback.
+
 ## 6. Formatos Soportados
 
 ### Importación
@@ -174,20 +176,19 @@ supabase/
 ### Edge Functions (manual)
 
 ```bash
-# Instalar Supabase CLI si no está
-npm i -g supabase
-
-# Login
-supabase login
+# Login con token de Supabase
+npx supabase login --token sbp_XXXXX
 
 # Link al proyecto
 cd MejoraContactos
-supabase link --project-ref jurmgatcyxjkutmzweey
+npx supabase link --project-ref tzatuvxatsduuslxqdtm
 
 # Deploy Edge Functions
-supabase functions deploy clean-contacts
-supabase functions deploy google-contacts-auth
+npx supabase functions deploy clean-contacts
+npx supabase functions deploy google-contacts-auth
 ```
+
+**⚠️ IMPORTANTE:** Si se modifican las Edge Functions, hay que redeployarlas manualmente con Supabase CLI. El frontend se deploya solo via GitHub Actions, pero las Edge Functions NO.
 
 ### URLs de Producción
 
@@ -204,10 +205,26 @@ supabase functions deploy google-contacts-auth
 | Hosting frontend | Hostinger (FTP IP: 185.212.70.250, SSH puerto: 65002) |
 | Usuario SSH | `u846064658` |
 | Ruta base | `/home/u846064658/domains/mejoraok.com/public_html/util/` |
-| Supabase project | `jurmgatcyxjkutmzweey` |
+| Supabase project | `tzatuvxatsduuslxqdtm` (propio del usuario) |
+| Supabase URL | `https://tzatuvxatsduuslxqdtm.supabase.co` |
 | Subdominio DNS | `util.mejoraok.com` → Hostinger |
 
 ## 8. Registro de Cambios
+
+### v4.3 — 2026-04-24 (Migración Supabase + Deploy completo)
+
+**Commits:** `3dfcce3`, `14b4319`, `d75e9b3`
+
+| Cambio | Tipo | Detalle |
+|--------|------|---------|
+| Migración a Supabase propio | 🔴 Infra | Proyecto `tzatuvxatsduuslxqdtm` (antes `jurmgatcyxjkutmzweey`) |
+| Supabase URL actualizada | 🔴 Config | `client.ts` → nueva URL + publishable key |
+| Edge Functions deployadas | 🔴 Deploy | `clean-contacts` + `google-contacts-auth` en nuevo proyecto |
+| CORS fix desplegado | 🔴 Fix | `util.mejoraok.com` en ALLOWED_ORIGINS (ambas funciones) |
+| `supabase/.temp` en gitignore | 🟠 Limpieza | Archivos de estado local fuera del repo |
+| Docs actualizados | 📚 Docs | Proyecto Supabase, deploy commands, infra actualizada |
+
+**Problema resuelto:** La app usaba un proyecto de Supabase (`jurmgatcyxjkutmzweey`) que no pertenecía al usuario. Las Edge Functions no se podían modificar ni deployar, y el CORS bloqueaba todas las llamadas desde `util.mejoraok.com`. Migración completa a proyecto propio con CORS fix y deploy exitoso.
 
 ### v4.2 — 2026-04-24 (CORS Fix + Consolidación Docs)
 
@@ -217,12 +234,6 @@ supabase functions deploy google-contacts-auth
 | CORS: `util.mejoraok.com` agregado a ALLOWED_ORIGINS | 🔴 Fix crítico | `google-contacts-auth/index.ts` |
 | Carpeta `documents/` renombrada a `Documents/` | 📚 Docs | `Documents/DOCS.md` |
 | Documentación consolidada en un solo archivo | 📚 Docs | `Documents/DOCS.md` |
-
-**⚠️ IMPORTANTE:** Los cambios de CORS en Edge Functions requieren redeploy:
-```bash
-supabase functions deploy clean-contacts
-supabase functions deploy google-contacts-auth
-```
 
 ### v4.1 — 2026-04-23 (Subdominio + Landing page)
 
@@ -281,49 +292,37 @@ Deploy funcional con CI/CD, validación telefónica, dedup O(n), Google Contacts
 
 ## 9. Plan de Trabajo — Estado y Etapas
 
-### Estado general: ✅ Core completo | 🔄 Deploy pendiente (CORS fix)
+### Estado general: ✅ Core completo | ✅ Deploy funcional | ⏳ Verificación en vivo pendiente
 
-### ✅ Etapas Completadas (v3.0 → v4.0)
+### ✅ Etapas Completadas
 
-| Etapa | Descripción | Estado |
-|-------|------------|--------|
-| Testing (113 tests) | Unit tests para lib/ | ✅ |
-| Multi-país | 21 países, selector UI | ✅ |
-| Refactor ProcessingPanel | Hook + Visualizer extraídos | ✅ |
-| CORS Edge Functions | Whitelist origins | ✅ |
-| Hardening & Performance | Worker, lazy xlsx, a11y, rate limit | ✅ |
+| Etapa | Descripción | Completado |
+|-------|------------|------------|
+| Core (v3.0) | App completa con pipeline IA | 2026-04-22 |
+| Security & Quality (v3.1) | XSS, .env, VCF fixes | 2026-04-23 |
+| Tests + Multi-país (v3.2) | 113 tests, 21 países | 2026-04-23 |
+| Refactor (v3.3) | ProcessingPanel dividido | 2026-04-23 |
+| Hardening (v4.0) | Worker, lazy xlsx, a11y, rate limit | 2026-04-23 |
+| Subdominio (v4.1) | util.mejoraok.com + landing | 2026-04-23 |
+| CORS Fix (v4.2) | util.mejoraok.com en whitelist | 2026-04-24 |
+| Migración Supabase (v4.3) | Proyecto propio + deploy completo | 2026-04-24 |
 
-### 🔄 Etapa Actual — Fix CORS + Deploy (v4.2)
-
-**Problema:** La app está en `util.mejoraok.com` pero las Edge Functions solo permitían `mejoraok.com`. **TODAS** las llamadas a la API de IA eran bloqueadas por CORS.
-
-**Fix aplicado:**
-- `clean-contacts/index.ts`: `util.mejoraok.com` agregado a ALLOWED_ORIGINS
-- `google-contacts-auth/index.ts`: `util.mejoraok.com` agregado a ALLOWED_ORIGINS
-
-**Pendiente de deploy:**
-```bash
-supabase functions deploy clean-contacts
-supabase functions deploy google-contacts-auth
-```
-
-### 📋 Próximas Etapas Sugeridas
+### 📋 Próximas Etapas
 
 #### Etapa 7 — Verificación Post-Deploy
-| # | Tarea | Detalle |
-|---|-------|---------|
-| 7.1 | Deploy Edge Functions | `supabase functions deploy` (ambas) |
-| 7.2 | Test API en vivo | Probar cada proveedor desde la app live |
-| 7.3 | Verificar Google OAuth | Test importación desde Google Contacts |
-| 7.4 | Monitoreo | Revisar logs de Edge Functions en Supabase Dashboard |
+| # | Tarea | Detalle | Estado |
+|---|-------|---------|--------|
+| 7.1 | Test API Groq en vivo | Cargar key, hacer test desde app live | ⏳ Pendiente (requiere API key del usuario) |
+| 7.2 | Test pipeline completo | Importar CSV, procesar, verificar resultados | ⏳ |
+| 7.3 | Verificar Google OAuth | Test importación desde Google Contacts | ⏳ |
+| 7.4 | Monitoreo | Revisar logs en Supabase Dashboard | ⏳ |
 
 #### Etapa 8 — Mejoras de Proveedores
 | # | Tarea | Detalle |
 |---|-------|---------|
-| 8.1 | Actualizar modelos | Verificar que los modelos siguen activos en cada proveedor |
-| 8.2 | Eliminar "lovable" del fallback | Solo funciona en Lovable.dev, no en Hostinger |
-| 8.3 | Health check automático | Test periódico de keys desde la UI |
-| 8.4 | Modelo por defecto actualizado | Verificar gemini-2.0-flash-exp sigue activo |
+| 8.1 | Eliminar "lovable" del fallback | Solo funciona en Lovable.dev |
+| 8.2 | Health check automático | Test periódico de keys desde la UI |
+| 8.3 | Actualizar modelos | Verificar que los modelos siguen activos |
 
 ## 10. Resumen de Estado por Componente
 
@@ -341,8 +340,10 @@ supabase functions deploy google-contacts-auth
 | Exportación | ✅ | 6 formatos (CSV, Excel, VCF, JSON, JSONL, HTML) |
 | Dashboard | ✅ | Métricas + gráficos |
 | Dark mode | ✅ | next-themes |
-| Deploy CI/CD | ✅ | GitHub Actions → Hostinger |
-| CORS | 🔄 | Fix aplicado, pendiente deploy Edge Functions |
+| Deploy CI/CD | ✅ | GitHub Actions → Hostinger (frontend) |
+| Deploy Edge Functions | ✅ | Supabase CLI → proyecto propio |
+| CORS | ✅ | `util.mejoraok.com` en whitelist, deployado |
+| Supabase | ✅ | Proyecto propio `tzatuvxatsduuslxqdtm` |
 | Tests | ✅ | 150+ tests, 11 archivos |
 | Multi-país | ✅ | 21 países con selector |
 | Web Worker | ✅ | batchRuleClean + dedup offloaded |
@@ -350,6 +351,7 @@ supabase functions deploy google-contacts-auth
 | Bundle splitting | ✅ | xlsx lazy, index 376KB |
 | Accesibilidad | ✅ | aria-labels, focus-visible, roles |
 | Rate limiting | ✅ | 30 req/min por IP |
+| API keys IA | ⏳ | Requiere que el usuario cargue al menos una |
 
 ## 11. Notas de Seguridad
 
@@ -357,8 +359,28 @@ supabase functions deploy google-contacts-auth
 2. **API keys en localStorage** — el usuario las ingresa manualmente, nunca van al repo
 3. **CORS restringido** — whitelist: `util.mejoraok.com`, `mejoraok.com`, `localhost:8080`, `localhost:5173`
 4. **XSS en reportes** — `escapeHtml()` aplicado en `generateHTMLReport()`
-5. **Supabase anon key** — pública (publishable, no service_role), protegida por RLS
+5. **Supabase publishable key** — pública, protegida por RLS
 6. **Rate limiting** — 30 req/min por IP en Edge Function, sliding window
+7. **Tokens de deploy** — NO se commitean (solo en entorno local del deployador)
+
+## 12. Comandos Rápidos
+
+```bash
+# Desarrollo local
+npm install && npm run dev    # → http://localhost:8080
+
+# Tests
+npm test                      # 150+ tests
+
+# Deploy Edge Functions (manual)
+npx supabase login --token sbp_XXXXX
+npx supabase link --project-ref tzatuvxatsduuslxqdtm
+npx supabase functions deploy clean-contacts
+npx supabase functions deploy google-contacts-auth
+
+# Deploy frontend (automático al pushear a main)
+git push origin main
+```
 
 ---
 

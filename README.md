@@ -43,4 +43,5 @@ Push a `main` → GitHub Actions → build → SCP a Hostinger (automático).
 
 ## Documentación
 
-Ver `documents/DOCS.md` para documentación consolidada, arquitectura y plan de trabajo.
+Ver `Documents/DOCS.md` para documentación consolidada, arquitectura y plan de trabajo.
+Cuando digas "documentar", se actualizará automáticamente con el estado actual.

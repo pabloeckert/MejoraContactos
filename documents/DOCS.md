@@ -2,11 +2,12 @@
 
 > **Instrucción:** Cuando el usuario diga **"documentar"**, actualizar este archivo con el estado actual del proyecto, trabajos realizados y pendientes.
 
-**Última actualización:** 2026-04-23 21:42 GMT+8  
+**Última actualización:** 2026-04-23 21:44 GMT+8  
 **Versión:** v3.3 (refactor + CORS)  
-**Commit HEAD:** pendiente  
+**Commit HEAD:** `1462562`  
 **Repo:** [pabloeckert/MejoraContactos](https://github.com/pabloeckert/MejoraContactos)  
-**Live:** https://mejoraok.com/util/mejoracontactos/
+**Live:** https://mejoraok.com/util/mejoracontactos/  
+**Deploy status:** ✅ `1462562` desplegado (2026-04-23 13:43 UTC)
 
 ---
 

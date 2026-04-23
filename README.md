@@ -2,53 +2,45 @@
 
 Limpieza, deduplicación y unificación de contactos con IA.
 
-## Descripción
-
-MejoraContactos es una aplicación web especializada en consolidar, limpiar y deduplicar bases de contactos de múltiples fuentes heterogéneas (CSV, Excel, VCF, JSON, Google Contacts).
-
 ## Stack
 
 - React 18 + Vite + TypeScript
 - Tailwind CSS + shadcn/ui
 - Supabase Edge Functions (Deno)
 - 12 proveedores de IA con rotación automática
-- IndexedDB (Dexie) para persistencia local
+- IndexedDB para persistencia local
 
 ## Funcionalidades
 
-- Importación desde CSV, Excel, VCF, JSON y Google Contacts (OAuth)
-- Mapeo automático de columnas con muestras aleatorias del dataset
-- Pipeline de limpieza híbrido: reglas determinísticas + IA en cascada (3 etapas)
-- Detección de duplicados con Jaro-Winkler
-- Normalización telefónica internacional (E.164)
-- 12 proveedores de IA con rotación automática y múltiples keys
-- Exportación a CSV, Excel, VCF y JSON
-- Dashboard con métricas en tiempo real
+- **Importación:** CSV, Excel, VCF, JSON, Google Contacts (OAuth multi-cuenta)
+- **Mapeo:** Auto-detección de columnas (español + inglés)
+- **Limpieza:** Reglas determinísticas (80%+) + IA en cascada (3 etapas)
+- **Validación:** Scoring semántico 0-100 por campo, correcciones con IA
+- **Deduplicación:** Email/teléfono exacto O(1) + nombre Jaro-Winkler acotado
+- **Telefonía:** E.164, detección WhatsApp, formatos AR/MX/ES
+- **Exportación:** CSV, Excel, VCF, JSON, JSONL (fine-tuning), HTML (informes)
+- **Dashboard:** Métricas en tiempo real, gráficos de calidad
+- **UI:** Dark mode, tabla virtualizada, responsive
 
-## Proveedores de IA soportados
+## Proveedores de IA
 
-1. Groq Cloud (Llama 3.3)
-2. OpenRouter (Mistral Small Free)
-3. Together AI (Llama 3.3)
-4. Cerebras (Llama 3.3)
-5. DeepInfra (Llama 3.3)
-6. SambaNova (Llama 3.3)
-7. Mistral AI (Small)
-8. DeepSeek Chat
-9. Google AI Studio (Gemini)
-10. Cloudflare Workers AI
-11. Hugging Face Inference
-12. Nebius AI
+Groq · OpenRouter · Together AI · Cerebras · DeepInfra · SambaNova · Mistral · DeepSeek · Gemini · Cloudflare · Hugging Face · Nebius
 
-## Documentación
-
-Ver el informe completo en `documents/Informe_MejoraContactos_v2.docx`.
-
-## Deploy
+## Desarrollo
 
 ```bash
 npm install
-npm run dev
+npm run dev     # http://localhost:8080
+npm test        # tests unitarios
+npm run build   # build producción
 ```
 
-Para producción, desplegar en Lovable Cloud o cualquier hosting compatible con Vite.
+## Deploy
+
+Push a `main` → GitHub Actions → build → SCP a Hostinger (automático).
+
+**Producción:** https://mejoraok.com/util/mejoracontactos/
+
+## Documentación
+
+Ver `documents/DOCS.md` para documentación consolidada, arquitectura y plan de trabajo.

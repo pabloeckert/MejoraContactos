@@ -2,12 +2,12 @@
 
 > **Instrucción:** Cuando el usuario diga **"documentar"**, actualizar este archivo con el estado actual del proyecto, trabajos realizados y pendientes.
 
-**Última actualización:** 2026-04-23 22:26 GMT+8  
+**Última actualización:** 2026-04-23 22:53 GMT+8  
 **Versión:** v4.0 (hardening + performance)  
-**Commit HEAD:** `55e56f6`  
+**Commit HEAD:** `5018cb4`  
 **Repo:** [pabloeckert/MejoraContactos](https://github.com/pabloeckert/MejoraContactos)  
-**Live:** https://mejoraok.com/util/mejoracontactos/  
-**Deploy status:** ✅ `55e56f6` desplegado (2026-04-23 14:23 UTC)
+**Live:** https://util.mejoraok.com/mejoracontactos/  
+**Deploy status:** ✅ `5018cb4` desplegado (2026-04-23 14:23 UTC)
 
 ---
 
@@ -141,7 +141,14 @@ supabase/functions/
 
 ## 7. Deploy
 
-**Producción:** https://mejoraok.com/util/mejoracontactos/
+**Producción (URLs activas):**
+- https://util.mejoraok.com/mejoracontactos/ ← subdominio principal
+- https://mejoraok.com/util/mejoracontactos/ ← ruta directa (fallback)
+
+**Landing page de utilidades:**
+- https://util.mejoraok.com/ → `index.html` con cards de cada app
+- Hosteado en `/public_html/util/index.html` (vía SSH/SCP manual)
+- Para agregar apps: editar `index.html` y subir via SSH
 
 **Pipeline CI/CD:**
 1. Push a `main` → GitHub Actions trigger
@@ -153,6 +160,13 @@ supabase/functions/
 - `vite.config.ts`: `base: "/mejoracontactos/"` en producción
 - `public/.htaccess`: Rewrite rules para SPA
 - GitHub Secrets: `SSH_HOST`, `SSH_USER`, `SSH_PASS`, `SSH_PORT`
+- Subdominio: `util.mejoraok.com` → apunta a `/public_html/util/`
+
+**Servidor:**
+- FTP IP: `185.212.70.250` (puerto 21)
+- SSH: `185.212.70.250` (puerto 65002)
+- Usuario: `u846064658`
+- Ruta base: `/home/u846064658/domains/mejoraok.com/public_html/util/`
 
 **Desarrollo local:**
 ```bash
@@ -161,6 +175,19 @@ npm run dev    # → http://localhost:8080
 ```
 
 ## 8. Registro de Cambios
+
+### v4.1 — 2026-04-23 (Subdominio + Landing page)
+
+| Cambio | Tipo | Archivo |
+|--------|------|---------|
+| Subdominio `util.mejoraok.com` activo | 🟠 Infra | DNS Hostinger |
+| Landing page de utilidades en `util.mejoraok.com/` | 🟠 Infra | `/public_html/util/index.html` |
+| URL principal actualizada a subdominio | 📚 Docs | `documents/DOCS.md` |
+
+**URLs activas:**
+- `https://util.mejoraok.com/` → landing page con índice de apps
+- `https://util.mejoraok.com/mejoracontactos/` → MejoraContactos
+- `https://mejoraok.com/util/mejoracontactos/` → fallback directo
 
 ### v4.0 — 2026-04-23 (Etapa 6: Hardening & Performance)
 

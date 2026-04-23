@@ -1,5 +1,4 @@
 import Papa from "papaparse";
-import * as XLSX from "xlsx";
 import type { ParsedFile, RawContact } from "@/types/contact";
 
 function genId(): string {
@@ -29,7 +28,8 @@ export function parseCSV(file: File): Promise<ParsedFile> {
   });
 }
 
-export function parseExcel(file: File): Promise<ParsedFile> {
+export async function parseExcel(file: File): Promise<ParsedFile> {
+  const XLSX = await import("xlsx");
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {

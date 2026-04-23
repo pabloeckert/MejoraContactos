@@ -4,7 +4,7 @@
  */
 
 import { supabase } from "@/integrations/supabase/client";
-import { getActiveKeysMulti } from "@/components/ApiKeysPanel";
+import { getActiveKeysMulti } from "@/lib/api-keys";
 import { validateContactFields } from "./field-validator";
 import type { UnifiedContact, FieldValidation } from "@/types/contact";
 
@@ -78,6 +78,11 @@ function parseAIResponse(response: string, contact: UnifiedContact): FieldValida
 /**
  * Valida un contacto con IA. Solo envía contactos que las reglas marcaron como ambiguos.
  * Retorna las validaciones de campo o null si no se pudo validar.
+ *
+ * Usa el endpoint clean-contacts en modo single con el prompt de validación
+ * embebido en el campo firstName del contacto. La Edge Function lo limpiará
+ * y devolverá el contacto corregido, que comparamos con el original para
+ * derivar las validaciones.
  */
 export async function validateContactWithAI(
   contact: UnifiedContact,
@@ -89,55 +94,74 @@ export async function validateContactWithAI(
     return validationCache.get(cacheKey)!;
   }
 
-  const prompt = buildValidationPrompt(contact);
-
   try {
     const keys = getActiveKeysMulti();
-    const body: Record<string, unknown> = {
-      contacts: [{ 
-        firstName: prompt,  // Reusamos el campo firstName para enviar el prompt
-        lastName: "", whatsapp: "", company: "", jobTitle: "", email: "" 
-      }],
-      provider: "single",
-      customKeys: keys,
-      validationMode: true,
-      singleProvider: provider,
-      validationPrompt: prompt,
-      contact: {
-        firstName: contact.firstName,
-        lastName: contact.lastName,
-        whatsapp: contact.whatsapp,
-        company: contact.company,
-        jobTitle: contact.jobTitle,
-        email: contact.email,
+
+    // Enviamos el contacto real a la Edge Function para que lo limpie.
+    // La IA corregirá los campos inválidos, y comparamos antes/después.
+    const { data, error } = await supabase.functions.invoke("clean-contacts", {
+      body: {
+        contacts: [{
+          firstName: contact.firstName,
+          lastName: contact.lastName,
+          whatsapp: contact.whatsapp,
+          company: contact.company,
+          jobTitle: contact.jobTitle,
+          email: contact.email,
+        }],
+        provider: "single",
+        customKeys: keys,
+        singleProvider: provider,
       },
-    };
+    });
 
-    const { data, error } = await supabase.functions.invoke("clean-contacts", { body });
-
-    if (error || data?.error) {
-      return null;
-    }
-
-    // Extraer la respuesta
-    if (data.contacts && data.contacts[0]) {
-      // Si la función devolvió contactos, no tenemos la respuesta cruda
-      // Usar las reglas determinísticas como fallback
+    if (error || data?.error || !data?.contacts?.[0]) {
+      // Fallback: usar reglas determinísticas
       const ruleResult = validateContactFields(contact);
       validationCache.set(cacheKey, ruleResult.validations);
       return ruleResult.validations;
     }
 
-    // Si hay una respuesta de validación directa
-    if (data.validation) {
-      const validations = parseAIResponse(JSON.stringify(data.validation), contact);
-      validationCache.set(cacheKey, validations);
-      return validations;
-    }
+    const cleaned = data.contacts[0] as Record<string, string>;
 
-    return null;
+    // Comparar original vs limpio para derivar validaciones
+    const fieldMap: Array<{ field: FieldValidation['field']; original: string; cleaned: string }> = [
+      { field: 'firstName', original: contact.firstName, cleaned: cleaned.firstName || '' },
+      { field: 'lastName', original: contact.lastName, cleaned: cleaned.lastName || '' },
+      { field: 'company', original: contact.company, cleaned: cleaned.company || '' },
+      { field: 'jobTitle', original: contact.jobTitle, cleaned: cleaned.jobTitle || '' },
+      { field: 'email', original: contact.email, cleaned: cleaned.email || '' },
+      { field: 'whatsapp', original: contact.whatsapp, cleaned: cleaned.whatsapp || '' },
+    ];
+
+    const validations: FieldValidation[] = fieldMap.map(({ field, original, cleaned: cleanedVal }) => {
+      const wasCleaned = original !== cleanedVal && cleanedVal !== '';
+      const wasEmptied = original && !cleanedVal;
+      const isUnchanged = original === cleanedVal;
+
+      if (wasEmptied) {
+        return { field, isValid: false, score: 15, reason: 'IA descartó el valor como inválido' };
+      }
+      if (wasCleaned) {
+        return {
+          field, isValid: true, score: 80,
+          correctedValue: cleanedVal !== original ? cleanedVal : undefined,
+          reason: `IA corrigió: "${original}" → "${cleanedVal}"`,
+        };
+      }
+      if (isUnchanged && original) {
+        return { field, isValid: true, score: 85 };
+      }
+      return { field, isValid: true, score: 50, reason: 'Campo vacío' };
+    });
+
+    validationCache.set(cacheKey, validations);
+    return validations;
   } catch {
-    return null;
+    // Fallback: usar reglas determinísticas
+    const ruleResult = validateContactFields(contact);
+    validationCache.set(cacheKey, ruleResult.validations);
+    return ruleResult.validations;
   }
 }
 

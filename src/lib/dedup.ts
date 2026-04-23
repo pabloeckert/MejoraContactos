@@ -177,8 +177,8 @@ export class DedupIndex {
 }
 
 /**
- * Función legacy compatible con la API anterior.
- * Usa DedupIndex internamente para O(n) en lugar de O(n²).
+ * @deprecated Usa DedupIndex en su lugar — esta función es O(n²) y solo existe
+ * por compatibilidad con código legacy. Será eliminada en la próxima versión.
  */
 export function checkDuplicate(
   contact: { firstName: string; lastName: string; email: string; whatsapp: string },

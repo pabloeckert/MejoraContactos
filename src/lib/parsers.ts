@@ -72,31 +72,56 @@ export function parseVCF(file: File): Promise<ParsedFile> {
 
           for (const line of lines) {
             if (line.startsWith("FN:") || line.startsWith("FN;")) {
-              contact["Full Name"] = line.replace(/^FN[;:].*?:?/, "").replace(/^FN:/, "").trim();
-              if (line.startsWith("FN:")) contact["Full Name"] = line.slice(3).trim();
+              // FN:John Doe → "John Doe"
+              // FN;CHARSET=UTF-8:John Doe → "John Doe"
+              const colonIdx = line.indexOf(":");
+              contact["Full Name"] = colonIdx >= 0 ? line.slice(colonIdx + 1).trim() : "";
             }
             if (line.startsWith("N:") || line.startsWith("N;")) {
-              const val = line.startsWith("N:") ? line.slice(2) : line.split(":").slice(1).join(":");
+              // N:García;Juan;;Dr; → parts = ["García", "Juan", "", "Dr", ""]
+              const colonIdx = line.indexOf(":");
+              const val = colonIdx >= 0 ? line.slice(colonIdx + 1) : "";
               const parts = val.split(";");
               contact["Last Name"] = parts[0]?.trim() || "";
               contact["First Name"] = parts[1]?.trim() || "";
             }
+            // TEL;TYPE=CELL:+54911... or TEL:+54911...
             if (line.startsWith("TEL") && line.includes(":")) {
-              const val = line.split(":").pop()?.trim() || "";
-              if (!contact["Phone"]) contact["Phone"] = val;
-              else contact["Phone 2"] = val;
+              const colonIdx = line.indexOf(":");
+              const val = colonIdx >= 0 ? line.slice(colonIdx + 1).trim() : "";
+              if (val) {
+                const isCell = line.toUpperCase().includes("CELL") || line.toUpperCase().includes("MOBILE");
+                if (!contact["Phone"]) {
+                  contact["Phone"] = val;
+                  if (isCell) contact["Phone Type"] = "CELL";
+                } else if (!contact["Phone 2"]) {
+                  contact["Phone 2"] = val;
+                }
+              }
             }
+            // EMAIL;TYPE=INTERNET:... or EMAIL:...
             if (line.startsWith("EMAIL") && line.includes(":")) {
-              contact["Email"] = line.split(":").pop()?.trim() || "";
+              const colonIdx = line.indexOf(":");
+              const val = colonIdx >= 0 ? line.slice(colonIdx + 1).trim() : "";
+              if (val) contact["Email"] = val;
             }
+            // ORG:Company;Department
             if (line.startsWith("ORG") && line.includes(":")) {
-              contact["Company"] = line.split(":").pop()?.replace(/;/g, " ").trim() || "";
+              const colonIdx = line.indexOf(":");
+              const val = colonIdx >= 0 ? line.slice(colonIdx + 1).replace(/;/g, " ").trim() : "";
+              if (val) contact["Company"] = val;
             }
+            // TITLE:Job Title
             if (line.startsWith("TITLE") && line.includes(":")) {
-              contact["Job Title"] = line.split(":").pop()?.trim() || "";
+              const colonIdx = line.indexOf(":");
+              const val = colonIdx >= 0 ? line.slice(colonIdx + 1).trim() : "";
+              if (val) contact["Job Title"] = val;
             }
+            // NOTE:...
             if (line.startsWith("NOTE") && line.includes(":")) {
-              contact["Notes"] = line.split(":").pop()?.trim() || "";
+              const colonIdx = line.indexOf(":");
+              const val = colonIdx >= 0 ? line.slice(colonIdx + 1).trim() : "";
+              if (val) contact["Notes"] = val;
             }
           }
 

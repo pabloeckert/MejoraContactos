@@ -1,6 +1,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
+  // ⚠️ SECURITY: En producción, reemplazar "*" con el dominio exacto del deploy.
+  // Ejemplo: "https://tu-app.lovable.dev" o "https://tu-dominio.com"
+  // El wildcard permite que cualquier sitio llame a esta función como proxy de IA.
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",

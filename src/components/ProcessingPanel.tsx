@@ -14,7 +14,8 @@ import { validateBatchWithAI, clearValidationCache } from "@/lib/ai-validator";
 import { validateContactFields } from "@/lib/field-validator";
 import { clearContacts } from "@/lib/db";
 import { supabase } from "@/integrations/supabase/client";
-import { getActiveKeysMulti, PROVIDERS } from "./ApiKeysPanel";
+import { getActiveKeysMulti } from "@/lib/api-keys";
+import { PROVIDERS } from "@/lib/providers";
 import type {
   ParsedFile,
   ColumnMapping,

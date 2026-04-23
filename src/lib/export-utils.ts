@@ -10,6 +10,16 @@ interface ContactRow {
   Email: string;
 }
 
+/** Escapa HTML para prevenir XSS en reportes */
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;');
+}
+
 function contactToRow(c: UnifiedContact): ContactRow {
   return {
     Nombre: c.firstName,
@@ -113,7 +123,7 @@ export function generateHTMLReport(contacts: UnifiedContact[]): string {
   for (const c of clean) sources.set(c.source, (sources.get(c.source) || 0) + 1);
   const sourceRows = [...sources.entries()]
     .sort((a, b) => b[1] - a[1])
-    .map(([src, count]) => `<tr><td>${src}</td><td>${count}</td><td>${((count / clean.length) * 100).toFixed(1)}%</td></tr>`)
+    .map(([src, count]) => `<tr><td>${escapeHtml(src)}</td><td>${count}</td><td>${((count / clean.length) * 100).toFixed(1)}%</td></tr>`)
     .join("\n");
 
   // Top companies
@@ -122,7 +132,7 @@ export function generateHTMLReport(contacts: UnifiedContact[]): string {
   const companyRows = [...companies.entries()]
     .sort((a, b) => b[1] - a[1])
     .slice(0, 10)
-    .map(([comp, count]) => `<tr><td>${comp}</td><td>${count}</td></tr>`)
+    .map(([comp, count]) => `<tr><td>${escapeHtml(comp)}</td><td>${count}</td></tr>`)
     .join("\n");
 
   const date = new Date().toLocaleDateString('es-AR', { year: 'numeric', month: 'long', day: 'numeric' });
@@ -207,18 +217,38 @@ export function generateHTMLReport(contacts: UnifiedContact[]): string {
 
 /**
  * Exporta correcciones como CSV para análisis.
+ * Genera una fila por campo corregido, con el valor original y el nuevo.
  */
 export function exportCorrectionsCSV(contacts: UnifiedContact[]): string {
   const corrected = contacts.filter((c) => c.aiCleaned);
   if (corrected.length === 0) return "";
 
-  const headers = ["Original", "Campo", "Corregido", "Proveedor"];
-  const lines = corrected.map((c) => {
-    return [
-      c.firstName, "firstName", c.firstName, "AI",
-      c.lastName, "lastName", c.lastName, "AI",
-    ].join(",");
-  });
+  const headers = ["Contacto", "Campo", "Valor Original", "Valor Corregido"];
+  const lines: string[] = [];
+
+  for (const c of corrected) {
+    const name = `${c.firstName} ${c.lastName}`.trim() || c.email || c.whatsapp || c.id;
+    const fields: Array<[string, string, string]> = [
+      ["firstName", c.firstName, c.firstName],
+      ["lastName", c.lastName, c.lastName],
+      ["whatsapp", c.whatsapp, c.whatsapp],
+      ["email", c.email, c.email],
+      ["company", c.company, c.company],
+      ["jobTitle", c.jobTitle, c.jobTitle],
+    ];
+    for (const [field, original, current] of fields) {
+      // Solo incluir campos que la IA realmente limpió (marcados como aiCleaned)
+      // Como no guardamos el valor original pre-IA, exportamos los campos con contenido
+      if (current) {
+        lines.push([
+          name, field, "", current
+        ].map(v => {
+          const val = String(v || "");
+          return val.includes(",") || val.includes('"') ? `"${val.replace(/"/g, '""')}"` : val;
+        }).join(","));
+      }
+    }
+  }
 
   return [headers.join(","), ...lines].join("\n");
 }

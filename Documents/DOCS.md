@@ -2,9 +2,10 @@
 
 > **⚡ Instrucción de actualización:** Cuando el usuario diga **"documentar"**, actualizar este archivo con el estado actual del proyecto, trabajos realizados, pendientes y cualquier cambio relevante. Todos los documentos viven en esta carpeta `Documents/`.
 
-**Última actualización:** 2026-04-24 20:38 GMT+8  
+**Última actualización:** 2026-04-24 21:10 GMT+8  
 **Versión:** v5.0 (Health Check + Historial/Deshacer)  
-**Commit HEAD:** `61adf4e`  
+**Commit HEAD:** `309ea00`  
+**Análisis profundo:** Ver `Documents/ANALISIS_PROFUNDO.md` (35 perspectivas, plan 5 etapas)  
 **Repo:** [pabloeckert/MejoraContactos](https://github.com/pabloeckert/MejoraContactos)  
 **Live:** https://util.mejoraok.com/mejoracontactos/  
 **Deploy status:** ✅ Deploy verificado — HTTP 200 — 150 tests pasan
@@ -360,7 +361,35 @@ Core completo: pipeline IA, dedup O(n), Google Contacts, exportación 6 formatos
 7. **Tokens de deploy** — NO se commitean (solo en entorno local del deployador)
 8. **Proveedores obsoletos eliminados** — "lovable" removido completamente del código
 
-## 12. Comandos Rápidos
+## 12. Análisis Profundo Multidisciplinario
+
+Se realizó un análisis completo del proyecto desde 35 perspectivas profesionales. El documento completo vive en:
+
+📄 **`Documents/ANALISIS_PROFUNDO.md`**
+
+### Resumen de Hallazgos Críticos
+
+| Área | Hallazgo Principal | Prioridad |
+|------|-------------------|-----------|
+| **Seguridad** | Sin CSP headers, Edge Function sin auth JWT, API keys en localStorage sin encriptar | 🔴 Alta |
+| **UX** | Sin onboarding wizard, 6 tabs abruman al usuario nuevo, sin preview pre-proceso | 🟡 Media-Alta |
+| **DevOps** | Sin rollback automático, Edge Functions deploy manual, sin staging | 🟡 Media |
+| **Testing** | 150 unit tests bien, pero 0 E2E, 0 integration, 0 visual regression | 🟡 Media |
+| **Legal** | Sin Privacy Policy ni ToS — riesgo GDPR | 🔴 Alta |
+| **Crecimiento** | Sin analytics, sin landing page SEO, sin presencia en redes | 🟢 Media-Baja |
+| **ML/AI** | Sin embeddings para dedup semántica, prompts hardcodeados | 🟢 Futuro |
+
+### Plan por Etapas (5 semanas)
+
+1. **Semana 1:** Seguridad y Estabilidad (CSP, auth, Sentry, Error Boundaries)
+2. **Semana 2:** UX y Onboarding (wizard, modo simple, preview, analytics)
+3. **Semana 3:** Performance (PWA, hooks refactor, CDN, rollback deploy)
+4. **Semana 4:** Testing (E2E Playwright, coverage, integration tests)
+5. **Semana 5+:** Crecimiento (landing page, Product Hunt, i18n, monetización)
+
+---
+
+## 13. Comandos Rápidos
 
 ```bash
 # Desarrollo local

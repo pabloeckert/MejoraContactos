@@ -2,9 +2,9 @@
 
 > **⚡ Instrucción de actualización:** Cuando el usuario diga **"documentar"**, actualizar este archivo con el estado actual del proyecto, trabajos realizados, pendientes y cualquier cambio relevante. Todos los documentos viven en esta carpeta `Documents/`.
 
-**Última actualización:** 2026-04-24 20:26 GMT+8  
-**Versión:** v4.5 (limpieza proveedor lovable + plan optimizado)  
-**Commit HEAD:** `c995baf`  
+**Última actualización:** 2026-04-24 20:34 GMT+8  
+**Versión:** v5.0 (Health Check + Historial/Deshacer)  
+**Commit HEAD:** `9e225c2`  
 **Repo:** [pabloeckert/MejoraContactos](https://github.com/pabloeckert/MejoraContactos)  
 **Live:** https://util.mejoraok.com/mejoracontactos/  
 **Deploy status:** ✅ Deploy verificado — HTTP 200 — 150 tests pasan
@@ -44,6 +44,8 @@ src/
 │   ├── ExportPanel.tsx          # Exportación multi-formato (6 formatos)
 │   ├── FileDropzone.tsx         # Drag & drop de archivos
 │   ├── GoogleContactsPanel.tsx  # OAuth multi-cuenta Google (hasta 5)
+│   ├── HealthCheckPanel.tsx     # Test masivo de API keys + latencia
+│   ├── HistoryPanel.tsx         # Historial de ops + deshacer (undo)
 │   ├── ProcessingPanel.tsx      # Pipeline de procesamiento (UI shell)
 │   ├── PipelineVisualizer.tsx   # Tracker visual de etapas del pipeline
 │   └── ui/                      # shadcn/ui components (20+)
@@ -210,6 +212,19 @@ npx supabase functions deploy google-contacts-auth
 
 ## 8. Registro de Cambios
 
+### v5.0 — 2026-04-24 (Health Check + Historial/Deshacer)
+
+**Commit:** `9e225c2`
+
+| Cambio | Tipo | Detalle |
+|--------|------|---------|
+| HealthCheckPanel | ✨ Feature | Test masivo de todas las API keys con latencia y status visual |
+| HistoryPanel | ✨ Feature | Snapshots automáticos antes de limpieza, deshacer con un click |
+| IndexedDB v3 | 🔧 Upgrade | Store "history" con max 10 snapshots, cursor-based |
+| Auto-snapshot | ✨ Feature | Guarda estado antes de procesar y antes de reiniciar |
+| Grid responsive | 🎨 UI | Health Check + Historial lado a lado en tab Config |
+| Bundle | 📊 Perf | +13KB (376KB → 389KB index) |
+
 ### v4.5 — 2026-04-24 (Limpieza proveedor lovable + plan optimizado)
 
 **Commit:** `a724830`
@@ -259,7 +274,7 @@ Core completo: pipeline IA, dedup O(n), Google Contacts, exportación 6 formatos
 
 ## 9. Plan de Trabajo — Etapas Optimizadas
 
-### Estado general: ✅ Core completo | ✅ Deploy funcional | ✅ APIs verificadas | ✅ Código limpio
+### Estado general: ✅ Core completo | ✅ Deploy funcional | ✅ APIs verificadas | ✅ Código limpio | ✅ Health Check | ✅ Historial/Undo
 
 ### ✅ Etapas Completadas
 
@@ -275,6 +290,7 @@ Core completo: pipeline IA, dedup O(n), Google Contacts, exportación 6 formatos
 | Migración Supabase (v4.3) | Proyecto propio + deploy | 2026-04-24 |
 | Fix APIs (v4.4) | Anon key + modelo OpenRouter | 2026-04-24 |
 | Limpieza código (v4.5) | Eliminar proveedor "lovable" obsoleto | 2026-04-24 |
+| **Health Check + Undo (v5.0)** | **Test masivo de keys + historial con deshacer** | **2026-04-24** |
 
 ### 📋 Próximas Etapas Sugeridas
 
@@ -288,11 +304,11 @@ Core completo: pipeline IA, dedup O(n), Google Contacts, exportación 6 formatos
 | 6.5 | Test Google OAuth | Importación desde Google Contacts | ⏳ Pendiente |
 
 #### Etapa 7 — Mejoras funcionales
-| # | Tarea | Detalle |
-|---|-------|---------|
-| 7.1 | Health check automático | Test periódico de keys desde la UI |
-| 7.2 | Monitoreo Edge Functions | Revisar logs en Supabase Dashboard |
-| 7.3 | Undo/History | Deshacer última operación de limpieza |
+| # | Tarea | Detalle | Estado |
+|---|-------|---------|--------|
+| 7.1 | Health check automático | Test masivo de keys con latencia y status visual | ✅ v5.0 |
+| 7.2 | Monitoreo Edge Functions | Revisar logs en Supabase Dashboard | ⏳ Pendiente |
+| 7.3 | Undo/History | Snapshots antes de limpieza, deshacer con un click | ✅ v5.0 |
 
 #### Etapa 8 — Optimización avanzada
 | # | Tarea | Detalle |

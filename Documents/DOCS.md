@@ -2,9 +2,9 @@
 
 > **⚡ Instrucción de actualización:** Cuando el usuario diga **"documentar"**, actualizar este archivo con el estado actual del proyecto, trabajos realizados, pendientes y cualquier cambio relevante. Todos los documentos viven en esta carpeta `Documents/`.
 
-**Última actualización:** 2026-04-24 21:45 GMT+8  
-**Versión:** v8.0 (Performance y Escalabilidad)  
-**Commit HEAD:** `cb08888`  
+**Última actualización:** 2026-04-24 21:58 GMT+8  
+**Versión:** v9.0 (Calidad y Testing)  
+**Commit HEAD:** (pending)  
 **Análisis profundo:** Ver `Documents/ANALISIS_PROFUNDO.md` (35 perspectivas, plan 5 etapas)  
 **Repo:** [pabloeckert/MejoraContactos](https://github.com/pabloeckert/MejoraContactos)  
 **Live:** https://util.mejoraok.com/mejoracontactos/  
@@ -212,6 +212,18 @@ npx supabase functions deploy google-contacts-auth
 | Subdominio DNS | `util.mejoraok.com` → Hostinger |
 
 ## 8. Registro de Cambios
+
+### v9.0 — 2026-04-24 (Calidad y Testing)
+
+| Cambio | Tipo | Detalle |
+|--------|------|---------|
+| E2E Playwright | ✅ Testing | 14 tests E2E: onboarding, navegación, theme, modos, empty states, settings, footer, privacy/terms, manifest, console errors |
+| Coverage config | ✅ Testing | vitest coverage v8 con thresholds: 70% lines, 70% functions, 60% branches |
+| Performance budget | ✅ Testing | 5 tests: dist <2MB, index <450KB, no JS >500KB, CSS <50KB |
+| A11y tests | ✅ Testing | 5 tests: aria-labels, alt text, form labels, heading hierarchy, focus styles |
+| Edge Function tests | ✅ Testing | 18 tests: input validation, sanitización, provider validation |
+| Playwright config | 🔧 Config | chromium, webServer auto-start, CI-aware retries |
+| package.json scripts | 🔧 CI | test:coverage, test:e2e, test:e2e:headed |
 
 ### v8.0 — 2026-04-24 (Performance y Escalabilidad)
 

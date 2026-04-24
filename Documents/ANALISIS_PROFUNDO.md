@@ -940,19 +940,20 @@ El proyecto tiene un core sólido, deploy funcional, 150 tests, y documentación
 
 ---
 
-## Etapa 9 — Calidad y Testing (Prioridad: 🟡 Media)
+## Etapa 9 — Calidad y Testing (Prioridad: 🟡 Media) ✅ COMPLETADA
 
-| # | Tarea | Responsable | Esfuerzo | Impacto |
-|---|-------|------------|----------|---------|
-| 9.1 | E2E tests con Playwright | QA | 6h | Alto |
-| 9.2 | Coverage report con mínimo 70% | QA | 1h | Medio |
-| 9.3 | Visual regression (Chromatic) | QA | 3h | Bajo |
-| 9.4 | Performance budget test | QA | 1h | Medio |
-| 9.5 | A11y automated tests | QA | 2h | Medio |
-| 9.6 | Edge Function integration tests | Backend Dev | 3h | Alto |
+**Completada:** 2026-04-24 (v9.0)
 
-**Esfuerzo total:** ~16 horas
-**Entregable:** Suite de testing completa + confianza en cambios
+| # | Tarea | Responsable | Esfuerzo | Impacto | Estado |
+|---|-------|------------|----------|---------|--------|
+| 9.1 | E2E tests con Playwright | QA | 6h | Alto | ✅ (14 tests) |
+| 9.2 | Coverage report con mínimo 70% | QA | 1h | Medio | ✅ (v8 thresholds) |
+| 9.3 | Visual regression (Chromatic) | QA | 3h | Bajo | ⏳ Pendiente (requiere servicio externo) |
+| 9.4 | Performance budget test | QA | 1h | Medio | ✅ (5 tests) |
+| 9.5 | A11y automated tests | QA | 2h | Medio | ✅ (5 tests) |
+| 9.6 | Edge Function integration tests | Backend Dev | 3h | Alto | ✅ (18 tests) |
+
+**Entregable:** Suite de testing completa + confianza en cambios ✅
 
 ---
 

@@ -4,7 +4,7 @@
 
 **Última actualización:** 2026-04-24 21:58 GMT+8  
 **Versión:** v9.0 (Calidad y Testing)  
-**Commit HEAD:** (pending)  
+**Commit HEAD:** `4ef99cc`  
 **Análisis profundo:** Ver `Documents/ANALISIS_PROFUNDO.md` (35 perspectivas, plan 5 etapas)  
 **Repo:** [pabloeckert/MejoraContactos](https://github.com/pabloeckert/MejoraContactos)  
 **Live:** https://util.mejoraok.com/mejoracontactos/  
@@ -394,7 +394,7 @@ Core completo: pipeline IA, dedup O(n), Google Contacts, exportación 6 formatos
 | Anon key JWT | ✅ | Obtenida via Management API |
 | Groq API | ✅ | Verificado HTTP 200 |
 | OpenRouter API | ✅ | Modelo actualizado, verificado |
-| Tests | ✅ | 150 tests, 11 archivos |
+| Tests | ✅ | 188 tests (174 unit + 14 E2E), 15 archivos |
 | CSP headers | ✅ | Content-Security-Policy + 5 headers de seguridad |
 | JWT auth | ✅ | Edge Function verifica contra Supabase Auth |
 | Input validation | ✅ | Zod-like validación + sanitización en Edge Function |

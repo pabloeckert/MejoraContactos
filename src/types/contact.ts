@@ -29,7 +29,7 @@ export type ContactField =
 export const CONTACT_FIELDS: { value: ContactField; label: string }[] = [
   { value: "firstName", label: "Nombre" },
   { value: "lastName", label: "Apellido" },
-  { value: "whatsapp", label: "WhatsApp" },
+  { value: "whatsapp", label: "Teléfono / WhatsApp" },
   { value: "company", label: "Empresa" },
   { value: "jobTitle", label: "Cargo" },
   { value: "email", label: "Email" },

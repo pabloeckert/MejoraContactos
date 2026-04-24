@@ -886,20 +886,21 @@ No hay comunidad activa.
 
 El proyecto tiene un core sólido, deploy funcional, 150 tests, y documentación consolidada. Las etapas anteriores (v1-v5) están completas.
 
-## Etapa 6 — Seguridad y Estabilidad (Prioridad: 🔴 Alta)
+## Etapa 6 — Seguridad y Estabilidad (Prioridad: 🔴 Alta) ✅ COMPLETADA
 
-| # | Tarea | Responsable | Esfuerzo | Impacto |
-|---|-------|------------|----------|---------|
-| 6.1 | CSP headers en `.htaccess` | Cybersecurity | 30min | Alto |
-| 6.2 | Auth en Edge Function (verificar JWT) | Backend Dev | 2h | Alto |
-| 6.3 | npm audit en CI pipeline | DevOps | 15min | Medio |
-| 6.4 | React Error Boundaries | Frontend Dev | 1h | Alto |
-| 6.5 | Sentry error tracking | SRE | 1h | Alto |
-| 6.6 | Privacy Policy + ToS (páginas estáticas) | Legal | 3h | Alto |
-| 6.7 | Validación de input con Zod en Edge Function | Backend Dev | 1h | Medio |
+**Completada:** 2026-04-24 (v6.0, commit `3018f84`)
 
-**Esfuerzo total:** ~9 horas
-**Entregable:** Deploy seguro + monitoreo básico + cumplimiento legal mínimo
+| # | Tarea | Responsable | Esfuerzo | Impacto | Estado |
+|---|-------|------------|----------|---------|--------|
+| 6.1 | CSP headers en `.htaccess` | Cybersecurity | 30min | Alto | ✅ |
+| 6.2 | Auth en Edge Function (verificar JWT) | Backend Dev | 2h | Alto | ✅ |
+| 6.3 | npm audit en CI pipeline | DevOps | 15min | Medio | ✅ |
+| 6.4 | React Error Boundaries | Frontend Dev | 1h | Alto | ✅ |
+| 6.5 | Error tracking utility (preparado para Sentry) | SRE | 30min | Alto | ✅ |
+| 6.6 | Privacy Policy + ToS (páginas estáticas) | Legal | 3h | Alto | ✅ |
+| 6.7 | Validación de input en Edge Function | Backend Dev | 1h | Medio | ✅ |
+
+**Entregable:** Deploy seguro + monitoreo básico + cumplimiento legal mínimo ✅
 
 ---
 

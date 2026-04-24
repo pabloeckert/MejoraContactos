@@ -19,7 +19,7 @@ jobs:
           node-version: 22
           cache: npm
 
-      - run: npm ci
+      - run: npm ci --legacy-peer-deps
       - run: npm audit --audit-level=high || true  # Warn but don't block deploy
       - run: npm test
       - run: npm run build

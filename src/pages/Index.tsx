@@ -198,6 +198,14 @@ const Index = () => {
           </TabsContent>
         </Tabs>
       </main>
+
+      {/* Footer */}
+      <footer className="py-3 px-4 text-center text-xs text-muted-foreground/60 border-t border-border/30">
+        <span>© 2026 MejoraContactos · </span>
+        <a href={`${import.meta.env.BASE_URL}privacy`} className="hover:text-foreground underline underline-offset-2">Privacidad</a>
+        <span> · </span>
+        <a href={`${import.meta.env.BASE_URL}terms`} className="hover:text-foreground underline underline-offset-2">Términos</a>
+      </footer>
     </div>
   );
 };

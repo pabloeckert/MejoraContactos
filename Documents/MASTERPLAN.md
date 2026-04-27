@@ -2,12 +2,12 @@
 
 > **⚡ Instrucción:** Cuando el usuario diga **"documentar"**, actualizar este archivo con el estado actual del proyecto, trabajos realizados, pendientes y cualquier cambio relevante. Todos los documentos viven en `Documents/`.
 
-**Última actualización:** 2026-04-28 06:30 GMT+8  
+**Última actualización:** 2026-04-28 06:32 GMT+8  
 **Versión actual:** v10.5  
-**Commit HEAD:** 0e9aa4c  
+**Commit HEAD:** 79a89c9  
 **Repo:** [pabloeckert/MejoraContactos](https://github.com/pabloeckert/MejoraContactos)  
 **Live:** https://util.mejoraok.com/mejoracontactos/  
-**Tests:** 174 pasando ✅ | Build: OK ✅
+**Tests:** 174 pasando ✅ | Build: OK ✅ | LOC: 8.115
 
 ---
 
@@ -218,7 +218,7 @@ Parseo → Mapeo → Reglas (80%) → IA Limpieza → IA Verificación → IA Co
 | 1 | groq | Groq Cloud | llama-3.3-70b-versatile | ✅ Verificado (9ms) |
 | 2 | cerebras | Cerebras | llama3.1-8b | ✅ Verificado (4ms) |
 | 3 | deepseek | DeepSeek | deepseek-chat | ⚠️ Key válida, sin saldo |
-| 4 | gemini | Google AI Studio | gemini-2.0-flash | ⚠️ Key pendiente verificar |
+| 4 | gemini | Google AI Studio | gemini-2.0-flash | ⚠️ Key recién creada, pendiente activación |
 | 5 | openrouter | OpenRouter | llama-3.3-70b-instruct:free | ⏳ Sin key |
 | 6 | together | Together AI | Llama-3.3-70B-Instruct-Turbo-Free | ⏳ Sin key |
 | 7 | deepinfra | DeepInfra | Llama-3.3-70B-Instruct | ⏳ Sin key |

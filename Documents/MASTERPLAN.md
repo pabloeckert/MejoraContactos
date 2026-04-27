@@ -2,9 +2,9 @@
 
 > **⚡ Instrucción:** Cuando el usuario diga **"documentar"**, actualizar este archivo con el estado actual del proyecto, trabajos realizados, pendientes y cualquier cambio relevante. Todos los documentos viven en `Documents/`.
 
-**Última actualización:** 2026-04-28 06:05 GMT+8  
-**Versión actual:** v10.3  
-**Commit HEAD:** bb5cee8  
+**Última actualización:** 2026-04-28 06:28 GMT+8  
+**Versión actual:** v10.4  
+**Commit HEAD:** 68f4a35  
 **Repo:** [pabloeckert/MejoraContactos](https://github.com/pabloeckert/MejoraContactos)  
 **Live:** https://util.mejoraok.com/mejoracontactos/  
 **Tests:** 174 pasando ✅ | Build: OK ✅
@@ -215,18 +215,18 @@ Parseo → Mapeo → Reglas (80%) → IA Limpieza → IA Verificación → IA Co
 
 | # | ID | Proveedor | Modelo | Estado |
 |---|-----|----------|--------|--------|
-| 1 | groq | Groq Cloud | llama-3.3-70b-versatile | ✅ Verificado |
-| 2 | openrouter | OpenRouter | llama-3.3-70b-instruct:free | ✅ Verificado (rate limit temporal) |
-| 3 | together | Together AI | Llama-3.3-70B-Instruct-Turbo-Free | ⏳ Pendiente |
-| 4 | cerebras | Cerebras | llama-3.3-70b | ⏳ Pendiente |
-| 5 | deepinfra | DeepInfra | Llama-3.3-70B-Instruct | ⏳ Pendiente |
-| 6 | sambanova | SambaNova | Meta-Llama-3.3-70B-Instruct | ⏳ Pendiente |
-| 7 | mistral | Mistral AI | mistral-small-latest | ⏳ Pendiente |
-| 8 | deepseek | DeepSeek | deepseek-chat | ⏳ Pendiente |
-| 9 | gemini | Google AI Studio | gemini-2.0-flash-exp | ⏳ Pendiente |
-| 10 | cloudflare | Cloudflare Workers AI | llama-3.3-70b-instruct-fp8-fast | ⏳ Pendiente |
-| 11 | huggingface | Hugging Face | Llama-3.3-70B-Instruct | ⏳ Pendiente |
-| 12 | nebius | Nebius AI | Llama-3.3-70B-Instruct | ⏳ Pendiente |
+| 1 | groq | Groq Cloud | llama-3.3-70b-versatile | ✅ Verificado (9ms) |
+| 2 | cerebras | Cerebras | llama3.1-8b | ✅ Verificado (4ms) |
+| 3 | deepseek | DeepSeek | deepseek-chat | ⚠️ Key válida, sin saldo |
+| 4 | gemini | Google AI Studio | gemini-2.0-flash | ⚠️ Key pendiente verificar |
+| 5 | openrouter | OpenRouter | llama-3.3-70b-instruct:free | ⏳ Sin key |
+| 6 | together | Together AI | Llama-3.3-70B-Instruct-Turbo-Free | ⏳ Sin key |
+| 7 | deepinfra | DeepInfra | Llama-3.3-70B-Instruct | ⏳ Sin key |
+| 8 | sambanova | SambaNova | Meta-Llama-3.3-70B-Instruct | ⏳ Sin key |
+| 9 | mistral | Mistral AI | mistral-small-latest | ⏳ Sin key |
+| 10 | cloudflare | Cloudflare Workers AI | llama-3.3-70b-instruct-fp8-fast | ⏳ Sin key |
+| 11 | huggingface | Hugging Face | — | ❌ Free tier no soporta 70B |
+| 12 | nebius | Nebius AI | Llama-3.3-70B-Instruct | ⏳ Sin key |
 
 **Configuración:**
 - Rotación automática: 429/402/401 → siguiente proveedor
@@ -318,7 +318,7 @@ Parseo → Mapeo → Reglas (80%) → IA Limpieza → IA Verificación → IA Co
 |---|-------|----------------|-----------|--------|
 | 11.1 | Verificar funcionalidad en producción | SRE, QA | 🔴 Crítica | ✅ Verificado 2026-04-25 |
 | 11.2 | Test pipeline completo con CSV real | QA, Product Owner | 🔴 Crítica | ✅ 27 contactos, 12 dup |
-| 11.3 | Test todos los proveedores IA con keys reales | Backend Dev | 🟡 Alta | ⏳ Necesita keys |
+| 11.3 | Test todos los proveedores IA con keys reales | Backend Dev | 🟡 Alta | ✅ 2/12 verificados (Groq, Cerebras) |
 | 11.4 | Monitoreo: Sentry para errores de producción | SRE | 🟡 Alta | ✅ Error Reporter v2 + Edge Function |
 | 11.5 | Uptime check (cron que verifique HTTP 200) | DevOps | 🟡 Alta | ✅ health.json + cron cada 5 min |
 | 11.6 | Cloudflare CDN + SSL | Cloud Architect | 🟢 Media | 📚 Guía lista |
@@ -443,6 +443,7 @@ npx supabase functions deploy google-contacts-auth
 
 | Versión | Fecha | Cambios principales |
 |---------|-------|-------------------|
+| v10.4 | 2026-04-28 | Cerebras modelo actualizado (llama3.1-8b), proveedores verificados |
 | v10.3 | 2026-04-28 | Monitoreo: error reporter v2, health endpoint, uptime cron |
 | v10.2 | 2026-04-28 | Fix 3 bugs: encoding UTF-8 CSV, regex column mapper, historial snapshot |
 | v10.1 | 2026-04-28 | Documentación consolidada en MASTERPLAN.md único |

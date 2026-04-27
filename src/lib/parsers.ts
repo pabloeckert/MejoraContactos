@@ -7,24 +7,39 @@ function genId(): string {
 
 export function parseCSV(file: File): Promise<ParsedFile> {
   return new Promise((resolve, reject) => {
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      encoding: "UTF-8",
-      complete(results) {
-        const rows = results.data as RawContact[];
-        resolve({
-          id: genId(),
-          name: file.name,
-          size: file.size,
-          type: "CSV",
-          rows,
-          columns: results.meta.fields || [],
-          addedAt: new Date(),
+    // Read as ArrayBuffer and decode as UTF-8 to handle BOM and special chars correctly
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const buffer = e.target!.result as ArrayBuffer;
+        const decoder = new TextDecoder("utf-8");
+        let text = decoder.decode(buffer);
+        // Strip BOM if present
+        if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+
+        Papa.parse(text, {
+          header: true,
+          skipEmptyLines: true,
+          complete(results) {
+            const rows = results.data as RawContact[];
+            resolve({
+              id: genId(),
+              name: file.name,
+              size: file.size,
+              type: "CSV",
+              rows,
+              columns: results.meta.fields || [],
+              addedAt: new Date(),
+            });
+          },
+          error: (err) => reject(err),
         });
-      },
-      error: (err) => reject(err),
-    });
+      } catch (err) {
+        reject(err);
+      }
+    };
+    reader.onerror = reject;
+    reader.readAsArrayBuffer(file);
   });
 }
 

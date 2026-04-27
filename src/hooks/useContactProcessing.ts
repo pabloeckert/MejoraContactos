@@ -3,7 +3,7 @@ import { DedupIndex } from "@/lib/dedup";
 import { batchRuleClean } from "@/lib/rule-cleaner";
 import { validateBatchWithAI, clearValidationCache } from "@/lib/ai-validator";
 import { validateContactFields } from "@/lib/field-validator";
-import { clearContacts } from "@/lib/db";
+import { clearContacts, saveHistorySnapshot, getAllContacts } from "@/lib/db";
 import { supabase } from "@/integrations/supabase/client";
 import { getActiveKeysMulti } from "@/lib/api-keys";
 import { autoDetectMappings } from "@/lib/column-mapper";
@@ -215,6 +215,17 @@ export function useContactProcessing(files: ParsedFile[]) {
     setPipelineState({ ...INITIAL_PIPELINE, mapping: "active" });
     setStats({ totalRows, processedRows: 0, uniqueContacts: 0, duplicatesFound: 0, aiCleanedCount: 0, rowsPerSecond: 0, startTime, status: "processing" });
     addLog("info", `Iniciando procesamiento de ${totalRows} filas...`);
+
+    // Save snapshot to history before processing (for undo)
+    try {
+      const existingContacts = await getAllContacts();
+      if (existingContacts.length > 0) {
+        await saveHistorySnapshot("clean", `Pre-limpieza (${existingContacts.length} contactos)`, existingContacts);
+        addLog("info", `📸 Snapshot guardado en historial (${existingContacts.length} contactos)`);
+      }
+    } catch (err) {
+      addLog("warning", `No se pudo guardar snapshot: ${err}`);
+    }
 
     const rawContacts: Partial<UnifiedContact>[] = [];
     const activeMappings = mappings.filter((m) => m.target !== "ignore");

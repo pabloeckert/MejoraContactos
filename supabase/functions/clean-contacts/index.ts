@@ -97,7 +97,7 @@ function buildConfig(provider: Exclude<Provider, "pipeline">, apiKey: string): P
     case "together":
       return { url: "https://api.together.xyz/v1/chat/completions", apiKey, model: "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free", name: "Together AI (Llama 3.3)" };
     case "cerebras":
-      return { url: "https://api.cerebras.ai/v1/chat/completions", apiKey, model: "llama-3.3-70b", name: "Cerebras (Llama 3.3)" };
+      return { url: "https://api.cerebras.ai/v1/chat/completions", apiKey, model: "llama3.1-8b", name: "Cerebras (Llama 3.1 8B)" };
     case "deepinfra":
       return { url: "https://api.deepinfra.com/v1/openai/chat/completions", apiKey, model: "meta-llama/Llama-3.3-70B-Instruct", name: "DeepInfra (Llama 3.3)" };
     case "sambanova":

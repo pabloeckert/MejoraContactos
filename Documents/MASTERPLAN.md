@@ -2,12 +2,12 @@
 
 > **⚡ Instrucción:** Cuando el usuario diga **"documentar"**, actualizar este archivo con el estado actual del proyecto, trabajos realizados, pendientes y cualquier cambio relevante. Todos los documentos viven en `Documents/`.
 
-**Última actualización:** 2026-04-28 06:32 GMT+8  
+**Última actualización:** 2026-04-28 06:37 GMT+8  
 **Versión actual:** v10.5  
-**Commit HEAD:** 79a89c9  
+**Commit HEAD:** 0ea9a95  
 **Repo:** [pabloeckert/MejoraContactos](https://github.com/pabloeckert/MejoraContactos)  
 **Live:** https://util.mejoraok.com/mejoracontactos/  
-**Tests:** 174 pasando ✅ | Build: OK ✅ | LOC: 8.115
+**Tests:** 174 pasando ✅ | Build: OK ✅ | LOC: 8.115 | Sesión: 9 commits
 
 ---
 
@@ -511,6 +511,75 @@ npx supabase functions deploy google-contacts-auth
 - **Git config:** `MejoraContactos Bot <bot@mejoraok.com>`
 - **Branch:** `main` (deploy automático)
 - **NO commitear:** `.env`, tokens, API keys, `supabase/.temp`
+
+---
+
+## 14. Resumen de Sesión — 2026-04-28
+
+### Commis realizados (9)
+
+| # | Commit | Tipo | Descripción |
+|---|--------|------|-------------|
+| 1 | `c579a03` | docs | Consolidación total en MASTERPLAN.md único |
+| 2 | `178997b` | fix | 3 bugs: encoding UTF-8 CSV, regex column mapper, historial snapshot |
+| 3 | `bb5cee8` | feat | Monitoreo: error reporter v2, health endpoint, uptime cron |
+| 4 | `b2a1834` | docs | MASTERPLAN.md v10.3 |
+| 5 | `68f4a35` | fix | Cerebras modelo actualizado a llama3.1-8b |
+| 6 | `d4680e7` | docs | MASTERPLAN.md v10.4 — proveedores verificados |
+| 7 | `0e9aa4c` | feat | Keyboard shortcuts, SimpleMode fix (ProcessingPanel integrado) |
+| 8 | `79a89c9` | docs | MASTERPLAN.md v10.5 |
+| 9 | `0ea9a95` | docs | MASTERPLAN.md v10.5 — commit HEAD actualizado |
+
+### Estado de proveedores IA (testeado con keys reales)
+
+| Proveedor | Key | Estado | Modelo | Latencia |
+|-----------|-----|--------|--------|----------|
+| **Groq** | ✅ `gsk_...` | **Funcionando** | llama-3.3-70b-versatile | ~9ms |
+| **Cerebras** | ✅ `csk_...` | **Funcionando** | llama3.1-8b | ~4ms ⚡ |
+| **DeepSeek** | ✅ `sk_...` | Key válida, sin saldo | deepseek-chat | — |
+| **Gemini** | ⚠️ `AlzaSy...` | Key recién creada, pendiente activación | gemini-2.0-flash | — |
+| **HuggingFace** | ✅ `hf_...` | Free tier no soporta 70B | — | — |
+
+### Archivos modificados en sesión
+
+| Archivo | Cambio |
+|---------|--------|
+| `Documents/MASTERPLAN.md` | Documento maestro único con toda la documentación |
+| `Documents/DOCS.md` | Redirige a MASTERPLAN.md |
+| `Documents/ANALISIS_PROFUNDO.md` | Redirige a MASTERPLAN.md |
+| `Documents/PROMPT.md` | Actualizado con estado v10.5 |
+| `README.md` | Referencía MASTERPLAN.md |
+| `src/lib/parsers.ts` | CSV: ArrayBuffer + TextDecoder UTF-8 + strip BOM |
+| `src/lib/column-mapper.ts` | Regex robusto con acentos y variantes |
+| `src/lib/error-reporter.ts` | v2: unhandled errors, webhook, Edge Function |
+| `src/lib/providers.ts` | Cerebras: llama3.1-8b |
+| `src/main.tsx` | initErrorReporting() al arrancar |
+| `src/components/SimpleMode.tsx` | ProcessingPanel integrado en paso 3 |
+| `src/pages/Index.tsx` | Keyboard shortcuts (1-6, D, S, ?) |
+| `src/hooks/useContactProcessing.ts` | saveHistorySnapshot pre-proceso |
+| `public/health.json` | Endpoint de health check |
+| `scripts/uptime-check.sh` | Script bash para monitoreo externo |
+| `supabase/functions/log-error/index.ts` | Edge Function para centralized error logging |
+| `supabase/functions/clean-contacts/index.ts` | Cerebras modelo actualizado |
+
+### Pendiente para próxima sesión
+
+1. **Gemini key** — verificar activación en aistudio.google.com/app/apikey
+2. **Deploy Edge Functions** — `npx supabase functions deploy log-error` + `clean-contacts`
+3. **Etapa 12** — analytics + mejoras UX (uso personal, sin monetización)
+4. **3er proveedor IA** — necesaria para pipeline completo (Groq + Cerebras + ?)
+5. **Cloudflare CDN** — guía lista, requiere configuración del usuario
+
+### Métricas de sesión
+
+- **Duración:** ~55 minutos
+- **Commits:** 9
+- **Tests:** 174 pasando (0 rotos)
+- **Deploy:** HTTP 200 verificado en cada push
+- **Proveedores verificados:** 2/12 (Groq, Cerebras)
+- **Bugs fixeados:** 3
+- **Features nuevas:** 3 (monitoreo, keyboard shortcuts, SimpleMode fix)
+- **Documentación:** Consolidada de 4 archivos a 1 (MASTERPLAN.md)
 
 ---
 

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getActiveKeysMulti } from "@/lib/api-keys";
 import { autoDetectMappings } from "@/lib/column-mapper";
 import type { ParsedFile, ColumnMapping, ContactField, StageConfig } from "@/types/contact";
@@ -47,7 +47,9 @@ export function usePipelineConfig(files: ParsedFile[]) {
   const allRowsRef = useRef<Record<string, string>[]>([]);
   useMemo(() => { allRowsRef.current = files.flatMap((f) => f.rows); }, [files]);
 
-  const activeKeys = useMemo(() => getActiveKeysMulti(), []);
+  const initialKeys = (() => { try { const r = getActiveKeysMulti(); return r instanceof Promise ? {} : r; } catch { return {}; } })();
+  const [activeKeys, setActiveKeys] = useState<Record<string, string[]>>(initialKeys);
+  useEffect(() => { Promise.resolve(getActiveKeysMulti()).then(setActiveKeys).catch(() => {}); }, []);
   const activeProviders = useMemo(() => Object.keys(activeKeys).filter(k => activeKeys[k].length > 0), [activeKeys]);
   const activeProvidersKey = activeProviders.join(",");
 

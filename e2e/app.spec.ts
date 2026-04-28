@@ -139,4 +139,63 @@ test.describe("MejoraContactos — E2E", () => {
     );
     expect(criticalErrors).toHaveLength(0);
   });
+
+  test("can import CSV file and see contacts", async ({ page }) => {
+    await page.getByRole("button", { name: /saltar/i }).click();
+
+    // Switch to advanced mode for full import flow
+    await page.getByTitle(/modo avanzado/i).click();
+
+    // Upload test CSV via the file input
+    const fileInput = page.locator('input[type="file"]');
+    await fileInput.setInputFiles("test-contacts.csv");
+
+    // Wait for parsing — should show file in the list
+    await expect(page.getByText(/test-contacts\.csv/i)).toBeVisible({ timeout: 10000 });
+
+    // Should show parsed row count
+    await expect(page.getByText(/\d+.*contactos?\s*(detectados|encontrados|cargados)?/i)).toBeVisible({ timeout: 10000 });
+  });
+
+  test("can import CSV and navigate to process tab", async ({ page }) => {
+    await page.getByRole("button", { name: /saltar/i }).click();
+    await page.getByTitle(/modo avanzado/i).click();
+
+    // Upload CSV
+    const fileInput = page.locator('input[type="file"]');
+    await fileInput.setInputFiles("test-contacts.csv");
+    await expect(page.getByText(/test-contacts\.csv/i)).toBeVisible({ timeout: 10000 });
+
+    // Navigate to process tab
+    await page.getByRole("tab", { name: /procesar/i }).click();
+
+    // Should show processing controls
+    await expect(page.getByText(/procesar contactos/i)).toBeVisible();
+  });
+
+  test("responsive: app works on mobile viewport", async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.getByRole("button", { name: /saltar/i }).click();
+
+    // Core elements should still be visible
+    await expect(page.getByText(/arrastrá archivos/i)).toBeVisible();
+    await expect(page.getByText("Modo simple")).toBeVisible();
+  });
+
+  test("keyboard shortcuts: number keys switch tabs in advanced mode", async ({ page }) => {
+    await page.getByRole("button", { name: /saltar/i }).click();
+    await page.getByTitle(/modo avanzado/i).click();
+
+    // Press 2 to go to process tab
+    await page.keyboard.press("2");
+    await expect(page.getByRole("tab", { name: /procesar/i })).toHaveAttribute("data-state", "active");
+
+    // Press 3 to go to results tab
+    await page.keyboard.press("3");
+    await expect(page.getByRole("tab", { name: /resultados/i })).toHaveAttribute("data-state", "active");
+
+    // Press 1 to go back to import tab
+    await page.keyboard.press("1");
+    await expect(page.getByRole("tab", { name: /importar/i })).toHaveAttribute("data-state", "active");
+  });
 });

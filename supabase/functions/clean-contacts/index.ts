@@ -7,44 +7,103 @@ const ALLOWED_ORIGINS = [
   "http://localhost:5173",
 ];
 
-// --- Rate limiting ---
-// Sliding window: max RATE_LIMIT_MAX requests per RATE_LIMIT_WINDOW_MS per IP
+// --- Rate limiting (DB-backed, cross-instance) ---
 const RATE_LIMIT_MAX = 30; // max requests per window
-const RATE_LIMIT_WINDOW_MS = 60_000; // 1 minute window
+const RATE_LIMIT_WINDOW_SEC = 60; // 1 minute window in seconds
+const CLEANUP_PROBABILITY = 0.01; // ~1% chance per request
 
-const rateLimitMap = new Map<string, number[]>();
+function getSupabaseAdmin() {
+  const url = Deno.env.get("SUPABASE_URL");
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!url || !key) throw new Error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
+  return { url, key };
+}
 
-function checkRateLimit(ip: string): { allowed: boolean; retryAfter?: number } {
-  const now = Date.now();
-  const windowStart = now - RATE_LIMIT_WINDOW_MS;
-  const timestamps = rateLimitMap.get(ip) || [];
+interface RateLimitResult {
+  allowed: boolean;
+  retryAfter?: number;
+}
 
-  // Prune old entries
-  const recent = timestamps.filter((t) => t > windowStart);
-  rateLimitMap.set(ip, recent);
+async function checkRateLimitDB(ip: string): Promise<RateLimitResult> {
+  const { url, key } = getSupabaseAdmin();
+  const windowStart = new Date(Date.now() - RATE_LIMIT_WINDOW_SEC * 1000).toISOString();
 
-  if (recent.length >= RATE_LIMIT_MAX) {
-    const oldestInWindow = recent[0];
-    const retryAfter = Math.ceil((oldestInWindow + RATE_LIMIT_WINDOW_MS - now) / 1000);
+  // Count entries for this IP in the current window
+  const countRes = await fetch(
+    `${url}/rest/v1/rate_limits?ip=eq.${encodeURIComponent(ip)}&timestamp=gte.${windowStart}&select=count`,
+    {
+      headers: {
+        apikey: key,
+        Authorization: `Bearer ${key}`,
+        Prefer: "count=exact",
+        Range: "0-0",
+      },
+    }
+  );
+
+  if (!countRes.ok) {
+    console.error("Rate limit count query failed:", await countRes.text());
+    // Fail-open: don't block on DB errors
+    return { allowed: true };
+  }
+
+  // Supabase returns count in Content-Range header when Prefer: count=exact
+  const contentRange = countRes.headers.get("Content-Range");
+  const count = contentRange ? parseInt(contentRange.split("/")[1] || "0", 10) : 0;
+
+  if (count >= RATE_LIMIT_MAX) {
+    // Calculate retry-after: need the oldest entry in the window
+    const oldestRes = await fetch(
+      `${url}/rest/v1/rate_limits?ip=eq.${encodeURIComponent(ip)}&timestamp=gte.${windowStart}&order=timestamp.asc&limit=1&select=timestamp`,
+      {
+        headers: {
+          apikey: key,
+          Authorization: `Bearer ${key}`,
+        },
+      }
+    );
+
+    let retryAfter = RATE_LIMIT_WINDOW_SEC;
+    if (oldestRes.ok) {
+      const rows = await oldestRes.json();
+      if (rows.length > 0) {
+        const oldest = new Date(rows[0].timestamp).getTime();
+        retryAfter = Math.ceil((oldest + RATE_LIMIT_WINDOW_SEC * 1000 - Date.now()) / 1000);
+        if (retryAfter < 1) retryAfter = 1;
+      }
+    }
+
     return { allowed: false, retryAfter };
   }
 
-  recent.push(now);
+  // Insert new entry (fire-and-forget to avoid adding latency)
+  fetch(`${url}/rest/v1/rate_limits`, {
+    method: "POST",
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/json",
+      Prefer: "return=minimal",
+    },
+    body: JSON.stringify({ ip, timestamp: new Date().toISOString() }),
+  }).catch((err) => console.error("Rate limit insert failed:", err));
+
   return { allowed: true };
 }
 
-// Periodic cleanup to prevent memory leak (runs every 5 min via request pattern)
-let lastCleanup = 0;
-function maybeCleanup() {
-  const now = Date.now();
-  if (now - lastCleanup < 300_000) return;
-  lastCleanup = now;
-  const cutoff = now - RATE_LIMIT_WINDOW_MS * 2;
-  for (const [ip, timestamps] of rateLimitMap) {
-    const recent = timestamps.filter((t) => t > cutoff);
-    if (recent.length === 0) rateLimitMap.delete(ip);
-    else rateLimitMap.set(ip, recent);
-  }
+async function cleanupOldEntries(): Promise<void> {
+  const { url, key } = getSupabaseAdmin();
+  const cutoff = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+
+  // Delete entries older than 5 minutes
+  fetch(`${url}/rest/v1/rate_limits?timestamp=lt.${cutoff}`, {
+    method: "DELETE",
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      Prefer: "return=minimal",
+    },
+  }).catch((err) => console.error("Rate limit cleanup failed:", err));
 }
 
 function getCorsHeaders(origin: string | null): Record<string, string> {
@@ -389,10 +448,9 @@ serve(async (req) => {
     );
   }
 
-  // Rate limiting by IP
-  maybeCleanup();
+  // Rate limiting by IP (DB-backed, cross-instance)
   const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
-  const rateLimit = checkRateLimit(clientIp);
+  const rateLimit = await checkRateLimitDB(clientIp);
   if (!rateLimit.allowed) {
     return new Response(
       JSON.stringify({
@@ -408,6 +466,11 @@ serve(async (req) => {
         },
       }
     );
+  }
+
+  // Probabilistic cleanup of old rate limit entries (~1% of requests)
+  if (Math.random() < CLEANUP_PROBABILITY) {
+    cleanupOldEntries();
   }
 
   // Input validation (Zod-like, inline for Deno Edge Function without npm)
@@ -543,11 +606,4 @@ serve(async (req) => {
   return new Response(JSON.stringify({ contacts: allCleaned, provider: usedProvider }), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
-  } catch (e) {
-    console.error("clean-contacts error:", e);
-    return new Response(
-      JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-  }
 });

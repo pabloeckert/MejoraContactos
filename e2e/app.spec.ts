@@ -1,4 +1,7 @@
 import { test, expect } from "@playwright/test";
+import { readFileSync } from "node:fs";
+
+const TEST_CSV = readFileSync("test-contacts.csv", "utf-8");
 
 test.describe("MejoraContactos — E2E", () => {
   test.beforeEach(async ({ page }) => {
@@ -146,25 +149,43 @@ test.describe("MejoraContactos — E2E", () => {
     // Switch to advanced mode for full import flow
     await page.getByTitle(/modo avanzado/i).click();
 
-    // Upload test CSV via the file input
-    const fileInput = page.locator('input[type="file"]');
-    await fileInput.setInputFiles("test-contacts.csv");
+    // Read CSV and inject via DataTransfer (bypass webkitdirectory restriction)
+    const csvContent = TEST_CSV;
+    await page.evaluate((content: string) => {
+      const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+      if (!input) throw new Error("File input not found");
+      const blob = new Blob([content], { type: "text/csv" });
+      const file = new File([blob], "test-contacts.csv", { type: "text/csv" });
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      input.files = dt.files;
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    }, csvContent);
 
     // Wait for parsing — should show file in the list
-    await expect(page.getByText(/test-contacts\.csv/i)).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(/test-contacts\.csv/i).first()).toBeVisible({ timeout: 10000 });
 
-    // Should show parsed row count
-    await expect(page.getByText(/\d+.*contactos?\s*(detectados|encontrados|cargados)?/i)).toBeVisible({ timeout: 10000 });
+    // Should show parsed row count (27 contacts in test CSV)
+    await expect(page.getByText(/27.*filas/i)).toBeVisible({ timeout: 10000 });
   });
 
   test("can import CSV and navigate to process tab", async ({ page }) => {
     await page.getByRole("button", { name: /saltar/i }).click();
     await page.getByTitle(/modo avanzado/i).click();
 
-    // Upload CSV
-    const fileInput = page.locator('input[type="file"]');
-    await fileInput.setInputFiles("test-contacts.csv");
-    await expect(page.getByText(/test-contacts\.csv/i)).toBeVisible({ timeout: 10000 });
+    // Read CSV and inject via DataTransfer
+    const csvContent = TEST_CSV;
+    await page.evaluate((content: string) => {
+      const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+      if (!input) throw new Error("File input not found");
+      const blob = new Blob([content], { type: "text/csv" });
+      const file = new File([blob], "test-contacts.csv", { type: "text/csv" });
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      input.files = dt.files;
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    }, csvContent);
+    await expect(page.getByText(/test-contacts\.csv/i).first()).toBeVisible({ timeout: 10000 });
 
     // Navigate to process tab
     await page.getByRole("tab", { name: /procesar/i }).click();

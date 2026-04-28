@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, memo } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Search, Edit, Trash2, Sparkles, Phone, Mail, Shield } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -19,7 +19,7 @@ interface ContactsTableProps {
   onDeleteContact: (id: string) => void;
 }
 
-export function ContactsTable({ contacts, onUpdateContact, onDeleteContact }: ContactsTableProps) {
+export const ContactsTable = memo(function ContactsTable({ contacts, onUpdateContact, onDeleteContact }: ContactsTableProps) {
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState<string>("unique");
   const [editContact, setEditContact] = useState<UnifiedContact | null>(null);
@@ -200,7 +200,7 @@ export function ContactsTable({ contacts, onUpdateContact, onDeleteContact }: Co
       </Dialog>
     </div>
   );
-}
+});
 
 function FieldIcon({ validation }: { validation: FieldValidation }) {
   if (!validation) return null;

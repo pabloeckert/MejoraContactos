@@ -22,6 +22,7 @@ import { HealthCheckPanel } from "@/components/HealthCheckPanel";
 import { HistoryPanel } from "@/components/HistoryPanel";
 import { Button } from "@/components/ui/button";
 import { CookieConsent } from "@/components/CookieConsent";
+import { usePWAInstall } from "@/hooks/usePWAInstall";
 
 const ONBOARDING_KEY = "__mc_onboarded__";
 const MODE_KEY = "__mc_simple_mode__";
@@ -35,6 +36,7 @@ const Index = () => {
   const [contacts, setContacts] = useState<UnifiedContact[]>([]);
   const [activeTab, setActiveTab] = useState("import");
   const { theme, setTheme } = useTheme();
+  const { isInstallable, isStandalone, install } = usePWAInstall();
 
   // Onboarding state
   const [showOnboarding, setShowOnboarding] = useState(() => {
@@ -192,6 +194,18 @@ const Index = () => {
               <Badge className="text-xs bg-primary-foreground/20 text-primary-foreground border-0">
                 {uniqueCount.toLocaleString()}
               </Badge>
+            )}
+            {/* PWA Install button */}
+            {isInstallable && !isStandalone && (
+              <button
+                onClick={() => install()}
+                className="h-7 px-2 rounded-full flex items-center gap-1 text-[10px] font-medium text-primary-foreground/50 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-all"
+                title="Instalar aplicación"
+                aria-label="Instalar aplicación"
+              >
+                <Download className="h-3 w-3" />
+                <span className="hidden sm:inline">Instalar</span>
+              </button>
             )}
             {/* Simple/Advanced mode toggle */}
             <button

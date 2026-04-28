@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, memo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Users, Sparkles, Copy, Mail, Phone, Shield, Building2, Briefcase, Globe } from "lucide-react";
@@ -9,7 +9,7 @@ interface DashboardPanelProps {
   contacts: UnifiedContact[];
 }
 
-export function DashboardPanel({ contacts }: DashboardPanelProps) {
+export const DashboardPanel = memo(function DashboardPanel({ contacts }: DashboardPanelProps) {
   const stats = useMemo(() => {
     const clean = contacts.filter((c) => !c.isDuplicate);
     const sources = new Map<string, number>();
@@ -202,7 +202,7 @@ export function DashboardPanel({ contacts }: DashboardPanelProps) {
       </div>
     </div>
   );
-}
+});
 
 function SummaryCard({ icon, label, value, suffix, color }: { icon: React.ReactNode; label: string; value: number; suffix?: string; color: string }) {
   return (

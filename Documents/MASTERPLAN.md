@@ -1,13 +1,12 @@
-# 📋 MejoraContactos — Masterplan Integral
+# 📋 MejoraContactos — Documento Maestro
 
-> **⚡ Instrucción:** Cuando el usuario diga **"documentar"**, actualizar este archivo con el estado actual del proyecto, trabajos realizados, pendientes y cualquier cambio relevante. Todos los documentos viven en `Documents/`.
+> **⚡ INSTRUCCIÓN:** Cuando el usuario diga **"documentar"**, actualizar este archivo con el estado actual del proyecto, trabajos realizados, pendientes y cualquier cambio relevante. Todos los documentos viven en `Documents/`.
 
-**Última actualización:** 2026-04-29 04:40 GMT+8  
-**Versión actual:** v10.5  
-**Commit HEAD:** 5587157  
-**Repo:** [pabloeckert/MejoraContactos](https://github.com/pabloeckert/MejoraContactos)  
-**Live:** https://util.mejoraok.com/mejoracontactos/  
-**Tests:** 174 pasando ✅ | Build: OK ✅ | LOC: 8.115
+**Última actualización:** 2026-04-29 06:15 GMT+8
+**Versión actual:** v10.6
+**Repo:** [pabloeckert/MejoraContactos](https://github.com/pabloeckert/MejoraContactos)
+**Live:** https://util.mejoraok.com/mejoracontactos/
+**Tests:** 174 pasando ✅ | Build: OK ✅
 
 ---
 
@@ -182,6 +181,7 @@ Parseo → Mapeo → Reglas (80%) → IA Limpieza → IA Verificación → IA Co
 - Pipeline visualizer
 - Health Check de proveedores
 - Historial/Undo con snapshots
+- Keyboard shortcuts (1-6 tabs, D tema, S modo, ? ayuda)
 
 ---
 
@@ -540,7 +540,7 @@ Parseo → Mapeo → Reglas (80%) → IA Limpieza → IA Verificación → IA Co
 | Fixes | UTF-8 CSV, regex column mapper, historial snapshot | v10.2 | 2026-04-28 |
 | UX Personal | Keyboard shortcuts, SimpleMode fix | v10.5 | 2026-04-28 |
 
-### 📋 ETAPA 11 — Hardening Técnico (Sprint actual)
+### 📋 ETAPA 11 — Hardening Técnico (Completada)
 
 | # | Tarea | Rol | Prioridad | Estado |
 |---|-------|-----|-----------|--------|
@@ -554,45 +554,49 @@ Parseo → Mapeo → Reglas (80%) → IA Limpieza → IA Verificación → IA Co
 | 11.8 | Fix: Historial snapshot pre-proceso | Backend | 🟡 Alta | ✅ v10.2 |
 | 11.9 | Keyboard shortcuts (1-6, D, S, ?) | Frontend | 🟢 Media | ✅ v10.5 |
 | 11.10 | SimpleMode fix (ProcessingPanel integrado) | Frontend | 🟢 Media | ✅ v10.5 |
+| 11.11 | Fix: Declaración duplicada en Edge Function | Backend Dev | 🔴 Crítica | ✅ v10.6 |
 
-### 📋 ETAPA 12 — Estabilización y Observabilidad (Sprint siguiente)
+### 📋 ETAPA 12 — Estabilización y Observabilidad (Sprint actual)
 
-| # | Tarea | Rol | Prioridad | Estado |
-|---|-------|-----|-----------|--------|
-| 12.1 | **Dividir useContactProcessing (407→3 hooks)** | Software Architect | 🔴 Alta | ⏳ |
-| 12.2 | **Sentry para errores de producción** | SRE | 🔴 Alta | ⏳ |
-| 12.3 | **Rate limit en Supabase DB (cross-instance)** | Backend Dev | 🟡 Alta | ⏳ |
-| 12.4 | **Playwright E2E en GitHub Actions** | QA Automation | 🟡 Alta | ⏳ |
-| 12.5 | Cloudflare CDN (gratis) | Cloud Architect | 🟡 Alta | ⏳ |
-| 12.6 | Encriptar API keys con Web Crypto API | Cybersecurity | 🟡 Alta | ⏳ |
-| 12.7 | 3er proveedor IA verificado (para pipeline completo) | Backend Dev | 🟡 Alta | ⏳ |
-| 12.8 | Gemini key: verificar activación | Backend Dev | 🟢 Media | ⏳ |
-| 12.9 | Deploy Edge Functions (log-error + clean-contacts) | DevOps | 🟢 Media | ⏳ |
+| # | Tarea | Rol | Complejidad | Prioridad | Estado |
+|---|-------|-----|-------------|-----------|--------|
+| 12.1 | **Dividir useContactProcessing (407→3 hooks)** | Software Architect | Media | 🔴 Alta | ⏳ |
+| 12.2 | **Sentry para errores de producción** | SRE | Baja | 🔴 Alta | ⏳ |
+| 12.3 | **Rate limit en Supabase DB (cross-instance)** | Backend Dev | Media | 🟡 Alta | ⏳ |
+| 12.4 | **Playwright E2E en GitHub Actions** | QA Automation | Media | 🟡 Alta | ⏳ |
+| 12.5 | Cloudflare CDN (gratis) | Cloud Architect | Baja | 🟡 Alta | ⏳ |
+| 12.6 | Encriptar API keys con Web Crypto API | Cybersecurity | Media | 🟡 Alta | ⏳ |
+| 12.7 | 3er proveedor IA verificado (para pipeline completo) | Backend Dev | Baja | 🟡 Alta | ⏳ |
+| 12.8 | Gemini key: verificar activación | Backend Dev | Baja | 🟢 Media | ⏳ |
+| 12.9 | Deploy Edge Functions (log-error + clean-contacts) | DevOps | Baja | 🟢 Media | ⏳ |
+| 12.10 | React.lazy para rutas secundarias | Frontend | Baja | 🟢 Media | ⏳ |
+| 12.11 | TTL de 30 días para snapshots de historial | DBA | Baja | 🟢 Media | ⏳ |
 
 ### 📋 ETAPA 13 — Crecimiento y Monetización (Sprint 2)
 
-| # | Tarea | Rol | Prioridad | Estado |
-|---|-------|-----|-----------|--------|
-| 13.1 | **Analytics: Plausible/Umami (GDPR-safe)** | BI Analyst | 🟡 Alta | ⏳ |
-| 13.2 | **Funnel tracking: visit → import → clean → export** | Growth Manager | 🟡 Alta | ⏳ |
-| 13.3 | **Pricing page: Free vs Pro** | Product Manager | 🟡 Alta | ⏳ |
-| 13.4 | Límites Free: 500 contacts/lote, 3 lotes/día | Backend Dev | 🟡 Alta | ⏳ |
-| 13.5 | Blog SEO: 3 artículos clave | Content Manager | 🟡 Alta | ⏳ |
-| 13.6 | Product Hunt launch | Growth Manager | 🟡 Alta | ⏳ |
-| 13.7 | Cookie consent banner | Legal, Frontend | 🟢 Media | ⏳ |
-| 13.8 | FAQ + Help Center | Customer Success | 🟢 Media | ⏳ |
+| # | Tarea | Rol | Complejidad | Prioridad | Estado |
+|---|-------|-----|-------------|-----------|--------|
+| 13.1 | **Analytics: Plausible/Umami (GDPR-safe)** | BI Analyst | Baja | 🟡 Alta | ⏳ |
+| 13.2 | **Funnel tracking: visit → import → clean → export** | Growth Manager | Media | 🟡 Alta | ⏳ |
+| 13.3 | **Pricing page: Free vs Pro** | Product Manager | Media | 🟡 Alta | ⏳ |
+| 13.4 | Límites Free: 500 contacts/lote, 3 lotes/día | Backend Dev | Media | 🟡 Alta | ⏳ |
+| 13.5 | Blog SEO: 3 artículos clave | Content Manager | Baja | 🟡 Alta | ⏳ |
+| 13.6 | Product Hunt launch | Growth Manager | Baja | 🟡 Alta | ⏳ |
+| 13.7 | Cookie consent banner | Legal, Frontend | Baja | 🟢 Media | ⏳ |
+| 13.8 | FAQ + Help Center | Customer Success | Baja | 🟢 Media | ⏳ |
+| 13.9 | Feedback in-app (thumbs up/down) | UX Researcher | Baja | 🟢 Media | ⏳ |
 
 ### 📋 ETAPA 14 — Escala (Sprint 3+)
 
-| # | Tarea | Rol | Prioridad | Estado |
-|---|-------|-----|-----------|--------|
-| 14.1 | Circuit breaker formal para proveedores IA | Software Architect | 🟢 Media | ⏳ |
-| 14.2 | Prompts configurables (no hardcodeados) | ML Engineer | 🟢 Media | ⏳ |
-| 14.3 | Twitter/X presencia + comunidad | Community Manager | 🟢 Media | ⏳ |
-| 14.4 | Integraciones CRM (HubSpot, Pipedrive) | Business Dev | 🔵 Futuro | ⏳ |
-| 14.5 | Embeddings para dedup semántica | ML Engineer | 🔵 Futuro | ⏳ |
-| 14.6 | Migración parcial a Supabase DB | Data Engineer | 🔵 Futuro | ⏳ |
-| 14.7 | App nativa iOS/Android | Mobile Devs | 🔵 Futuro | ⏳ |
+| # | Tarea | Rol | Complejidad | Prioridad | Estado |
+|---|-------|-----|-------------|-----------|--------|
+| 14.1 | Circuit breaker formal para proveedores IA | Software Architect | Alta | 🟢 Media | ⏳ |
+| 14.2 | Prompts configurables (no hardcodeados) | ML Engineer | Media | 🟢 Media | ⏳ |
+| 14.3 | Twitter/X presencia + comunidad | Community Manager | Baja | 🟢 Media | ⏳ |
+| 14.4 | Integraciones CRM (HubSpot, Pipedrive) | Business Dev | Alta | 🔵 Futuro | ⏳ |
+| 14.5 | Embeddings para dedup semántica | ML Engineer | Alta | 🔵 Futuro | ⏳ |
+| 14.6 | Migración parcial a Supabase DB | Data Engineer | Alta | 🔵 Futuro | ⏳ |
+| 14.7 | App nativa iOS/Android | Mobile Devs | Alta | 🔵 Futuro | ⏳ |
 
 ---
 
@@ -679,6 +683,7 @@ npx supabase functions deploy google-contacts-auth
 
 | Versión | Fecha | Cambios principales |
 |---------|-------|-------------------|
+| v10.6 | 2026-04-29 | Fix crítico: declaración duplicada en Edge Function clean-contacts, consolidación documentación |
 | v10.5 | 2026-04-28 | Keyboard shortcuts, SimpleMode fix (ProcessingPanel integrado) |
 | v10.4 | 2026-04-28 | Cerebras modelo actualizado (llama3.1-8b), proveedores verificados |
 | v10.3 | 2026-04-28 | Monitoreo: error reporter v2, health endpoint, uptime cron |
@@ -708,10 +713,13 @@ npx supabase functions deploy google-contacts-auth
 | `src/lib/dedup.ts` | Deduplicación O(n) + Jaro-Winkler | 227 |
 | `src/lib/rule-cleaner.ts` | Limpieza determinística | 166 |
 | `src/lib/ai-validator.ts` | Validación IA con cache | 231 |
+| `src/lib/field-validator.ts` | Validación semántica de campos | 280 |
 | `src/lib/column-mapper.ts` | Auto-detección de columnas | 45 |
+| `src/lib/export-utils.ts` | Exportación 6 formatos | 250 |
 | `src/components/ColumnMapper.tsx` | UI mapeo de columnas | 171 |
 | `src/pages/Index.tsx` | Página principal (6 tabs) | 324 |
-| `supabase/functions/clean-contacts/index.ts` | Edge Function: limpieza IA | — |
+| `src/workers/pipeline.worker.ts` | Web Worker para batch+dedup | 200 |
+| `supabase/functions/clean-contacts/index.ts` | Edge Function: limpieza IA | 550 |
 | `Documents/MASTERPLAN.md` | Este archivo (doc principal) | — |
 
 ---
@@ -751,4 +759,4 @@ npx supabase functions deploy google-contacts-auth
 ---
 
 *Documento maestro — consolidación de toda la documentación del proyecto. Actualizar al decir "documentar".*
-*Última actualización: 2026-04-29 04:40 GMT+8 — 174 tests · v10.5 · 12 proveedores IA · Pipeline híbrido*
+*Última actualización: 2026-04-29 06:15 GMT+8 — 174 tests · v10.6 · 12 proveedores IA · Pipeline híbrido*

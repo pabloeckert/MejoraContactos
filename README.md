@@ -20,7 +20,7 @@ Limpieza, deduplicación y unificación de contactos con IA.
 - **Telefonía:** E.164, detección WhatsApp, formatos AR/MX/ES
 - **Exportación:** CSV, Excel, VCF, JSON, JSONL (fine-tuning), HTML (informes)
 - **Dashboard:** Métricas en tiempo real, gráficos de calidad
-- **UI:** Dark mode, tabla virtualizada, responsive
+- **UI:** Dark mode, tabla virtualizada, responsive, keyboard shortcuts
 
 ## Proveedores de IA
 
@@ -29,9 +29,9 @@ Groq · OpenRouter · Together AI · Cerebras · DeepInfra · SambaNova · Mistr
 ## Desarrollo
 
 ```bash
-npm install
+npm install --legacy-peer-deps
 npm run dev     # http://localhost:8080
-npm test        # tests unitarios
+npm test        # 174 tests unitarios
 npm run build   # build producción
 ```
 
@@ -45,6 +45,6 @@ Push a `main` → GitHub Actions → build → SCP a Hostinger (automático).
 
 Toda la documentación consolidada en un solo archivo:
 
-- **`Documents/MASTERPLAN.md`** — Documento maestro (análisis 35 roles, plan por etapas, arquitectura, todo)
+- **`Documents/MASTERPLAN.md`** — Documento maestro (análisis 36 roles, plan por etapas, arquitectura, seguridad, todo)
 
 Cuando digas **"documentar"**, se actualizará `MASTERPLAN.md` con el estado actual.

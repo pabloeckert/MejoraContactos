@@ -496,55 +496,53 @@ serve(async (req) => {
 
   const provider = providerParam || "groq";
 
-    const provider = providerParam || "groq";
-
-    if (provider === "pipeline") {
-      const batchSize = 20;
-      const allCleaned: RawContact[] = [];
-      const allStages: string[] = [];
-
-      for (let i = 0; i < sanitizedContacts.length; i += batchSize) {
-        const batch = sanitizedContacts.slice(i, i + batchSize);
-        const result = await pipelineBatch(batch, customKeys, pipelineStages);
-        allCleaned.push(...result.contacts);
-        if (i === 0) allStages.push(...result.stages);
-      }
-
-      const stageNames = [
-        pipelineStages?.clean || "groq",
-        pipelineStages?.verify || "openrouter",
-        pipelineStages?.correct || "gemini",
-      ];
-      return new Response(JSON.stringify({
-        contacts: allCleaned, provider: `Pipeline (${stageNames.join(" → ")})`, stages: allStages,
-      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-
-    const batchSize = 25;
+  if (provider === "pipeline") {
+    const batchSize = 20;
     const allCleaned: RawContact[] = [];
-    let usedProvider = "";
+    const allStages: string[] = [];
 
     for (let i = 0; i < sanitizedContacts.length; i += batchSize) {
       const batch = sanitizedContacts.slice(i, i + batchSize);
-      try {
-        const result = await callAIWithFallback(provider as Exclude<Provider, "pipeline">, SYSTEM_CLEAN, buildCleanPrompt(batch), customKeys);
-        allCleaned.push(...result.contacts);
-        usedProvider = result.usedProvider;
-      } catch (e) {
-        const msg = (e as Error).message;
-        if (msg.includes("Todos los proveedores")) {
-          return new Response(
-            JSON.stringify({ error: msg, exhausted: true }),
-            { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-        allCleaned.push(...batch);
-      }
+      const result = await pipelineBatch(batch, customKeys, pipelineStages);
+      allCleaned.push(...result.contacts);
+      if (i === 0) allStages.push(...result.stages);
     }
 
-    return new Response(JSON.stringify({ contacts: allCleaned, provider: usedProvider }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    const stageNames = [
+      pipelineStages?.clean || "groq",
+      pipelineStages?.verify || "openrouter",
+      pipelineStages?.correct || "gemini",
+    ];
+    return new Response(JSON.stringify({
+      contacts: allCleaned, provider: `Pipeline (${stageNames.join(" → ")})`, stages: allStages,
+    }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  }
+
+  const batchSize = 25;
+  const allCleaned: RawContact[] = [];
+  let usedProvider = "";
+
+  for (let i = 0; i < sanitizedContacts.length; i += batchSize) {
+    const batch = sanitizedContacts.slice(i, i + batchSize);
+    try {
+      const result = await callAIWithFallback(provider as Exclude<Provider, "pipeline">, SYSTEM_CLEAN, buildCleanPrompt(batch), customKeys);
+      allCleaned.push(...result.contacts);
+      usedProvider = result.usedProvider;
+    } catch (e) {
+      const msg = (e as Error).message;
+      if (msg.includes("Todos los proveedores")) {
+        return new Response(
+          JSON.stringify({ error: msg, exhausted: true }),
+          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      allCleaned.push(...batch);
+    }
+  }
+
+  return new Response(JSON.stringify({ contacts: allCleaned, provider: usedProvider }), {
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
   } catch (e) {
     console.error("clean-contacts error:", e);
     return new Response(

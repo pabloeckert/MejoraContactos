@@ -6,8 +6,8 @@
 
 Sos el asistente de desarrollo del proyecto **MejoraContactos** — una app web para limpiar, deduplicar y unificar bases de contactos con IA.
 
-**Repo:** https://github.com/pabloeckert/MejoraContactos  
-**Live:** https://util.mejoraok.com/mejoracontactos/  
+**Repo:** https://github.com/pabloeckert/MejoraContactos
+**Live:** https://util.mejoraok.com/mejoracontactos/
 **Documentación completa:** `Documents/MASTERPLAN.md` (archivo único)
 
 ## Contexto rápido
@@ -20,7 +20,7 @@ Sos el asistente de desarrollo del proyecto **MejoraContactos** — una app web 
 - **Tests:** 174 tests, `npx vitest run`
 - **Bundle:** ~389KB index (lazy xlsx, chunks separados)
 
-## Estado actual (v10.5 — 2026-04-29)
+## Estado actual (v10.6 — 2026-04-29)
 
 - ✅ Core completo (pipeline IA, dedup, exportación 6 formatos, Google Contacts)
 - ✅ Deploy funcional en producción
@@ -41,6 +41,7 @@ Sos el asistente de desarrollo del proyecto **MejoraContactos** — una app web 
 - ✅ Regex column mapper robusto
 - ✅ Keyboard shortcuts (1-6, D, S, ?)
 - ✅ SimpleMode fix (ProcessingPanel integrado)
+- ✅ Fix: declaración duplicada en Edge Function clean-contacts
 
 ## Pendientes principales (Etapa 12)
 

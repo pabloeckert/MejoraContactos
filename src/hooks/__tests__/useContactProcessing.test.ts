@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { renderHook, act } from "@testing-library/react";
+import { renderHook, act, waitFor } from "@testing-library/react";
 import { useContactProcessing, suggestOptimalConfig, INITIAL_PIPELINE } from "@/hooks/useContactProcessing";
 import type { ParsedFile } from "@/types/contact";
 
@@ -95,10 +95,12 @@ describe("useContactProcessing", () => {
     expect(result.current.mappings[0].target).toBe("firstName");
   });
 
-  it("should track active providers", () => {
+  it("should track active providers", async () => {
     const { result } = renderHook(() => useContactProcessing([]));
-    expect(result.current.activeProviders).toContain("groq");
-    expect(result.current.activeProviders).toContain("openrouter");
+    await waitFor(() => {
+      expect(result.current.activeProviders).toContain("groq");
+      expect(result.current.activeProviders).toContain("openrouter");
+    });
   });
 
   it("should compute progress correctly", () => {

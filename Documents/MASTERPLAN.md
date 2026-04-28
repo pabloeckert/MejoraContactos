@@ -2,8 +2,8 @@
 
 > **⚡ INSTRUCCIÓN:** Cuando el usuario diga **"documentar"**, actualizar este archivo con el estado actual del proyecto, trabajos realizados, pendientes y cualquier cambio relevante. Todos los documentos viven en `Documents/`.
 
-**Última actualización:** 2026-04-29 06:15 GMT+8
-**Versión actual:** v10.6
+**Última actualización:** 2026-04-29 06:22 GMT+8
+**Versión actual:** v10.7
 **Repo:** [pabloeckert/MejoraContactos](https://github.com/pabloeckert/MejoraContactos)
 **Live:** https://util.mejoraok.com/mejoracontactos/
 **Tests:** 174 pasando ✅ | Build: OK ✅
@@ -555,17 +555,18 @@ Parseo → Mapeo → Reglas (80%) → IA Limpieza → IA Verificación → IA Co
 | 11.9 | Keyboard shortcuts (1-6, D, S, ?) | Frontend | 🟢 Media | ✅ v10.5 |
 | 11.10 | SimpleMode fix (ProcessingPanel integrado) | Frontend | 🟢 Media | ✅ v10.5 |
 | 11.11 | Fix: Declaración duplicada en Edge Function | Backend Dev | 🔴 Crítica | ✅ v10.6 |
+| 11.12 | Dividir useContactProcessing (407→3 hooks) | Software Architect | Media | 🔴 Alta | ✅ v10.7 |
 
 ### 📋 ETAPA 12 — Estabilización y Observabilidad (Sprint actual)
 
 | # | Tarea | Rol | Complejidad | Prioridad | Estado |
 |---|-------|-----|-------------|-----------|--------|
-| 12.1 | **Dividir useContactProcessing (407→3 hooks)** | Software Architect | Media | 🔴 Alta | ⏳ |
+| 12.1 | ~~Dividir useContactProcessing (407→3 hooks)~~ | Software Architect | Media | 🔴 Alta | ✅ Movido a 11.12 |
 | 12.2 | **Sentry para errores de producción** | SRE | Baja | 🔴 Alta | ⏳ |
-| 12.3 | **Rate limit en Supabase DB (cross-instance)** | Backend Dev | Media | 🟡 Alta | ⏳ |
-| 12.4 | **Playwright E2E en GitHub Actions** | QA Automation | Media | 🟡 Alta | ⏳ |
+| 12.3 | **Rate limit en Supabase DB (cross-instance)** | Backend Dev | Media | 🟡 Alta | ⏳ (sub-agente) |
+| 12.4 | **Playwright E2E en GitHub Actions** | QA Automation | Media | 🟡 Alta | ⏳ (sub-agente) |
 | 12.5 | Cloudflare CDN (gratis) | Cloud Architect | Baja | 🟡 Alta | ⏳ |
-| 12.6 | Encriptar API keys con Web Crypto API | Cybersecurity | Media | 🟡 Alta | ⏳ |
+| 12.6 | Encriptar API keys con Web Crypto API | Cybersecurity | Media | 🟡 Alta | ⏳ (sub-agente) |
 | 12.7 | 3er proveedor IA verificado (para pipeline completo) | Backend Dev | Baja | 🟡 Alta | ⏳ |
 | 12.8 | Gemini key: verificar activación | Backend Dev | Baja | 🟢 Media | ⏳ |
 | 12.9 | Deploy Edge Functions (log-error + clean-contacts) | DevOps | Baja | 🟢 Media | ⏳ |
@@ -683,6 +684,7 @@ npx supabase functions deploy google-contacts-auth
 
 | Versión | Fecha | Cambios principales |
 |---------|-------|-------------------|
+| v10.7 | 2026-04-29 | Refactor: useContactProcessing dividido en 3 hooks (useAIPipeline, useDedup, orchestrator) |
 | v10.6 | 2026-04-29 | Fix crítico: declaración duplicada en Edge Function clean-contacts, consolidación documentación |
 | v10.5 | 2026-04-28 | Keyboard shortcuts, SimpleMode fix (ProcessingPanel integrado) |
 | v10.4 | 2026-04-28 | Cerebras modelo actualizado (llama3.1-8b), proveedores verificados |
@@ -707,7 +709,9 @@ npx supabase functions deploy google-contacts-auth
 
 | Archivo | Qué hace | Líneas |
 |---------|----------|--------|
-| `src/hooks/useContactProcessing.ts` | Lógica central del pipeline | 407 |
+| `src/hooks/useContactProcessing.ts` | Orquestador del pipeline | ~200 |
+| `src/hooks/useAIPipeline.ts` | Lógica de limpieza IA + validación | ~200 |
+| `src/hooks/useDedup.ts` | Deduplicación con Web Workers | ~50 |
 | `src/lib/providers.ts` | Config de 12 proveedores IA | 29 |
 | `src/lib/db.ts` | IndexedDB v3 | 228 |
 | `src/lib/dedup.ts` | Deduplicación O(n) + Jaro-Winkler | 227 |

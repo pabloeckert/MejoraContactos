@@ -20,6 +20,7 @@ jobs:
           cache: npm
 
       - run: npm ci --legacy-peer-deps
+      - run: npm run lint
       - run: npm audit --audit-level=high || true  # Warn but don't block deploy
       - run: npm test
       - run: npm run build
@@ -30,12 +31,19 @@ jobs:
           test -f dist/index.html || (echo "ERROR: dist/index.html not found" && exit 1)
           echo "✅ Build OK — dist/ contains $(find dist -type f | wc -l) files"
 
-      # E2E tests against the production build (fail fast before deploy)
+      # E2E tests against a root-based build (production base is /mejoracontactos/, E2E needs /)
+      - name: Build for E2E tests
+        run: npm run build:test
+
       - name: Install Playwright Browsers
         run: npx playwright install --with-deps chromium
 
       - name: Run E2E tests
         run: npx playwright test --reporter=list
+
+      # Rebuild with production base path for deploy
+      - name: Rebuild for production
+        run: npm run build
 
       # Backup current deployment (for rollback)
       - name: Backup current deployment

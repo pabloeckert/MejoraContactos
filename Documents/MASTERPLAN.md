@@ -6,7 +6,7 @@
 **Versión actual:** v12.0
 **Repo:** [pabloeckert/MejoraContactos](https://github.com/pabloeckert/MejoraContactos)
 **Live:** https://util.mejoraok.com/mejoracontactos/
-**Tests:** 199 pasando ✅ | Build: OK ✅
+**Tests:** 199 pasando ✅ | Build: OK ✅ | Lint: 0 errors ✅
 
 ---
 
@@ -32,7 +32,7 @@
 
 MejoraContactos es una SPA para limpiar, deduplicar y unificar contactos desde múltiples fuentes (CSV, Excel, VCF, JSON, Google Contacts) usando un pipeline híbrido: reglas determinísticas (80%+) + IA con 12 proveedores y rotación automática.
 
-**Estado actual:** ✅ Core completo | ✅ Deploy funcional | ✅ 174 tests | ✅ CI/CD con E2E | ✅ PWA | ✅ SEO | ✅ i18n | ✅ GDPR compliant
+**Estado actual:** ✅ Core completo | ✅ Deploy funcional | ✅ 199 tests | ✅ CI/CD con E2E | ✅ PWA | ✅ SEO | ✅ i18n | ✅ GDPR compliant | ✅ GitHub templates | ✅ SECURITY.md | ✅ CONTRIBUTING.md | ✅ Dependabot | ✅ CODEOWNERS
 
 **Diferenciadores clave:**
 - 12 proveedores IA con rotación automática y retry con backoff exponencial

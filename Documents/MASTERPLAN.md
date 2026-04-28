@@ -6,7 +6,7 @@
 **Versión actual:** v12.0
 **Repo:** [pabloeckert/MejoraContactos](https://github.com/pabloeckert/MejoraContactos)
 **Live:** https://util.mejoraok.com/mejoracontactos/
-**Tests:** 180 pasando ✅ | Build: OK ✅
+**Tests:** 199 pasando ✅ | Build: OK ✅
 
 ---
 
@@ -611,4 +611,4 @@ npx supabase functions deploy google-contacts-auth
 ---
 
 *Documento maestro — consolidación de toda la documentación del proyecto. Actualizar al decir "documentar".*
-*Última actualización: 2026-04-29 06:35 GMT+8 — 174 tests · v11.0 · 12 proveedores IA · Pipeline híbrido · GDPR compliant*
+*Última actualización: 2026-04-29 06:45 GMT+8 — 199 tests · v12.0 · 12 proveedores IA · Pipeline híbrido · GDPR compliant · Free tier limits · Blog SEO · Pricing BYOK*

@@ -69,7 +69,7 @@ test.describe("MejoraContactos — E2E", () => {
 
     // Switch back to simple
     await page.getByTitle(/modo simple/i).click();
-    await expect(page.getByText("Modo simple")).toBeVisible();
+    await expect(page.getByText("Modo simple", { exact: true })).toBeVisible();
   });
 
   test("shows empty states for results/export/dashboard", async ({ page }) => {

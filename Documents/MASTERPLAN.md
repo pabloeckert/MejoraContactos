@@ -2,11 +2,11 @@
 
 > **⚡ INSTRUCCIÓN:** Cuando el usuario diga **"documentar"**, actualizar este archivo con el estado actual del proyecto, trabajos realizados, pendientes y cualquier cambio relevante. Todos los documentos viven en `Documents/`.
 
-**Última actualización:** 2026-04-29 06:35 GMT+8
-**Versión actual:** v11.0
+**Última actualización:** 2026-04-29 06:45 GMT+8
+**Versión actual:** v12.0
 **Repo:** [pabloeckert/MejoraContactos](https://github.com/pabloeckert/MejoraContactos)
 **Live:** https://util.mejoraok.com/mejoracontactos/
-**Tests:** 174 pasando ✅ | Build: OK ✅
+**Tests:** 180 pasando ✅ | Build: OK ✅
 
 ---
 
@@ -37,10 +37,15 @@ MejoraContactos es una SPA para limpiar, deduplicar y unificar contactos desde m
 **Diferenciadores clave:**
 - 12 proveedores IA con rotación automática y retry con backoff exponencial
 - Pipeline híbrido: reglas (80%) + IA (20%) = rápido + inteligente
-- Gratuito (el usuario paga solo la API que usa)
+- Gratuito (el usuario paga solo la API que usa — modelo BYOK)
 - Privacy-first: todo procesa en el browser del usuario
 - Multi-formato: 5 formatos de entrada, 6 de salida
 - API keys cifradas con AES-GCM en localStorage
+- Free tier limits: 500 contacts/lote, 3 lotes/día (client-side)
+- Pricing page: Free vs Pro (BYOK — bring your own keys)
+- Plausible analytics (GDPR-safe, conditional loading)
+- Funnel tracking: visit → import → map → process → export
+- Blog SEO: 3 artículos indexados
 
 ---
 
@@ -204,6 +209,11 @@ Parseo → Mapeo → Reglas (80%) → IA Limpieza → IA Verificación → IA Co
 - PWA install prompt (Android + iOS standalone detection)
 - Cookie consent banner (GDPR)
 - FAQ / Help Center
+- Pricing page (Free vs Pro BYOK)
+- Usage banner (free tier limits)
+- Blog con 3 artículos SEO
+- Funnel visualization en Dashboard
+- Plausible analytics (GDPR-safe)
 
 ---
 
@@ -404,14 +414,14 @@ Parseo → Mapeo → Reglas (80%) → IA Limpieza → IA Verificación → IA Co
 
 ### 📋 ETAPA 13 — Crecimiento y Monetización (Sprint siguiente)
 
-| # | Tarea | Rol | Prioridad |
-|---|-------|-----|-----------|
-| 13.1 | Analytics: Plausible/Umami (GDPR-safe) | BI Analyst | 🟡 Alta |
-| 13.2 | Funnel tracking: visit → import → clean → export | Growth Manager | 🟡 Alta |
-| 13.3 | Pricing page: Free vs Pro | Product Manager | 🟡 Alta |
-| 13.4 | Límites Free: 500 contacts/lote, 3 lotes/día | Backend Dev | 🟡 Alta |
-| 13.5 | Blog SEO: 3 artículos clave | Content Manager | 🟡 Alta |
-| 13.6 | Product Hunt launch | Growth Manager | 🟡 Alta |
+| # | Tarea | Rol | Estado |
+|---|-------|-----|--------|
+| 13.1 | Analytics: Plausible integration (GDPR-safe) | BI Analyst | ✅ (necesita VITE_PLAUSIBLE_DOMAIN) |
+| 13.2 | Funnel tracking: visit → import → map → process → export | Growth Manager | ✅ |
+| 13.3 | Pricing page: Free vs Pro (BYOK) | Product Manager | ✅ |
+| 13.4 | Límites Free: 500 contacts/lote, 3 lotes/día | Backend Dev | ✅ |
+| 13.5 | Blog SEO: 3 artículos clave | Content Manager | ✅ |
+| 13.6 | Product Hunt launch | Growth Manager | ⏳ (manual) |
 
 ### 📋 ETAPA 14 — Escala (Sprint 3+)
 
@@ -525,6 +535,7 @@ CREATE POLICY "Service role only" ON rate_limits FOR ALL USING (true);
 
 | Versión | Fecha | Cambios principales |
 |---------|-------|-------------------|
+| v12.0 | 2026-04-29 | Etapa 13 completa: free tier limits, pricing BYOK, Plausible analytics, funnel tracking, blog SEO, export tracking |
 | v11.0 | 2026-04-29 | Etapa 12 completa: hooks divididos, keys cifradas, E2E CI, rate limit DB, retry backoff, cookie consent, FAQ, PWA install, prompts extraídos, data retention |
 | v10.6 | 2026-04-29 | Fix crítico: declaración duplicada en Edge Function, consolidación documentación |
 | v10.5 | 2026-04-28 | Keyboard shortcuts, SimpleMode fix |

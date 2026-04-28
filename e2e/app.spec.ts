@@ -58,7 +58,7 @@ test.describe("MejoraContactos — E2E", () => {
     await page.getByRole("button", { name: /saltar/i }).click();
 
     // Default should be simple mode — look for the label text
-    await expect(page.getByText("Modo simple")).toBeVisible();
+    await expect(page.getByText("Modo simple", { exact: true })).toBeVisible();
 
     // Switch to advanced using the title attribute
     await page.getByTitle(/modo avanzado/i).click();
@@ -201,7 +201,7 @@ test.describe("MejoraContactos — E2E", () => {
 
     // Core elements should still be visible
     await expect(page.getByText(/arrastrá archivos/i)).toBeVisible();
-    await expect(page.getByText("Modo simple")).toBeVisible();
+    await expect(page.getByText("Modo simple", { exact: true })).toBeVisible();
   });
 
   test("keyboard shortcuts: number keys switch tabs in advanced mode", async ({ page }) => {

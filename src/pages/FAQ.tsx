@@ -121,6 +121,10 @@ const FAQ = () => {
       {/* Footer */}
       <footer className="py-3 px-4 text-center text-xs text-muted-foreground/60 border-t border-border/30">
         <span>© 2026 MejoraContactos · </span>
+        <a href={`${import.meta.env.BASE_URL}pricing`} className="hover:text-foreground underline underline-offset-2">
+          Precios
+        </a>
+        <span> · </span>
         <a href={`${import.meta.env.BASE_URL}privacy`} className="hover:text-foreground underline underline-offset-2">
           Privacidad
         </a>
@@ -129,8 +133,8 @@ const FAQ = () => {
           Términos
         </a>
         <span> · </span>
-        <a href={`${import.meta.env.BASE_URL}faq`} className="hover:text-foreground underline underline-offset-2">
-          FAQ
+        <a href={`${import.meta.env.BASE_URL}blog`} className="hover:text-foreground underline underline-offset-2">
+          Blog
         </a>
       </footer>
     </div>

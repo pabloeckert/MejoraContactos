@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { exportCSV, exportExcel, exportVCF, exportJSON, exportJSONL, generateHTMLReport, downloadFile } from "@/lib/export-utils";
+import { analytics } from "@/lib/analytics";
 import type { UnifiedContact } from "@/types/contact";
 import { toast } from "sonner";
 
@@ -51,6 +52,7 @@ export const ExportPanel = memo(function ExportPanel({ contacts }: ExportPanelPr
       }
     }
     const label = { csv: 'CSV', excel: 'Excel', vcf: 'VCF', json: 'JSON', jsonl: 'JSONL', report: 'HTML' }[format] || format;
+    analytics.exportCompleted(format, clean.length);
     toast.success(`Exportado ${clean.length} contactos en formato ${label}`);
   };
 

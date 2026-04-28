@@ -23,8 +23,12 @@ import { HistoryPanel } from "@/components/HistoryPanel";
 import { Button } from "@/components/ui/button";
 import { CookieConsent } from "@/components/CookieConsent";
 import { usePWAInstall } from "@/hooks/usePWAInstall";
+import { getUsageStats } from "@/lib/usage-limits";
 import { UsageBanner } from "@/components/UsageBanner";
 import { PricingSection } from "@/components/PricingSection";
+
+// Track page views
+analytics.pageView();
 
 const ONBOARDING_KEY = "__mc_onboarded__";
 const MODE_KEY = "__mc_simple_mode__";
@@ -366,6 +370,22 @@ const Index = () => {
 
             <TabsContent value="settings">
               <div className="space-y-4">
+                {/* Usage Stats */}
+                <div className="flex items-center justify-between p-4 rounded-lg border bg-muted/30">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">Plan: {getUsageStats().tier === "free" ? "Free" : "Pro"}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {getUsageStats().tier === "free"
+                        ? `${getUsageStats().batchesUsedToday}/${getUsageStats().maxBatchesPerDay} lotes hoy · ${getUsageStats().maxContactsPerBatch.toLocaleString()} contactos/lote`
+                        : "Lotes ilimitados · 10,000 contactos/lote"}
+                    </p>
+                  </div>
+                  {getUsageStats().tier === "free" && (
+                    <a href={`${import.meta.env.BASE_URL}pricing`} className="text-xs text-violet-500 hover:text-violet-600 font-medium">
+                      Ver Pro →
+                    </a>
+                  )}
+                </div>
                 <ApiKeysPanel />
                 <div className="grid gap-4 lg:grid-cols-2">
                   <HealthCheckPanel />
@@ -388,11 +408,15 @@ const Index = () => {
       {/* Footer */}
       <footer className="py-3 px-4 text-center text-xs text-muted-foreground/60 border-t border-border/30">
         <span>© 2026 MejoraContactos · </span>
+        <a href={`${import.meta.env.BASE_URL}pricing`} className="hover:text-foreground underline underline-offset-2">Precios</a>
+        <span> · </span>
         <a href={`${import.meta.env.BASE_URL}privacy`} className="hover:text-foreground underline underline-offset-2">Privacidad</a>
         <span> · </span>
         <a href={`${import.meta.env.BASE_URL}terms`} className="hover:text-foreground underline underline-offset-2">Términos</a>
         <span> · </span>
         <a href={`${import.meta.env.BASE_URL}faq`} className="hover:text-foreground underline underline-offset-2">FAQ</a>
+        <span> · </span>
+        <a href={`${import.meta.env.BASE_URL}blog`} className="hover:text-foreground underline underline-offset-2">Blog</a>
       </footer>
     </div>
   );

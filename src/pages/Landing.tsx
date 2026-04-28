@@ -270,8 +270,10 @@ export default function Landing() {
               <span>© 2026</span>
             </div>
             <div className="flex gap-4">
+              <a href={`${import.meta.env.BASE_URL}pricing`} className="hover:text-foreground">Precios</a>
               <a href={`${import.meta.env.BASE_URL}privacy`} className="hover:text-foreground">Privacidad</a>
               <a href={`${import.meta.env.BASE_URL}terms`} className="hover:text-foreground">Términos</a>
+              <a href={`${import.meta.env.BASE_URL}blog`} className="hover:text-foreground">Blog</a>
               <a href="https://github.com/pabloeckert/MejoraContactos" className="hover:text-foreground" target="_blank" rel="noopener noreferrer">GitHub</a>
             </div>
           </div>

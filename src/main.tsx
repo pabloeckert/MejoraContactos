@@ -7,6 +7,17 @@ import { cleanupOldHistory } from "./lib/db";
 // Initialize error reporting (captures unhandled errors)
 initErrorReporting();
 
+// Inject Plausible analytics script if configured (GDPR-safe, no cookies)
+const PLAUSIBLE_DOMAIN = import.meta.env.VITE_PLAUSIBLE_DOMAIN as string | undefined;
+if (PLAUSIBLE_DOMAIN) {
+  const PLAUSIBLE_URL = (import.meta.env.VITE_PLAUSIBLE_URL as string) || "https://plausible.io";
+  const script = document.createElement("script");
+  script.defer = true;
+  script.dataset.domain = PLAUSIBLE_DOMAIN;
+  script.src = `${PLAUSIBLE_URL}/js/script.tagged-events.js`;
+  document.head.appendChild(script);
+}
+
 // Cleanup history entries older than 30 days (fire-and-forget)
 cleanupOldHistory().catch(() => {});
 

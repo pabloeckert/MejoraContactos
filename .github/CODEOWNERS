@@ -1,0 +1,8 @@
+# Default owner for everything in the repo
+* @pabloeckert
+
+# CI/CD workflows
+.github/ @pabloeckert
+
+# Supabase edge functions
+supabase/ @pabloeckert

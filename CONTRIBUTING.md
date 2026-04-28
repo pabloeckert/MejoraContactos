@@ -15,7 +15,7 @@ npm run dev
 
 - **Commits:** `tipo: descripción` (feat, fix, docs, chore, ci, perf)
 - **Branches:** `feature/nombre`, `fix/nombre`, `docs/nombre`
-- **Tests:** Todos los PRs deben pasar `npm test` (174+ tests)
+- **Tests:** Todos los PRs deben pasar `npm test` (199+ tests)
 - **Lint:** `npm run lint` debe pasar sin errores
 
 ## Pull Requests

@@ -1,7 +1,7 @@
 # MejoraContactos
 
 [![Build & Deploy](https://github.com/pabloeckert/MejoraContactos/actions/workflows/deploy.yml/badge.svg)](https://github.com/pabloeckert/MejoraContactos/actions/workflows/deploy.yml)
-[![Tests](https://img.shields.io/badge/tests-180%20passing-brightgreen)](https://github.com/pabloeckert/MejoraContactos/actions)
+[![Tests](https://img.shields.io/badge/tests-199%20passing-brightgreen)](https://github.com/pabloeckert/MejoraContactos/actions)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![Live](https://img.shields.io/badge/live-demo-brightgreen)](https://util.mejoraok.com/mejoracontactos/)
 
@@ -36,7 +36,7 @@ Groq · OpenRouter · Together AI · Cerebras · DeepInfra · SambaNova · Mistr
 ```bash
 npm install --legacy-peer-deps
 npm run dev       # http://localhost:8080
-npm test          # 174 tests unitarios (Vitest)
+npm test          # 199 tests unitarios (Vitest)
 npm run test:e2e  # 14 tests E2E (Playwright)
 npm run build     # build producción
 ```
@@ -46,7 +46,7 @@ npm run build     # build producción
 Push a `main` ejecuta GitHub Actions automáticamente:
 
 1. **Lint** — ESLint + TypeScript
-2. **Unit tests** — 174 tests con Vitest
+2. **Unit tests** — 199 tests con Vitest
 3. **Build** — Vite producción
 4. **E2E tests** — 14 tests con Playwright (Chromium)
 5. **Deploy** — SCP a Hostinger

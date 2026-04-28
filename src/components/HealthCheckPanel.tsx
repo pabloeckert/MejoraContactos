@@ -91,9 +91,13 @@ export function HealthCheckPanel() {
 
     setRunning(false);
 
-    const okCount = withKeys.length - results.filter(p => p.status === "error").length;
-    const errCount = results.filter(p => p.status === "error").length;
-    toast.info(`Health check: ${okCount} OK, ${errCount} con error de ${withKeys.length} con keys`);
+    // Use a callback ref to get latest results at toast time
+    setResults(prev => {
+      const ok = withKeys.length - prev.filter(p => p.status === "error").length;
+      const err = prev.filter(p => p.status === "error").length;
+      toast.info(`Health check: ${ok} OK, ${err} con error de ${withKeys.length} con keys`);
+      return prev;
+    });
   }, []);
 
   const okCount = results.filter(p => p.status === "ok").length;

@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Download, FileSpreadsheet, FileText, File, BarChart3, Brain } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,7 +11,7 @@ interface ExportPanelProps {
   contacts: UnifiedContact[];
 }
 
-export function ExportPanel({ contacts }: ExportPanelProps) {
+export const ExportPanel = memo(function ExportPanel({ contacts }: ExportPanelProps) {
   const clean = contacts.filter((c) => !c.isDuplicate);
   const discarded = contacts.filter((c) => c.isDuplicate);
 
@@ -136,7 +137,7 @@ export function ExportPanel({ contacts }: ExportPanelProps) {
       )}
     </div>
   );
-}
+});
 
 function StatCard({ label, value, icon, color }: { label: string; value: number; icon: string; color?: string }) {
   return (

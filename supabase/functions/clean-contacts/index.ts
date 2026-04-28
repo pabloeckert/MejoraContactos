@@ -350,6 +350,7 @@ async function pipelineBatch(batch: RawContact[], customKeys?: CustomKeysInput, 
   let verified: (RawContact & { issues?: string[] })[];
   try {
     const result = await callAIWithFallback(verifyProvider, SYSTEM_VERIFY, buildVerifyPrompt(batch, cleaned), customKeys);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Supabase AI response shape varies
     verified = result.contacts as any;
     const issueCount = verified.reduce((acc, v) => acc + (v.issues?.length || 0), 0);
     log.push(`Verificacion: ${result.usedProvider} OK (${issueCount} issues)`);

@@ -44,7 +44,6 @@ export async function encryptString(plain: string): Promise<string> {
   const combined = new Uint8Array(iv.length + cipherBuf.byteLength);
   combined.set(iv, 0);
   combined.set(new Uint8Array(cipherBuf), iv.length);
-  // Encode as base64
   let binary = "";
   for (const byte of combined) binary += String.fromCharCode(byte);
   return ENC_MARKER + btoa(binary);
@@ -63,16 +62,18 @@ export async function decryptString(encrypted: string): Promise<string> {
   return new TextDecoder().decode(plainBuf);
 }
 
-// ─── Migration ──────────────────────────────────────────────────────
+// ─── Migration: re-encrypt existing plain-text keys in-place ────────
 
-async function migrateProviderKeys(data: ProviderKeys[]): Promise<ProviderKeys[]> {
+async function migrateUnencryptedKeys(): Promise<void> {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (!raw) return;
+  const data = JSON.parse(raw) as ProviderKeys[];
   let changed = false;
   const migrated: ProviderKeys[] = [];
   for (const pk of data) {
     const keys: KeyEntry[] = [];
     for (const k of pk.keys) {
       if (k.apiKey && !k.apiKey.startsWith(ENC_MARKER)) {
-        // Plain-text key → encrypt it
         keys.push({ ...k, apiKey: await encryptString(k.apiKey) });
         changed = true;
       } else {
@@ -81,10 +82,7 @@ async function migrateProviderKeys(data: ProviderKeys[]): Promise<ProviderKeys[]
     }
     migrated.push({ ...pk, keys });
   }
-  if (changed) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
-  }
-  return migrated;
+  if (changed) localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
 }
 
 // ─── Public API ─────────────────────────────────────────────────────
@@ -94,7 +92,9 @@ export async function loadProviderKeys(): Promise<ProviderKeys[]> {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as ProviderKeys[];
-      // Decrypt all keys
+      // Migrate any remaining plain-text keys (fire-and-forget for next load)
+      migrateUnencryptedKeys();
+      // Decrypt all keys for in-memory use
       const decrypted: ProviderKeys[] = [];
       for (const pk of parsed) {
         const keys: KeyEntry[] = [];
@@ -103,17 +103,15 @@ export async function loadProviderKeys(): Promise<ProviderKeys[]> {
         }
         decrypted.push({ ...pk, keys });
       }
-      // Also ensure any remaining plain-text keys get encrypted (migration)
-      await migrateProviderKeys(parsed);
       return decrypted;
     }
-    // Migration from v1
+    // Migration from v1 (legacy format)
     const legacy = localStorage.getItem(LEGACY_KEY);
     if (legacy) {
       const old = JSON.parse(legacy) as Array<{ providerId: string; apiKey: string; status?: string; lastTested?: string }>;
-      const migrated: ProviderKeys[] = [];
+      const encrypted: ProviderKeys[] = [];
       for (const o of old) {
-        migrated.push({
+        encrypted.push({
           providerId: o.providerId,
           keys: [{
             id: crypto.randomUUID(),
@@ -123,24 +121,23 @@ export async function loadProviderKeys(): Promise<ProviderKeys[]> {
           }],
         });
       }
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(encrypted));
       // Return decrypted for in-memory use
-      return migrated.map(pk => ({
-        ...pk,
-        keys: pk.keys.map(k => ({ ...k, apiKey: o_find_key(old, pk.providerId) || k.apiKey })),
+      return old.map(o => ({
+        providerId: o.providerId,
+        keys: [{
+          id: crypto.randomUUID(),
+          apiKey: o.apiKey,
+          status: (o.status as KeyEntry["status"]) || "untested",
+          lastTested: o.lastTested,
+        }],
       }));
     }
     return [];
   } catch { return []; }
 }
 
-// Helper for legacy migration — returns the original plain-text key for the provider
-function o_find_key(old: Array<{ providerId: string; apiKey: string }>, providerId: string): string {
-  return old.find(o => o.providerId === providerId)?.apiKey || "";
-}
-
 export async function saveProviderKeys(keys: ProviderKeys[]) {
-  // Encrypt all keys before saving
   const encrypted: ProviderKeys[] = [];
   for (const pk of keys) {
     const encKeys: KeyEntry[] = [];

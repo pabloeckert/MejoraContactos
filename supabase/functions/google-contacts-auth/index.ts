@@ -101,6 +101,7 @@ serve(async (req) => {
         return respond(false, { error: "No access token" }, corsHeaders);
       }
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Google Contacts API response
       const allContacts: any[] = [];
       let nextPageToken: string | undefined;
       let page = 0;

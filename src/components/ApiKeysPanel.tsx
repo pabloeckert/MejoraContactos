@@ -27,7 +27,7 @@ export function ApiKeysPanel() {
   const [showKey, setShowKey] = useState<Record<string, boolean>>({});
   const [openProviders, setOpenProviders] = useState<Record<string, boolean>>({});
 
-  useEffect(() => { setProviders(loadProviderKeys()); }, []);
+  useEffect(() => { loadProviderKeys().then(setProviders); }, []);
 
   const getProviderKeys = (providerId: string): KeyEntry[] => {
     return providers.find(p => p.providerId === providerId)?.keys || [];
@@ -36,7 +36,7 @@ export function ApiKeysPanel() {
   const updateProviders = (updater: (prev: ProviderKeys[]) => ProviderKeys[]) => {
     setProviders(prev => {
       const next = updater(prev);
-      saveProviderKeys(next);
+      saveProviderKeys(next).catch(console.error);
       return next;
     });
   };
@@ -129,7 +129,7 @@ export function ApiKeysPanel() {
         await testKey(provider, k.id);
         // give UI a tick
         await new Promise(r => setTimeout(r, 200));
-        const updated = loadProviderKeys().find(p => p.providerId === pk.providerId)?.keys.find(x => x.id === k.id);
+        const updated = (await loadProviderKeys()).find(p => p.providerId === pk.providerId)?.keys.find(x => x.id === k.id);
         if (updated?.status === "ok") okCount++; else errCount++;
       }
     }

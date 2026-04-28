@@ -2,8 +2,8 @@
 
 > **⚡ INSTRUCCIÓN:** Cuando el usuario diga **"documentar"**, actualizar este archivo con el estado actual del proyecto, trabajos realizados, pendientes y cualquier cambio relevante. Todos los documentos viven en `Documents/`.
 
-**Última actualización:** 2026-04-29 06:22 GMT+8
-**Versión actual:** v10.7
+**Última actualización:** 2026-04-29 06:28 GMT+8
+**Versión actual:** v10.8
 **Repo:** [pabloeckert/MejoraContactos](https://github.com/pabloeckert/MejoraContactos)
 **Live:** https://util.mejoraok.com/mejoracontactos/
 **Tests:** 174 pasando ✅ | Build: OK ✅
@@ -563,10 +563,10 @@ Parseo → Mapeo → Reglas (80%) → IA Limpieza → IA Verificación → IA Co
 |---|-------|-----|-------------|-----------|--------|
 | 12.1 | ~~Dividir useContactProcessing (407→3 hooks)~~ | Software Architect | Media | 🔴 Alta | ✅ Movido a 11.12 |
 | 12.2 | **Sentry para errores de producción** | SRE | Baja | 🔴 Alta | ⏳ |
-| 12.3 | **Rate limit en Supabase DB (cross-instance)** | Backend Dev | Media | 🟡 Alta | ⏳ (sub-agente) |
-| 12.4 | **Playwright E2E en GitHub Actions** | QA Automation | Media | 🟡 Alta | ⏳ (sub-agente) |
+| 12.3 | **Rate limit en Supabase DB (cross-instance)** | Backend Dev | Media | 🟡 Alta | ✅ v10.8 |
+| 12.4 | **Playwright E2E en GitHub Actions** | QA Automation | Media | 🟡 Alta | ✅ v10.8 |
 | 12.5 | Cloudflare CDN (gratis) | Cloud Architect | Baja | 🟡 Alta | ⏳ |
-| 12.6 | Encriptar API keys con Web Crypto API | Cybersecurity | Media | 🟡 Alta | ⏳ (sub-agente) |
+| 12.6 | Encriptar API keys con Web Crypto API | Cybersecurity | Media | 🟡 Alta | ✅ v10.8 |
 | 12.7 | 3er proveedor IA verificado (para pipeline completo) | Backend Dev | Baja | 🟡 Alta | ⏳ |
 | 12.8 | Gemini key: verificar activación | Backend Dev | Baja | 🟢 Media | ⏳ |
 | 12.9 | Deploy Edge Functions (log-error + clean-contacts) | DevOps | Baja | 🟢 Media | ⏳ |
@@ -684,6 +684,7 @@ npx supabase functions deploy google-contacts-auth
 
 | Versión | Fecha | Cambios principales |
 |---------|-------|-------------------|
+| v10.8 | 2026-04-29 | API keys encryption (AES-GCM Web Crypto), Playwright E2E en CI, rate limit DB |
 | v10.7 | 2026-04-29 | Refactor: useContactProcessing dividido en 3 hooks (useAIPipeline, useDedup, orchestrator) |
 | v10.6 | 2026-04-29 | Fix crítico: declaración duplicada en Edge Function clean-contacts, consolidación documentación |
 | v10.5 | 2026-04-28 | Keyboard shortcuts, SimpleMode fix (ProcessingPanel integrado) |

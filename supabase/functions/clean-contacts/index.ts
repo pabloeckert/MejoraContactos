@@ -1,4 +1,3 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import {
   SYSTEM_CLEAN,
   SYSTEM_VERIFY,
@@ -315,8 +314,7 @@ async function pipelineBatch(batch: RawContact[], customKeys?: CustomKeysInput, 
   let verified: (RawContact & { issues?: string[] })[];
   try {
     const result = await callAIWithFallback(verifyProvider, SYSTEM_VERIFY, buildVerifyPrompt(batch, cleaned), customKeys);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Supabase AI response shape varies
-    verified = result.contacts as any;
+    verified = result.contacts as unknown as (RawContact & { issues?: string[] })[];
     const issueCount = verified.reduce((acc, v) => acc + (v.issues?.length || 0), 0);
     log.push(`Verificacion: ${result.usedProvider} OK (${issueCount} issues)`);
   } catch (e) {
@@ -401,7 +399,7 @@ async function verifyJWT(authHeader: string | null): Promise<{ valid: boolean; u
   }
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   const corsHeaders = getCorsHeaders(req.headers.get("origin"));
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 

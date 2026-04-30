@@ -2,8 +2,8 @@
 
 > **⚡ INSTRUCCIÓN:** Cuando el usuario diga **"documentar"**, actualizar este archivo con el estado actual del proyecto, trabajos realizados, pendientes y cualquier cambio relevante. Todos los documentos viven en `Documents/`.
 
-**Última actualización:** 2026-04-29 06:58 GMT+8
-**Versión actual:** v12.0
+**Última actualización:** 2026-05-01 03:15 GMT+8
+**Versión actual:** v12.1
 **Repo:** [pabloeckert/MejoraContactos](https://github.com/pabloeckert/MejoraContactos)
 **Live:** https://util.mejoraok.com/mejoracontactos/
 **Tests:** 199 pasando ✅ | E2E: 21 pasando ✅ | Build: OK ✅ | Lint: 0 errores ✅
@@ -243,6 +243,7 @@ Steps:
 
 | Versión | Fecha | Cambios |
 |---------|-------|---------|
+| v12.1 | 2026-05-01 | Edge Function modernizada (Deno.serve), type safety fix, version sync |
 | v12.0 | 2026-04-29 | Etapa 13: pricing BYOK, blog SEO, free tier, Plausible analytics, funnel tracking, E2E fixes |
 | v11.0 | 2026-04-29 | Etapa 12: hooks divididos, keys cifradas, E2E CI, rate limit DB, retry backoff, cookie consent, FAQ, PWA install |
 | v10.6 | 2026-04-29 | Fix Edge Function duplicada, consolidación docs |
@@ -295,4 +296,4 @@ git push origin main                             # Deploy automático
 ---
 
 *Documento maestro — Actualizar al decir "documentar".*
-*2026-04-29 06:58 GMT+8 — 199 tests · 21 E2E · v12.0 · 12 proveedores IA · Pipeline híbrido · GDPR · BETA*
+*2026-05-01 03:15 GMT+8 — 199 tests · 21 E2E · v12.1 · 12 proveedores IA · Pipeline híbrido · GDPR · BETA*

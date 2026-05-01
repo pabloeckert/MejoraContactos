@@ -1,7 +1,7 @@
 # 📋 MejoraContactos — PLAN GENERAL
 
-> **Última sesión:** Sesión 5 — 2026-05-02 06:20 GMT+8
-> **Versión:** v12.4
+> **Última sesión:** Sesión 6 — 2026-05-02 06:49 GMT+8
+> **Versión:** v12.5
 > **Estado:** ✅ BETA — Producción activa
 
 ---
@@ -16,7 +16,7 @@
 | **Lint** | ✅ 0 errores | 4 warnings pre-existentes (no críticos) |
 | **Deploy** | ✅ Automático | GitHub Actions → SCP → Hostinger, rollback incluido |
 | **Seguridad** | ✅ Sólido | AES-GCM, CSP, JWT, rate limiting, CORS whitelist, Sentry error tracking |
-| **Performance** | ✅ Optimizado | Web Workers, chunk splitting, lazy loading (xlsx, papaparse, libphonenumber), virtualización |
+| **Performance** | ✅ Optimizado | Web Workers, chunk splitting, lazy loading (xlsx, papaparse, libphonenumber, **@sentry/react**), virtualización |
 | **UX** | ✅ Completo | Onboarding, dark mode, keyboard shortcuts, responsive |
 | **Legal** | ✅ GDPR | Privacy policy, terms, cookies, data retention |
 | **Edge Function** | ✅ Modernizado | Deno.serve(), type-safe, 12 proveedores con rotación |
@@ -43,6 +43,7 @@
 | **Sesión 3** | **v12.2** | **219** | **Lazy loading: papaparse, libphonenumber-js; recharts eliminado; bundle -31%** |
 | **Sesión 4** | **v12.3** | **219** | **Edge Function: 3→1 DB queries, L1 cache, structured timing logs** |
 | **Sesión 5** | **v12.4** | **219** | **Sentry integration: error tracking, tags, severity routing, dedup** |
+| **Sesión 6** | **v12.5** | **219** | **Sentry lazy-load: @sentry/react code-split 81KB del main bundle (-21%)** |
 
 ### 📋 Pendientes de Usuario
 
@@ -58,21 +59,20 @@
 
 ## Próximas Micro-Misiones (ordenadas por impacto)
 
-### 🥇 Opción 1: Lucide React Tree-Shaking Audit (Prioridad: Performance)
+### 🥇 Opción 1: date-fns Tree-Shaking + Import Optimization (Prioridad: Performance)
 **Tiempo estimado:** 15 min
-**Impacto:** MEDIO — lucide-react es 37MB en node_modules
-- Verificar que Vite tree-shakea correctamente los iconos no usados
-- Considerar importar iconos individuales: `import { Play } from "lucide-react/dist/esm/icons/play"`
-- Auditar qué iconos se usan realmente (31 imports detectados)
-- Potencial ahorro: 20-50KB del bundle
+**Impacto:** MEDIO — date-fns tiene 65 refs en el bundle principal
+- Verificar imports de date-fns: `import { format } from "date-fns"` vs `import format from "date-fns/format"`
+- date-fns v3 soporta tree-shaking nativo, pero los barrel imports pueden impedirlo
+- Considerar reemplazar con `Intl.RelativeTimeFormat` para casos simples
+- Potencial ahorro: 10-30KB del bundle
 
-### 🥈 Opción 2: ContactsTable Virtual Scroll Optimization (Prioridad: UX/Performance)
+### 🥈 Opción 2: Sonner CSS-in-JS Optimization (Prioridad: Performance)
 **Tiempo estimado:** 20 min
-**Impacto:** MEDIO — Mejor UX con datasets grandes
-- Auditar que @tanstack/react-virtual está correctamente implementado
-- Agregar windowing para listas >1000 contactos
-- Optimizar re-renders con memoización profunda
-- Medir FPS durante scroll con 10K+ contactos
+**Impacto:** MEDIO — sonner tiene 115 refs y CSS-in-JS inline (~15KB de estilos)
+- Auditar si sonner puede cargarse lazy (solo se necesita al mostrar toasts)
+- Considerar reemplazar con toast nativo de radix-ui (ya incluido en ui chunk)
+- O mover sonner a chunk separado con dynamic import
 
 ### 🥉 Opción 3: CSP Headers + Security Headers Audit (Prioridad: Seguridad)
 **Tiempo estimado:** 20 min
@@ -451,6 +451,55 @@ captureError() [error-reporter.ts]
 4. Opcional: configurar source maps upload en CI/CD
 
 **Próxima micro-misión recomendada:** Lucide React Tree-Shaking Audit
+
+---
+
+### Sesión 6 — 2026-05-02 06:49 GMT+8
+
+**Micro-misión:** Sentry Lazy-Load — Code-split @sentry/react del bundle principal
+
+**Análisis previo:**
+- Lucide React tree-shaking audit: **VERIFICADO** — Vite ya tree-shakea correctamente (67 iconos usados de 1744, solo 5KB de SVG paths en bundle). No se requiere acción.
+- ContactsTable virtual scroll: **VERIFICADO** — Ya implementado con @tanstack/react-virtual. No se requiere acción.
+- Descubrimiento: `@sentry/react` (81KB) estaba siendo importado estáticamente en `main.tsx`, forzándolo al bundle principal cuando `VITE_SENTRY_DSN` está configurado en producción.
+
+**Cambios realizados:**
+
+1. **`src/main.tsx`** (MODIFICADO):
+   - `import { initSentry } from "./lib/sentry"` → `import("./lib/sentry").then(({ initSentry }) => initSentry())`
+   - Sentry ahora se carga de forma lazy (dynamic import) después del render inicial
+   - `@sentry/react` se code-split a chunk separado (`sentry-*.js`, 81KB gzip: 28KB)
+
+**Impacto:**
+
+| Escenario | Antes | Después | Cambio |
+|-----------|-------|---------|--------|
+| **Sin DSN (dev)** | 296 KB | 296 KB | Sin cambio (Vite tree-shakea Sentry) |
+| **Con DSN (prod)** | ~377 KB (Sentry en main) | 296 KB + 81 KB async | **-21% bundle principal** |
+| **Sentry chunk** | N/A (en main) | 81 KB async (carga bajo demanda) | No bloquea paint |
+
+**Hallazgo importante:**
+- Lucide-react NO requiere optimización — Vite ya tree-shakea correctamente los 1677 iconos no usados
+- ContactsTable ya tiene virtualización con @tanstack/react-virtual
+- `sonner` (115 refs, CSS-in-JS) y `date-fns` (65 refs) son los próximos targets de optimización
+
+**Validación:**
+- ✅ 219/219 tests pasando
+- ✅ Build compila correctamente
+- ✅ 0 lint errors (4 warnings pre-existentes)
+- ✅ TypeScript sin errores
+- ✅ Performance budget: index chunk 290KB < 450KB limit
+
+**Archivos modificados:**
+- `src/main.tsx`
+- `package-lock.json` (npm metadata)
+
+**Push:** ❌ Requiere configurar credenciales GitHub (`git push origin main`)
+
+**Próximas micro-misiones recomendadas:**
+1. 🥇 date-fns Tree-Shaking + Import Optimization (Performance)
+2. 🥈 Sonner CSS-in-JS Optimization / Replace with radix toast (Performance)
+3. 🥉 CSP Headers + Security Headers Audit (Seguridad)
 
 ---
 

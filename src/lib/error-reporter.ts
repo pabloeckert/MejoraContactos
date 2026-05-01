@@ -30,7 +30,7 @@ interface ErrorReport {
 }
 
 const SESSION_ID = crypto.randomUUID();
-const APP_VERSION = "v12.0-beta";
+const APP_VERSION = "v12.1-beta";
 const MAX_STORED_ERRORS = 20;
 const STORAGE_KEY = "__mc_errors__";
 const WEBHOOK_KEY = "__mc_error_webhook__";

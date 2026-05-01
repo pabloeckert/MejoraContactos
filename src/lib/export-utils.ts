@@ -1,3 +1,4 @@
+import { handleError } from "./error-handler";
 import type { UnifiedContact } from "@/types/contact";
 
 interface ContactRow {

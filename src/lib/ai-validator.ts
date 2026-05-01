@@ -5,6 +5,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { getActiveKeysMulti } from "@/lib/api-keys";
+import { handleError } from "./error-handler";
 import { validateContactFields } from "./field-validator";
 import type { UnifiedContact, FieldValidation } from "@/types/contact";
 
@@ -59,7 +60,14 @@ function parseAIResponse(response: string, contact: UnifiedContact): FieldValida
         reason: !isValid ? `IA: no es un ${field} válido` : correction ? `IA sugiere: ${correction}` : undefined,
       });
     }
-  } catch {
+  } catch (err) {
+    handleError(err, {
+      component: "ai-validator",
+      action: "parseAIResponse",
+      category: "ai",
+      severity: "low",
+      extra: { rawResponse: response?.slice(0, 200) },
+    });
     // Si la IA devolvió algo inválido, marcar todo como no validado
     const fields: FieldValidation['field'][] = ['firstName', 'lastName', 'whatsapp', 'email', 'company', 'jobTitle'];
     for (const field of fields) {
@@ -157,7 +165,14 @@ export async function validateContactWithAI(
 
     validationCache.set(cacheKey, validations);
     return validations;
-  } catch {
+  } catch (err) {
+    handleError(err, {
+      component: "ai-validator",
+      action: "validateContactWithAI",
+      category: "ai",
+      severity: "medium",
+      extra: { provider, contactId: contact.id },
+    });
     // Fallback: usar reglas determinísticas
     const ruleResult = validateContactFields(contact);
     validationCache.set(cacheKey, ruleResult.validations);

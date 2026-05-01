@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { parseFile } from "@/lib/parsers";
+import { handleError } from "@/lib/error-handler";
 import type { ParsedFile } from "@/types/contact";
 import { toast } from "sonner";
 
@@ -56,6 +57,13 @@ export function FileDropzone({ files, onFilesAdded, onRemoveFile }: FileDropzone
           parsed.push(result);
           toast.success(`${file.name}: ${result.rows.length} filas cargadas`);
         } catch (err: unknown) {
+          handleError(err, {
+            component: "FileDropzone",
+            action: "parseFile",
+            category: "parse",
+            severity: "medium",
+            extra: { fileName: file.name },
+          });
           const message = err instanceof Error ? err.message : "Error desconocido";
           toast.error(`Error en ${file.name}: ${message}`);
         }

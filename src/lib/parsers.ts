@@ -1,4 +1,5 @@
 import Papa from "papaparse";
+import { handleParseError } from "./error-handler";
 import type { ParsedFile, RawContact } from "@/types/contact";
 
 function genId(): string {
@@ -35,6 +36,7 @@ export function parseCSV(file: File): Promise<ParsedFile> {
           error: (err) => reject(err),
         });
       } catch (err) {
+        handleParseError(err, file.name, "CSV");
         reject(err);
       }
     };
@@ -64,6 +66,7 @@ export async function parseExcel(file: File): Promise<ParsedFile> {
           addedAt: new Date(),
         });
       } catch (err) {
+        handleParseError(err, file.name, "Excel");
         reject(err);
       }
     };
@@ -156,6 +159,7 @@ export function parseVCF(file: File): Promise<ParsedFile> {
           addedAt: new Date(),
         });
       } catch (err) {
+        handleParseError(err, file.name, "VCF");
         reject(err);
       }
     };
@@ -191,6 +195,7 @@ export function parseJSON(file: File): Promise<ParsedFile> {
           addedAt: new Date(),
         });
       } catch (err) {
+        handleParseError(err, file.name, "JSON");
         reject(err);
       }
     };

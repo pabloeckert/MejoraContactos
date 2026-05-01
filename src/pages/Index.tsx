@@ -11,8 +11,10 @@ import { OnboardingWizard } from "@/components/OnboardingWizard";
 import { EmptyState } from "@/components/EmptyState";
 import { PreviewPanel } from "@/components/PreviewPanel";
 import { SimpleMode } from "@/components/SimpleMode";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { analytics } from "@/lib/analytics";
 import { saveContacts, updateContact, deleteContact, clearContacts, saveHistorySnapshot } from "@/lib/db";
+import { handleError } from "@/lib/error-handler";
 import type { ParsedFile, UnifiedContact } from "@/types/contact";
 import { toast } from "sonner";
 import { Upload, Zap, Users, Download, BarChart3, Settings, Moon, Sun, Activity, History, Sparkles, Settings2 } from "lucide-react";
@@ -135,7 +137,13 @@ const Index = () => {
     try {
       const clean = processed.filter((c) => !c.isDuplicate);
       await saveContacts(clean);
-    } catch {
+    } catch (err) {
+      handleError(err, {
+        component: "Index",
+        action: "saveContacts",
+        category: "storage",
+        severity: "high",
+      });
       toast.error("Error guardando en base de datos local");
     }
     setActiveTab("results");
@@ -313,59 +321,67 @@ const Index = () => {
             </TabsContent>
 
             <TabsContent value="process">
-              {files.length === 0 ? (
-                <EmptyState
-                  illustration="process"
-                  title="Primero importá tus contactos"
-                  description="Subí archivos CSV, Excel, VCF o JSON desde la pestaña Importar para empezar a procesar."
-                  action={{ label: "Ir a Importar", onClick: () => setActiveTab("import") }}
-                />
-              ) : (
-                <ProcessingPanel files={files} onProcessingComplete={handleProcessingComplete} onResetAll={handleResetAll} />
-              )}
+              <ErrorBoundary>
+                {files.length === 0 ? (
+                  <EmptyState
+                    illustration="process"
+                    title="Primero importá tus contactos"
+                    description="Subí archivos CSV, Excel, VCF o JSON desde la pestaña Importar para empezar a procesar."
+                    action={{ label: "Ir a Importar", onClick: () => setActiveTab("import") }}
+                  />
+                ) : (
+                  <ProcessingPanel files={files} onProcessingComplete={handleProcessingComplete} onResetAll={handleResetAll} />
+                )}
+              </ErrorBoundary>
             </TabsContent>
 
             <TabsContent value="results">
-              {contacts.length === 0 ? (
-                <EmptyState
-                  illustration="results"
-                  title="Sin resultados todavía"
-                  description="Procesá tus archivos para ver los contactos limpios y deduplicados acá."
-                  action={files.length > 0 ? { label: "Ir a Procesar", onClick: () => setActiveTab("process") } : { label: "Importar archivos", onClick: () => setActiveTab("import") }}
-                />
-              ) : (
-                <ContactsTable
-                  contacts={contacts}
-                  onUpdateContact={handleUpdateContact}
-                  onDeleteContact={handleDeleteContact}
-                />
-              )}
+              <ErrorBoundary>
+                {contacts.length === 0 ? (
+                  <EmptyState
+                    illustration="results"
+                    title="Sin resultados todavía"
+                    description="Procesá tus archivos para ver los contactos limpios y deduplicados acá."
+                    action={files.length > 0 ? { label: "Ir a Procesar", onClick: () => setActiveTab("process") } : { label: "Importar archivos", onClick: () => setActiveTab("import") }}
+                  />
+                ) : (
+                  <ContactsTable
+                    contacts={contacts}
+                    onUpdateContact={handleUpdateContact}
+                    onDeleteContact={handleDeleteContact}
+                  />
+                )}
+              </ErrorBoundary>
             </TabsContent>
 
             <TabsContent value="export">
-              {contacts.length === 0 ? (
-                <EmptyState
-                  illustration="export"
-                  title="Nada para exportar"
-                  description="Procesá tus contactos primero. Después podés exportarlos en CSV, Excel, VCF, JSON, JSONL o HTML."
-                  action={{ label: "Ir a Importar", onClick: () => setActiveTab("import") }}
-                />
-              ) : (
-                <ExportPanel contacts={contacts} />
-              )}
+              <ErrorBoundary>
+                {contacts.length === 0 ? (
+                  <EmptyState
+                    illustration="export"
+                    title="Nada para exportar"
+                    description="Procesá tus contactos primero. Después podés exportarlos en CSV, Excel, VCF, JSON, JSONL o HTML."
+                    action={{ label: "Ir a Importar", onClick: () => setActiveTab("import") }}
+                  />
+                ) : (
+                  <ExportPanel contacts={contacts} />
+                )}
+              </ErrorBoundary>
             </TabsContent>
 
             <TabsContent value="dashboard">
-              {contacts.length === 0 ? (
-                <EmptyState
-                  illustration="dashboard"
-                  title="Dashboard vacío"
-                  description="Cuando procesés tus contactos, acá vas a ver métricas de calidad, distribución de scores y más."
-                  action={{ label: "Importar contactos", onClick: () => setActiveTab("import") }}
-                />
-              ) : (
-                <DashboardPanel contacts={contacts} />
-              )}
+              <ErrorBoundary>
+                {contacts.length === 0 ? (
+                  <EmptyState
+                    illustration="dashboard"
+                    title="Dashboard vacío"
+                    description="Cuando procesés tus contactos, acá vas a ver métricas de calidad, distribución de scores y más."
+                    action={{ label: "Importar contactos", onClick: () => setActiveTab("import") }}
+                  />
+                ) : (
+                  <DashboardPanel contacts={contacts} />
+                )}
+              </ErrorBoundary>
             </TabsContent>
 
             <TabsContent value="settings">

@@ -1,12 +1,16 @@
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
-import { initSentry } from "./lib/sentry";
 import { initErrorReporting } from "./lib/error-reporter";
 import { cleanupOldHistory } from "./lib/db";
 
-// Initialize Sentry first (captures unhandled errors globally if DSN configured)
-initSentry();
+// Lazy-load Sentry after app renders (avoids blocking initial paint with ~186KB @sentry/react)
+// initSentry() is called async so the main bundle doesn't include @sentry/react
+import("./lib/sentry")
+  .then(({ initSentry }) => initSentry())
+  .catch(() => {
+    // Sentry module failed to load — non-critical, fallback error reporting handles it
+  });
 
 // Initialize fallback error reporting (no-op if Sentry is active)
 initErrorReporting();

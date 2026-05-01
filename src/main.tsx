@@ -1,10 +1,14 @@
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
+import { initSentry } from "./lib/sentry";
 import { initErrorReporting } from "./lib/error-reporter";
 import { cleanupOldHistory } from "./lib/db";
 
-// Initialize error reporting (captures unhandled errors)
+// Initialize Sentry first (captures unhandled errors globally if DSN configured)
+initSentry();
+
+// Initialize fallback error reporting (no-op if Sentry is active)
 initErrorReporting();
 
 // Inject Plausible analytics script if configured (GDPR-safe, no cookies)

@@ -30,7 +30,7 @@ interface ErrorReport {
 }
 
 const SESSION_ID = crypto.randomUUID();
-const APP_VERSION = "v12.3-beta";
+export const APP_VERSION = "v12.4-beta";
 const MAX_STORED_ERRORS = 20;
 const STORAGE_KEY = "__mc_errors__";
 const WEBHOOK_KEY = "__mc_error_webhook__";
@@ -142,6 +142,18 @@ export function captureError(error: Error, context?: ErrorContext) {
 
   // 4. Send to Supabase Edge Function (optional, async, non-blocking)
   sendToSupabase(report);
+
+  // 5. Send to Sentry (structured tags, dedup, source maps)
+  // Dynamic import to avoid loading Sentry if not configured
+  import("./sentry").then(({ captureToSentry }) => {
+    captureToSentry(error, {
+      component: context?.component,
+      action: context?.action,
+      category: context?.extra?.category as string,
+      severity: context?.extra?.severity as string,
+      extra: context?.extra,
+    });
+  }).catch(() => { /* sentry not available */ });
 }
 
 export function getRecentErrors(): ErrorReport[] {
@@ -162,7 +174,17 @@ export function initErrorReporting() {
   if (initialized) return;
   initialized = true;
 
-  // Unhandled errors
+  // If Sentry is configured, it handles unhandled errors globally
+  // with better stack traces and source maps. Skip our own handlers
+  // to avoid duplicate reports. captureError() still sends to Sentry
+  // for manually reported errors (from handleError, ErrorBoundary, etc).
+  const hasSentryDsn = !!import.meta.env.VITE_SENTRY_DSN;
+  if (hasSentryDsn) {
+    console.log("[ErrorReporter] Sentry active — skipping global error handlers (Sentry handles them)");
+    return;
+  }
+
+  // Fallback: capture unhandled errors when Sentry is not configured
   window.addEventListener("error", (event) => {
     captureError(event.error || new Error(event.message), {
       component: "window",

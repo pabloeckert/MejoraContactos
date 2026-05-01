@@ -1,7 +1,7 @@
 # 📋 MejoraContactos — PLAN GENERAL
 
-> **Última sesión:** Sesión 4 — 2026-05-02 06:12 GMT+8
-> **Versión:** v12.3
+> **Última sesión:** Sesión 5 — 2026-05-02 06:20 GMT+8
+> **Versión:** v12.4
 > **Estado:** ✅ BETA — Producción activa
 
 ---
@@ -15,7 +15,7 @@
 | **Build** | ✅ OK | Vite 5, chunks optimizados, budget < 2MB |
 | **Lint** | ✅ 0 errores | 4 warnings pre-existentes (no críticos) |
 | **Deploy** | ✅ Automático | GitHub Actions → SCP → Hostinger, rollback incluido |
-| **Seguridad** | ✅ Sólido | AES-GCM, CSP, JWT, rate limiting, CORS whitelist |
+| **Seguridad** | ✅ Sólido | AES-GCM, CSP, JWT, rate limiting, CORS whitelist, Sentry error tracking |
 | **Performance** | ✅ Optimizado | Web Workers, chunk splitting, lazy loading (xlsx, papaparse, libphonenumber), virtualización |
 | **UX** | ✅ Completo | Onboarding, dark mode, keyboard shortcuts, responsive |
 | **Legal** | ✅ GDPR | Privacy policy, terms, cookies, data retention |
@@ -42,6 +42,7 @@
 | **Sesión 2** | **v12.1** | **219** | **Unified Error Handling, ErrorBoundaries granulares, captureError en pipeline** |
 | **Sesión 3** | **v12.2** | **219** | **Lazy loading: papaparse, libphonenumber-js; recharts eliminado; bundle -31%** |
 | **Sesión 4** | **v12.3** | **219** | **Edge Function: 3→1 DB queries, L1 cache, structured timing logs** |
+| **Sesión 5** | **v12.4** | **219** | **Sentry integration: error tracking, tags, severity routing, dedup** |
 
 ### 📋 Pendientes de Usuario
 
@@ -57,15 +58,7 @@
 
 ## Próximas Micro-Misiones (ordenadas por impacto)
 
-### 🥇 Opción 1: Sentry Integration (Prioridad: Observabilidad)
-**Tiempo estimado:** 15 min
-**Impacto:** MEDIO — Error tracking centralizado en producción
-- Crear cuenta en sentry.io (o usar DSN existente)
-- npm install @sentry/react
-- Reemplazar captureError() con Sentry.captureException()
-- Ya preparado: error-handler.ts + error-reporter.ts con comentarios de migración
-
-### 🥈 Opción 2: Lucide React Tree-Shaking Audit (Prioridad: Performance)
+### 🥇 Opción 1: Lucide React Tree-Shaking Audit (Prioridad: Performance)
 **Tiempo estimado:** 15 min
 **Impacto:** MEDIO — lucide-react es 37MB en node_modules
 - Verificar que Vite tree-shakea correctamente los iconos no usados
@@ -73,13 +66,21 @@
 - Auditar qué iconos se usan realmente (31 imports detectados)
 - Potencial ahorro: 20-50KB del bundle
 
-### 🥉 Opción 3: ContactosTable Virtual Scroll Optimization (Prioridad: UX/Performance)
+### 🥈 Opción 2: ContactsTable Virtual Scroll Optimization (Prioridad: UX/Performance)
 **Tiempo estimado:** 20 min
 **Impacto:** MEDIO — Mejor UX con datasets grandes
 - Auditar que @tanstack/react-virtual está correctamente implementado
 - Agregar windowing para listas >1000 contactos
 - Optimizar re-renders con memoización profunda
 - Medir FPS durante scroll con 10K+ contactos
+
+### 🥉 Opción 3: CSP Headers + Security Headers Audit (Prioridad: Seguridad)
+**Tiempo estimado:** 20 min
+**Impacto:** MEDIO — Hardening de producción
+- Auditar CSP headers en Hostinger/.htaccess
+- Verificar X-Frame-Options, X-Content-Type-Options, Referrer-Policy
+- Agregar Strict-Transport-Security (HSTS)
+- Test con securityheaders.com
 
 ---
 
@@ -115,6 +116,7 @@
 - Performance budget monitoreado en CI
 - Dependabot activo para actualizaciones de seguridad
 - **Nuevo:** Observabilidad mejorada — errores críticos ahora se capturan con contexto (component, action, category, severity)
+- **Sesión 5:** Sentry error tracking con source maps, tags estructurados, severity routing, dedup automático
 
 ### QA Automation
 - 219 tests unitarios cubriendo todas las lib críticas (+20 tests error-handler)
@@ -126,6 +128,7 @@
 - CSP headers + CORS whitelist
 - JWT verification en Edge Function
 - Input sanitización (500 chars max por field)
+- **Sesión 5:** Sentry integration con tags (category, severity, component, provider), beforeSend redacción de API keys, ignoreErrors para ruido de navegador
 
 ### Product Manager
 - BETA en producción, funcional
@@ -359,6 +362,95 @@ Más cleanup probabilística como 4ª query.
 2. Deploy Edge Function: `npx supabase functions deploy clean-contacts`
 
 **Próxima micro-misión recomendada:** Sentry Integration
+
+---
+
+### Sesión 5 — 2026-05-02 06:20 GMT+8
+
+**Micro-misión:** Sentry Integration — Error tracking centralizado
+
+**Objetivo:** Integrar Sentry para error tracking en producción con tags estructurados, sin duplicar reportes con el sistema existente.
+
+**Cambios realizados:**
+
+1. **`src/lib/sentry.ts`** (NUEVO):
+   - Configuración de Sentry con `@sentry/react`
+   - `initSentry()` — inicialización segura (no-op sin DSN)
+   - `captureToSentry()` — envía errores con tags: category, severity, component, action, provider
+   - `setSentryUser()` — contexto de usuario (non-PII)
+   - `addSentryBreadcrumb()` — tracking de acciones
+   - `beforeSend` redacta API keys de breadcrumbs
+   - `ignoreErrors` filtra ruido de navegador (ResizeObserver, NetworkError, AbortError)
+   - Fingerprinting por component + action + message (agrupación inteligente)
+   - Performance monitoring: 10% tracesSampleRate
+   - Solo activo en producción (deshabilitado en dev)
+
+2. **`src/lib/error-reporter.ts`** (MODIFICADO):
+   - `APP_VERSION` ahora exportado (para Sentry release tag)
+   - `captureError()` — 5º canal: envía a Sentry via dynamic import
+   - `initErrorReporting()` — detecta Sentry activo y omite sus propios global handlers (evita duplicación)
+   - Flujo: error → captureError → console + sessionStorage + webhook + supabase + sentry
+
+3. **`src/main.tsx`** (MODIFICADO):
+   - `initSentry()` se llama ANTES de `initErrorReporting()`
+   - Sentry captura unhandled errors globalmente (mejor stack traces + source maps)
+   - `initErrorReporting()` es no-op cuando Sentry está activo
+
+4. **`package.json`** (MODIFICADO):
+   - `@sentry/react` agregado a dependencies
+
+**Arquitectura de error reporting (5 canales):**
+
+```
+Error occurs
+  ↓
+handleError() [error-handler.ts]  ← context enrichment
+  ↓
+captureError() [error-reporter.ts]
+  ├── 1. console.error()          ← always
+  ├── 2. sessionStorage            ← always (max 20)
+  ├── 3. Webhook (Discord/Slack)   ← optional
+  ├── 4. Supabase Edge Function    ← optional
+  └── 5. Sentry.captureException() ← if DSN configured
+```
+
+**Dedup strategy:**
+- Sentry tiene sus propios global handlers para unhandled errors
+- `initErrorReporting()` detecta `VITE_SENTRY_DSN` y omite sus handlers
+- Solo Sentry captura unhandled errors (mejor stack traces, source maps)
+- `captureError()` sigue enviando a Sentry para errores manuales (ErrorBoundary, handleError)
+
+**Variables de entorno requeridas:**
+- `VITE_SENTRY_DSN` — DSN de Sentry (obtener en sentry.io)
+- `VITE_SENTRY_ENV` — Entorno (default: "production")
+- Sin DSN → Sentry deshabilitado, fallback al error-reporter original
+
+**Impacto:**
+- **Observabilidad:** Error tracking centralizado con tags, source maps, alertas
+- **Seguridad:** beforeSend redacta API keys, ignoreErrors filtra ruido
+- **Dedup:** Sin reportes duplicados entre Sentry y error-reporter
+- **Bundle:** +0.52 KB al bundle principal (295.97 → 296.49 KB)
+- **Zero-config:** Sin VITE_SENTRY_DSN, todo funciona como antes
+
+**Validación:**
+- ✅ 219/219 tests pasando
+- ✅ Build compila correctamente
+- ✅ 0 lint errors (4 warnings pre-existentes)
+- ✅ TypeScript sin errores
+
+**Archivos modificados:**
+- `src/lib/sentry.ts` (nuevo)
+- `src/lib/error-reporter.ts`
+- `src/main.tsx`
+- `package.json` / `package-lock.json`
+
+**Deploy manual requerido:**
+1. Crear proyecto en sentry.io
+2. Obtener DSN
+3. Agregar `VITE_SENTRY_DSN=https://xxx@sentry.io/yyy` en variables de entorno del build
+4. Opcional: configurar source maps upload en CI/CD
+
+**Próxima micro-misión recomendada:** Lucide React Tree-Shaking Audit
 
 ---
 

@@ -13,6 +13,11 @@ vi.mock("@/lib/export-utils", () => ({
   exportVCF: vi.fn().mockReturnValue("vcf-data"),
   exportJSON: vi.fn().mockReturnValue("{}"),
   exportJSONL: vi.fn().mockReturnValue("{}\n"),
+  exportGoogleContactsCSV: vi.fn().mockReturnValue("google-csv-data"),
+  exportHubSpotCSV: vi.fn().mockReturnValue("hubspot-csv-data"),
+  exportSalesforceCSV: vi.fn().mockReturnValue("salesforce-csv-data"),
+  exportZohoCSV: vi.fn().mockReturnValue("zoho-csv-data"),
+  exportAirtableCSV: vi.fn().mockReturnValue("airtable-csv-data"),
   generateHTMLReport: vi.fn().mockReturnValue("<html></html>"),
   downloadFile: vi.fn(),
 }));
@@ -68,6 +73,12 @@ describe("ExportPanel", () => {
     expect(screen.getByText("JSON")).toBeTruthy();
     expect(screen.getByText("JSONL")).toBeTruthy();
     expect(screen.getByText("Informe")).toBeTruthy();
+    // CRM formats
+    expect(screen.getByText("Google Contacts")).toBeTruthy();
+    expect(screen.getByText("HubSpot")).toBeTruthy();
+    expect(screen.getByText("Salesforce")).toBeTruthy();
+    expect(screen.getByText("Zoho CRM")).toBeTruthy();
+    expect(screen.getByText("Airtable")).toBeTruthy();
   });
 
   it("should show duplicates section when duplicates exist", () => {

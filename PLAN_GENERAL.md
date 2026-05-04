@@ -1,7 +1,7 @@
 # 📋 MejoraContactos — PLAN GENERAL
 
-> **Última sesión:** Sesión 8 — 2026-05-02 07:20 GMT+8
-> **Versión:** v12.7
+> **Última sesión:** Sesión 9 — 2026-05-05 04:00 GMT+8
+> **Versión:** v12.8
 > **Estado:** ✅ BETA — Producción activa
 
 ---
@@ -46,6 +46,7 @@
 | **Sesión 6** | **v12.5** | **219** | **Sentry lazy-load: @sentry/react code-split 81KB del main bundle (-21%)** |
 | **Sesión 7** | **v12.6** | **219** | **Dead dep removal: date-fns eliminado (0 imports, -37MB node_modules)** |
 | **Sesión 8** | **v12.7** | **219** | **Dead deps audit: 9 deps eliminadas (embla, cmdk, input-otp, day-picker, vaul, resizable-panels, hookform, resolvers, zod) — -19MB** |
+| **Sesión 9** | **v12.8** | **219** | **Google Contacts delete + CRM exports + Edge Function modernization** |
 
 ### 📋 Pendientes de Usuario
 
@@ -574,6 +575,63 @@ captureError() [error-reporter.ts]
 1. 🥇 Sonner CSS-in-JS Optimization / Replace with radix toast
 2. 🥈 CSP Headers + Security Headers Audit
 3. 🥉 Radix UI Unused Components Audit
+
+---
+
+### Sesión 9 — 2026-05-05 04:00 GMT+8
+
+**Micro-misión:** Google Contacts Delete + CRM Export Formats + Edge Function Modernization
+
+**Cambios realizados:**
+
+1. **`supabase/functions/google-contacts-auth/index.ts`** (MODIFICADO):
+   - Reemplazado `serve()` deprecated por `Deno.serve()` nativo
+   - Scope de Google API: `contacts.readonly` → `contacts` (lectura + escritura)
+   - Nueva acción `delete_contacts`: borrado masivo vía `people:batchDelete` (chunks de 200, retry en 429)
+   - Nueva acción `refresh`: renueva access_token con refresh_token
+   - Acción `exchange` ahora obtiene info del usuario (email, nombre, avatar) via People API
+
+2. **`src/components/GoogleContactsPanel.tsx`** (MODIFICADO):
+   - Campo `refreshToken` en interfaz `GoogleAccount`
+   - Botón de eliminación por cuenta (ícono 🗑️ rojo)
+   - Botón "Borrar todo" para eliminar de todas las cuentas
+   - Diálogo de confirmación con advertencias de seguridad
+   - Resultado de eliminación con feedback visual (éxito/parcial/error)
+
+3. **`src/lib/export-utils.ts`** (MODIFICADO):
+   - `exportGoogleContactsCSV()` — formato re-importable a Google Contacts
+   - `exportHubSpotCSV()` — formato HubSpot CRM
+   - `exportSalesforceCSV()` — formato Salesforce Data Import Wizard
+   - `exportZohoCSV()` — formato Zoho CRM
+   - `exportAirtableCSV()` — formato Airtable
+   - `EXPORT_FORMATS` — registro centralizado de todos los formatos
+
+4. **`src/components/ExportPanel.tsx`** (MODIFICADO):
+   - Nueva sección "Exportar para CRM / Plataformas" con 5 botones:
+     - 🔵 Google Contacts (re-importable)
+     - 🟠 HubSpot
+     - ☁️ Salesforce
+     - 🟢 Zoho CRM
+     - 🟡 Airtable
+
+**Impacto:**
+- **Funcionalidad:** Flujo completo Export → Delete → Re-import para Google Contacts
+- **CRM:** 5 nuevos formatos de exportación para plataformas populares
+- **Edge Function:** Modernizado, eliminado import deprecated
+- **Bundle:** +9KB (305KB index, dentro del budget)
+
+**Validación:**
+- ✅ 219/219 tests pasando
+- ✅ Build OK (305KB index, 1.56MB total)
+- ✅ 0 lint errors
+
+**Archivos modificados:**
+- `supabase/functions/google-contacts-auth/index.ts`
+- `src/components/GoogleContactsPanel.tsx`
+- `src/lib/export-utils.ts`
+- `src/components/ExportPanel.tsx`
+
+**Push:** ✅ Pushed a main
 
 ---
 

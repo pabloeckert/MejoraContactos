@@ -3,7 +3,7 @@ import { Download, FileSpreadsheet, FileText, File, BarChart3, Brain } from "luc
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { exportCSV, exportExcel, exportVCF, exportJSON, exportJSONL, generateHTMLReport, downloadFile } from "@/lib/export-utils";
+import { exportCSV, exportExcel, exportVCF, exportJSON, exportJSONL, exportGoogleContactsCSV, exportHubSpotCSV, exportSalesforceCSV, exportZohoCSV, exportAirtableCSV, generateHTMLReport, downloadFile } from "@/lib/export-utils";
 import { analytics } from "@/lib/analytics";
 import type { UnifiedContact } from "@/types/contact";
 import { toast } from "sonner";
@@ -50,8 +50,33 @@ export const ExportPanel = memo(function ExportPanel({ contacts }: ExportPanelPr
         downloadFile(data, `informe_${timestamp}.html`, "text/html");
         break;
       }
+      case "google": {
+        const data = exportGoogleContactsCSV(clean);
+        downloadFile(data, `google_contacts_${timestamp}.csv`, "text/csv;charset=utf-8");
+        break;
+      }
+      case "hubspot": {
+        const data = exportHubSpotCSV(clean);
+        downloadFile(data, `hubspot_${timestamp}.csv`, "text/csv;charset=utf-8");
+        break;
+      }
+      case "salesforce": {
+        const data = exportSalesforceCSV(clean);
+        downloadFile(data, `salesforce_${timestamp}.csv`, "text/csv;charset=utf-8");
+        break;
+      }
+      case "zoho": {
+        const data = exportZohoCSV(clean);
+        downloadFile(data, `zoho_${timestamp}.csv`, "text/csv;charset=utf-8");
+        break;
+      }
+      case "airtable": {
+        const data = exportAirtableCSV(clean);
+        downloadFile(data, `airtable_${timestamp}.csv`, "text/csv;charset=utf-8");
+        break;
+      }
     }
-    const label = { csv: 'CSV', excel: 'Excel', vcf: 'VCF', json: 'JSON', jsonl: 'JSONL', report: 'HTML' }[format] || format;
+    const label = { csv: 'CSV', excel: 'Excel', vcf: 'VCF', json: 'JSON', jsonl: 'JSONL', report: 'HTML', google: 'Google Contacts', hubspot: 'HubSpot', salesforce: 'Salesforce', zoho: 'Zoho', airtable: 'Airtable' }[format] || format;
     analytics.exportCompleted(format, clean.length);
     toast.success(`Exportado ${clean.length} contactos en formato ${label}`);
   };
@@ -76,7 +101,7 @@ export const ExportPanel = memo(function ExportPanel({ contacts }: ExportPanelPr
           <Button variant="outline" className="h-auto py-4 flex-col gap-2" onClick={() => handleExport("csv")} aria-label="Exportar contactos como CSV">
             <FileText className="h-5 w-5 text-green-600" />
             <span className="text-xs font-semibold">CSV</span>
-            <span className="text-[10px] text-muted-foreground">Google Contacts</span>
+            <span className="text-[10px] text-muted-foreground">Genérico</span>
           </Button>
           <Button variant="outline" className="h-auto py-4 flex-col gap-2" onClick={() => handleExport("excel")} aria-label="Exportar contactos como Excel">
             <FileSpreadsheet className="h-5 w-5 text-blue-500" />
@@ -92,6 +117,43 @@ export const ExportPanel = memo(function ExportPanel({ contacts }: ExportPanelPr
             <FileText className="h-5 w-5 text-purple-500" />
             <span className="text-xs font-semibold">JSON</span>
             <span className="text-[10px] text-muted-foreground">Completo</span>
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* CRM Export */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Download className="h-4 w-4" />
+            Exportar para CRM / Plataformas
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <Button variant="outline" className="h-auto py-4 flex-col gap-2" onClick={() => handleExport("google")} aria-label="Exportar para Google Contacts">
+            <span className="text-lg">🔵</span>
+            <span className="text-xs font-semibold">Google Contacts</span>
+            <span className="text-[10px] text-muted-foreground">Re-importable</span>
+          </Button>
+          <Button variant="outline" className="h-auto py-4 flex-col gap-2" onClick={() => handleExport("hubspot")} aria-label="Exportar para HubSpot">
+            <span className="text-lg">🟠</span>
+            <span className="text-xs font-semibold">HubSpot</span>
+            <span className="text-[10px] text-muted-foreground">CRM</span>
+          </Button>
+          <Button variant="outline" className="h-auto py-4 flex-col gap-2" onClick={() => handleExport("salesforce")} aria-label="Exportar para Salesforce">
+            <span className="text-lg">☁️</span>
+            <span className="text-xs font-semibold">Salesforce</span>
+            <span className="text-[10px] text-muted-foreground">CRM</span>
+          </Button>
+          <Button variant="outline" className="h-auto py-4 flex-col gap-2" onClick={() => handleExport("zoho")} aria-label="Exportar para Zoho CRM">
+            <span className="text-lg">🟢</span>
+            <span className="text-xs font-semibold">Zoho CRM</span>
+            <span className="text-[10px] text-muted-foreground">CRM</span>
+          </Button>
+          <Button variant="outline" className="h-auto py-4 flex-col gap-2" onClick={() => handleExport("airtable")} aria-label="Exportar para Airtable">
+            <span className="text-lg">🟡</span>
+            <span className="text-xs font-semibold">Airtable</span>
+            <span className="text-[10px] text-muted-foreground">Base de datos</span>
           </Button>
         </CardContent>
       </Card>

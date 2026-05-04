@@ -227,3 +227,183 @@ export function downloadFile(content: string | Uint8Array, filename: string, mim
   a.click();
   URL.revokeObjectURL(url);
 }
+
+// ── CRM Export Formats ──────────────────────────────────────
+
+/**
+ * Exporta contactos en formato Google Contacts CSV (re-importable).
+ * Compatible con la importación masiva de Google Contacts.
+ */
+export function exportGoogleContactsCSV(contacts: UnifiedContact[]): string {
+  // Google Contacts import format headers
+  const headers = [
+    "Name", "Given Name", "Family Name", "E-mail 1 - Value",
+    "Phone 1 - Type", "Phone 1 - Value",
+    "Organization 1 - Name", "Organization 1 - Title",
+  ];
+
+  const rows = contacts.map(c => {
+    const name = `${c.firstName} ${c.lastName}`.trim();
+    return [
+      name,
+      c.firstName,
+      c.lastName,
+      c.email,
+      c.whatsapp ? "Mobile" : "",
+      c.whatsapp,
+      c.company,
+      c.jobTitle,
+    ];
+  });
+
+  return [
+    headers.join(","),
+    ...rows.map(row =>
+      row.map(val => {
+        const v = String(val || "");
+        return v.includes(",") || v.includes('"') || v.includes("\n")
+          ? `"${v.replace(/"/g, '""')}"`
+          : v;
+      }).join(",")
+    ),
+  ].join("\n");
+}
+
+/**
+ * Exporta contactos en formato HubSpot CSV.
+ * Columnas esperadas por el importador de HubSpot.
+ */
+export function exportHubSpotCSV(contacts: UnifiedContact[]): string {
+  const headers = [
+    "First Name", "Last Name", "Email", "Phone Number",
+    "Company", "Job Title",
+  ];
+
+  const rows = contacts.map(c => [
+    c.firstName,
+    c.lastName,
+    c.email,
+    c.whatsapp,
+    c.company,
+    c.jobTitle,
+  ]);
+
+  return [
+    headers.join(","),
+    ...rows.map(row =>
+      row.map(val => {
+        const v = String(val || "");
+        return v.includes(",") || v.includes('"') || v.includes("\n")
+          ? `"${v.replace(/"/g, '""')}"`
+          : v;
+      }).join(",")
+    ),
+  ].join("\n");
+}
+
+/**
+ * Exporta contactos en formato Salesforce CSV.
+ * Compatible con el Data Import Wizard de Salesforce.
+ */
+export function exportSalesforceCSV(contacts: UnifiedContact[]): string {
+  const headers = [
+    "First Name", "Last Name", "Email", "Phone",
+    "Company", "Title",
+  ];
+
+  const rows = contacts.map(c => [
+    c.firstName,
+    c.lastName,
+    c.email,
+    c.whatsapp,
+    c.company,
+    c.jobTitle,
+  ]);
+
+  return [
+    headers.join(","),
+    ...rows.map(row =>
+      row.map(val => {
+        const v = String(val || "");
+        return v.includes(",") || v.includes('"') || v.includes("\n")
+          ? `"${v.replace(/"/g, '""')}"`
+          : v;
+      }).join(",")
+    ),
+  ].join("\n");
+}
+
+/**
+ * Exporta contactos en formato Zoho CRM CSV.
+ */
+export function exportZohoCSV(contacts: UnifiedContact[]): string {
+  const headers = [
+    "First Name", "Last Name", "Email", "Phone",
+    "Company", "Title",
+  ];
+
+  const rows = contacts.map(c => [
+    c.firstName,
+    c.lastName,
+    c.email,
+    c.whatsapp,
+    c.company,
+    c.jobTitle,
+  ]);
+
+  return [
+    headers.join(","),
+    ...rows.map(row =>
+      row.map(val => {
+        const v = String(val || "");
+        return v.includes(",") || v.includes('"') || v.includes("\n")
+          ? `"${v.replace(/"/g, '""')}"`
+          : v;
+      }).join(",")
+    ),
+  ].join("\n");
+}
+
+/**
+ * Exporta contactos en formato Airtable CSV.
+ */
+export function exportAirtableCSV(contacts: UnifiedContact[]): string {
+  const headers = [
+    "Name", "Email", "Phone", "Company", "Job Title",
+  ];
+
+  const rows = contacts.map(c => [
+    `${c.firstName} ${c.lastName}`.trim(),
+    c.email,
+    c.whatsapp,
+    c.company,
+    c.jobTitle,
+  ]);
+
+  return [
+    headers.join(","),
+    ...rows.map(row =>
+      row.map(val => {
+        const v = String(val || "");
+        return v.includes(",") || v.includes('"') || v.includes("\n")
+          ? `"${v.replace(/"/g, '""')}"`
+          : v;
+      }).join(",")
+    ),
+  ].join("\n");
+}
+
+/**
+ * Lista de todos los formatos de exportación disponibles.
+ */
+export const EXPORT_FORMATS = [
+  { id: "csv", label: "CSV (genérico)", icon: "📄", exportFn: exportCSV },
+  { id: "google", label: "Google Contacts CSV", icon: "🔵", exportFn: exportGoogleContactsCSV },
+  { id: "hubspot", label: "HubSpot CSV", icon: "🟠", exportFn: exportHubSpotCSV },
+  { id: "salesforce", label: "Salesforce CSV", icon: "☁️", exportFn: exportSalesforceCSV },
+  { id: "zoho", label: "Zoho CRM CSV", icon: "🟢", exportFn: exportZohoCSV },
+  { id: "airtable", label: "Airtable CSV", icon: "🟡", exportFn: exportAirtableCSV },
+  { id: "vcf", label: "vCard (VCF)", icon: "📇", exportFn: exportVCF },
+  { id: "json", label: "JSON", icon: "🔧", exportFn: exportJSON },
+  { id: "jsonl", label: "JSONL (fine-tuning)", icon: "🤖", exportFn: exportJSONL },
+] as const;

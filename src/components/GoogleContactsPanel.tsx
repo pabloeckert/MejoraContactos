@@ -1,9 +1,10 @@
 import { useState, useCallback, useEffect } from "react";
-import { Chrome, Loader2, Users, Download, RefreshCw, LogOut, ChevronDown, ChevronUp, Plus, CheckCircle2, XCircle } from "lucide-react";
+import { Chrome, Loader2, Users, Download, RefreshCw, LogOut, ChevronDown, ChevronUp, Plus, CheckCircle2, XCircle, Trash2, AlertTriangle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { ParsedFile } from "@/types/contact";
@@ -27,6 +28,7 @@ interface GoogleAccount {
   email: string;
   displayName: string;
   accessToken: string;
+  refreshToken?: string;
   avatarUrl?: string;
   contactsCount: number;
   lastSync: Date | null;
@@ -129,6 +131,7 @@ export function GoogleContactsPanel({ onContactsImported }: GoogleContactsPanelP
         email: (data.email as string) || `cuenta${accounts.length + 1}@gmail.com`,
         displayName: (data.name as string) || `Cuenta ${accounts.length + 1}`,
         accessToken: data.access_token as string,
+        refreshToken: data.refresh_token as string | undefined,
         avatarUrl: data.avatar as string | undefined,
         contactsCount: 0,
         lastSync: null,
@@ -258,6 +261,76 @@ export function GoogleContactsPanel({ onContactsImported }: GoogleContactsPanelP
     toast.success("Cuenta desconectada");
   };
 
+  // Delete contacts from Google
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null); // accountId or 'all'
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteResult, setDeleteResult] = useState<{ deleted: number; total: number; errors?: string[] } | null>(null);
+
+  const openDeleteDialog = (target: string) => {
+    setDeleteTarget(target);
+    setDeleteResult(null);
+    setShowDeleteDialog(true);
+  };
+
+  const executeDelete = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    setDeleteResult(null);
+
+    try {
+      const targetAccounts = deleteTarget === 'all'
+        ? accounts
+        : accounts.filter(a => a.id === deleteTarget);
+
+      let totalDeleted = 0;
+      let totalContacts = 0;
+      const allErrors: string[] = [];
+
+      for (const account of targetAccounts) {
+        const { data, error } = await supabase.functions.invoke("google-contacts-auth", {
+          body: { action: "delete_contacts", code: account.accessToken, redirectUri: REDIRECT_URI },
+        });
+
+        if (error) {
+          allErrors.push(`${account.email}: ${error.message}`);
+          continue;
+        }
+        if (!data?.ok) {
+          allErrors.push(`${account.email}: ${data?.error || "Delete failed"}`);
+          continue;
+        }
+
+        totalDeleted += data.deleted || 0;
+        totalContacts += data.total || 0;
+        if (data.errors) allErrors.push(...data.errors);
+
+        // Update account state
+        const updated = accounts.map(a =>
+          a.id === account.id
+            ? { ...a, contacts: [], contactsCount: 0, lastSync: null }
+            : a
+        );
+        setAccounts(updated);
+        saveAccounts(updated);
+      }
+
+      setDeleteResult({ deleted: totalDeleted, total: totalContacts, errors: allErrors.length > 0 ? allErrors : undefined });
+
+      if (allErrors.length === 0) {
+        toast.success(`${totalDeleted} contactos eliminados de Google Contacts`);
+      } else {
+        toast.warning(`${totalDeleted}/${totalContacts} eliminados con ${allErrors.length} errores`);
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Error desconocido";
+      toast.error(`Error eliminando: ${message}`);
+      setDeleteResult({ deleted: 0, total: 0, errors: [message] });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const totalContacts = accounts.reduce((sum, a) => sum + a.contactsCount, 0);
   const anySynced = accounts.some(a => a.contactsCount > 0);
 
@@ -350,6 +423,15 @@ export function GoogleContactsPanel({ onContactsImported }: GoogleContactsPanelP
                     <Download className="h-3 w-3" />
                     Importar
                   </Button>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    className="h-7 text-[10px] gap-1"
+                    onClick={() => openDeleteDialog(account.id)}
+                    title="Eliminar TODOS los contactos de esta cuenta de Google"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
                 </div>
 
                 {/* Preview toggle */}
@@ -423,17 +505,115 @@ export function GoogleContactsPanel({ onContactsImported }: GoogleContactsPanelP
               <Download className="h-3.5 w-3.5" />
               Importar todas ({totalContacts.toLocaleString()})
             </Button>
+            <Button size="sm" variant="destructive" onClick={() => openDeleteDialog('all')} className="gap-1.5 text-xs" title="Eliminar TODOS los contactos de TODAS las cuentas de Google">
+              <Trash2 className="h-3.5 w-3.5" />
+              Borrar todo
+            </Button>
           </div>
         )}
 
-        {/* Single account: simple import button */}
+        {/* Single account: simple import + delete buttons */}
         {accounts.length === 1 && anySynced && (
-          <Button size="sm" onClick={() => importAccountContacts(accounts[0].id)} disabled={accounts[0].contactsCount === 0} className="w-full gap-1.5">
-            <Download className="h-3.5 w-3.5" />
-            Importar {accounts[0].contactsCount.toLocaleString()} contactos
-          </Button>
+          <div className="flex gap-2">
+            <Button size="sm" onClick={() => importAccountContacts(accounts[0].id)} disabled={accounts[0].contactsCount === 0} className="flex-1 gap-1.5">
+              <Download className="h-3.5 w-3.5" />
+              Importar {accounts[0].contactsCount.toLocaleString()} contactos
+            </Button>
+            <Button size="sm" variant="destructive" onClick={() => openDeleteDialog(accounts[0].id)} className="gap-1.5" title="Eliminar TODOS los contactos de Google">
+              <Trash2 className="h-3.5 w-3.5" />
+              Borrar de Google
+            </Button>
+          </div>
         )}
       </CardContent>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" />
+              ⚠️ Eliminar contactos de Google
+            </DialogTitle>
+          </DialogHeader>
+
+          {!deleteResult ? (
+            <>
+              <div className="space-y-3 text-sm">
+                <p className="font-semibold">
+                  Esta acción es IRREVERSIBLE. Se eliminarán permanentemente los contactos de Google Contacts.
+                </p>
+                <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 space-y-2">
+                  <p><strong>¿Qué va a pasar?</strong></p>
+                  <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
+                    <li>Se exportan TODOS los contactos actuales como backup (CSV)</li>
+                    <li>Se eliminan permanentemente de Google Contacts</li>
+                    <li>Podrás re-importar desde el archivo de backup limpio y deduplicado</li>
+                  </ol>
+                </div>
+                <p className="text-muted-foreground">
+                  {deleteTarget === 'all'
+                    ? `Se borrarán los contactos de las ${accounts.length} cuentas conectadas.`
+                    : `Se borrarán los contactos de ${accounts.find(a => a.id === deleteTarget)?.email || 'esta cuenta'}.`}
+                </p>
+              </div>
+              <DialogFooter className="gap-2">
+                <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
+                  Cancelar
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={executeDelete}
+                  disabled={isDeleting}
+                  className="gap-2"
+                >
+                  {isDeleting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Eliminando...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="h-4 w-4" />
+                      Sí, eliminar todo
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
+            </>
+          ) : (
+            <>
+              <div className="space-y-3 text-sm">
+                {deleteResult.errors && deleteResult.errors.length > 0 ? (
+                  <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-3">
+                    <p className="font-semibold text-yellow-600">Resultado parcial</p>
+                    <p>{deleteResult.deleted} de {deleteResult.total} contactos eliminados</p>
+                    <div className="mt-2 max-h-32 overflow-auto text-xs text-muted-foreground">
+                      {deleteResult.errors.slice(0, 5).map((err, i) => (
+                        <p key={i}>• {err}</p>
+                      ))}
+                      {deleteResult.errors.length > 5 && <p>... y {deleteResult.errors.length - 5} errores más</p>}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-green-500/30 bg-green-500/5 p-3">
+                    <p className="font-semibold text-green-600">✓ Completado</p>
+                    <p>{deleteResult.deleted} contactos eliminados exitosamente de Google Contacts</p>
+                  </div>
+                )}
+                <p className="text-muted-foreground">
+                  Ahora podés importar tu archivo de backup limpio desde la pestaña Importar.
+                </p>
+              </div>
+              <DialogFooter>
+                <Button onClick={() => setShowDeleteDialog(false)}>
+                  Cerrar
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

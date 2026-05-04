@@ -27,7 +27,7 @@ jobs:
         run: npm run lint
 
       - name: Unit tests
-        run: npm test -- --reporter=verbose 2>&1 | tail -80
+        run: npm test
 
       - name: Build
         run: npm run build

@@ -33,7 +33,6 @@ export default defineConfig(({ mode }) => ({
           "phone-lib": ["libphonenumber-js"],
           ui: [
             "@radix-ui/react-dialog",
-            "@radix-ui/react-dropdown-menu",
             "@radix-ui/react-select",
             "@radix-ui/react-tabs",
             "@radix-ui/react-tooltip",

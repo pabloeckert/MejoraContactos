@@ -6,7 +6,7 @@
 **Versión actual:** v12.8
 **Repo:** [pabloeckert/MejoraContactos](https://github.com/pabloeckert/MejoraContactos)
 **Live:** https://util.mejoraok.com/mejoracontactos/
-**Tests:** 219 pasando ✅ | E2E: 21 pasando ✅ | Build: 305KB index ✅ | Lint: 0 errores ✅
+**Tests:** 253 pasando ✅ | E2E: 21 pasando ✅ | Build: 312KB index ✅ | Lint: 0 errores ✅
 
 ---
 
@@ -446,13 +446,21 @@ push to main
 
 ### 🟢 Mejoras sugeridas (no bloqueantes)
 
-| # | Tarea | Impacto | Tiempo est. |
-|---|-------|---------|-------------|
-| 1 | Sonner CSS-in-JS optimization | MEDIO | 20 min |
-| 2 | CSP Headers + Security Headers audit | MEDIO | 20 min |
-| 3 | Radix UI unused components audit | BAJO | 15 min |
-| 4 | Product Hunt launch | ALTO | — |
-| 5 | Twitter/X presencia | MEDIO | — |
+| # | Tarea | Impacto | Estado |
+|---|-------|---------|--------|
+| 1 | CSP Headers + Security Headers audit | MEDIO | ✅ Hecho (Plausible + Sentry en CSP) |
+| 2 | Export-utils factory pattern (CRM) | ALTO | ✅ Hecho (-200 líneas duplicadas) |
+| 3 | Eliminar checkDuplicate legacy | MEDIO | ✅ Hecho (solo DedupIndex O(n)) |
+| 4 | Error boundary en pipeline worker | MEDIO | ✅ Hecho (try/catch + error msg) |
+| 5 | Typing improvements | MEDIO | ✅ Hecho (CleanResult import, casts) |
+| 6 | Loading skeletons | MEDIO | ✅ Hecho (PageSkeleton en Suspense) |
+| 7 | i18n framework (ES/EN) | ALTO | ✅ Hecho (context + hook, 140+ keys) |
+| 8 | Integration tests | ALTO | ✅ Hecho (pipeline completo, 1000+ rows) |
+| 9 | .env.example docs | BAJO | ✅ Hecho (Sentry + Plausible documented) |
+| 10 | Radix UI unused components audit | BAJO | ✅ Todos en uso, nada que eliminar |
+| 11 | Sonner CSS-in-JS optimization | MEDIO | Pendiente |
+| 12 | Product Hunt launch | ALTO | Pendiente |
+| 13 | Twitter/X presencia | MEDIO | Pendiente |
 
 ---
 
@@ -497,6 +505,10 @@ push to main
 | `src/lib/error-reporter.ts` | 5 canales de error reporting |
 | `src/lib/sentry.ts` | Sentry integration (lazy) |
 | `src/lib/analytics.ts` | Analytics locales + Plausible |
+| `src/lib/i18n.tsx` | Internacionalización (ES/EN) — context + hook |
+| `src/lib/locales/es.ts` | Traducciones español (140+ keys) |
+| `src/lib/locales/en.ts` | Traducciones inglés (140+ keys) |
+| `src/components/ui/skeleton.tsx` | Loading skeletons (Page, Card, Skeleton) |
 | `src/lib/usage-limits.ts` | Free tier: 500/lote, 3 lotes/día |
 | `src/lib/feature-flags.ts` | Feature flags |
 | `src/integrations/supabase/client.ts` | Supabase client |

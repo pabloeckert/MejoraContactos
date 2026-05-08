@@ -17,7 +17,8 @@ import { saveContacts, updateContact, deleteContact, clearContacts, saveHistoryS
 import { handleError } from "@/lib/error-handler";
 import type { ParsedFile, UnifiedContact } from "@/types/contact";
 import { toast } from "sonner";
-import { Upload, Zap, Users, Download, BarChart3, Settings, Moon, Sun, Activity, History, Sparkles, Settings2 } from "lucide-react";
+import { Upload, Zap, Users, Download, BarChart3, Settings, Moon, Sun, Activity, History, Sparkles, Settings2, Globe } from "lucide-react";
+import { useI18n } from "@/lib/i18n";
 import { GoogleContactsPanel } from "@/components/GoogleContactsPanel";
 import { ApiKeysPanel } from "@/components/ApiKeysPanel";
 import { HealthCheckPanel } from "@/components/HealthCheckPanel";
@@ -45,6 +46,7 @@ const Index = () => {
   const [activeTab, setActiveTab] = useState("import");
   const { theme, setTheme } = useTheme();
   const { isInstallable, isStandalone, install } = usePWAInstall();
+  const { locale, setLocale } = useI18n();
 
   // Onboarding state
   const [showOnboarding, setShowOnboarding] = useState(() => {
@@ -94,6 +96,12 @@ const Index = () => {
         e.preventDefault();
       }
 
+      // L → toggle language
+      if (key === "l") {
+        setLocale(locale === "es" ? "en" : "es");
+        e.preventDefault();
+      }
+
       // ? → show shortcuts help
       if (key === "?") {
         toast.info("Atajos: 1-6 tabs · D tema · S modo · R reiniciar", { duration: 4000 });
@@ -103,7 +111,7 @@ const Index = () => {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [theme, simpleMode, setTheme]);
+  }, [theme, simpleMode, setTheme, locale, setLocale]);
 
   const handleOnboardingComplete = useCallback(() => {
     localStorage.setItem(ONBOARDING_KEY, "true");
@@ -252,6 +260,16 @@ const Index = () => {
               aria-label="Cambiar tema"
             >
               {theme === 'dark' ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
+            </button>
+            {/* Language toggle */}
+            <button
+              onClick={() => setLocale(locale === "es" ? "en" : "es")}
+              className="h-7 px-2 rounded-full flex items-center gap-1 text-[10px] font-medium text-primary-foreground/50 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-all"
+              title={locale === "es" ? "Switch to English" : "Cambiar a español"}
+              aria-label={locale === "es" ? "Switch to English" : "Cambiar a español"}
+            >
+              <Globe className="h-3 w-3" />
+              <span className="hidden sm:inline">{locale.toUpperCase()}</span>
             </button>
             {/* Admin icon */}
             <button

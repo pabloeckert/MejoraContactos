@@ -7,6 +7,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { PageSkeleton } from "@/components/ui/skeleton";
+import { I18nProvider } from "@/lib/i18n";
 import Index from "./pages/Index.tsx";
 
 // Lazy load secondary routes
@@ -24,6 +25,7 @@ const routerBasename = import.meta.env.BASE_URL === "/" ? undefined : import.met
 
 const App = () => (
   <ErrorBoundary>
+    <I18nProvider>
     <QueryClientProvider client={queryClient}>
       <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
         <TooltipProvider>
@@ -48,6 +50,7 @@ const App = () => (
         </TooltipProvider>
       </ThemeProvider>
     </QueryClientProvider>
+    </I18nProvider>
   </ErrorBoundary>
 );
 

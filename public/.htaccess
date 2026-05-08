@@ -10,7 +10,7 @@ RewriteRule . /mejoracontactos/index.html [L]
 # --- Security Headers ---
 <IfModule mod_headers.c>
   # Content Security Policy
-  Header set Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://*.supabase.co https://api.groq.com https://openrouter.ai https://api.together.xyz https://api.cerebras.ai https://api.deepinfra.com https://api.sambanova.ai https://api.mistral.ai https://api.deepseek.com https://generativelanguage.googleapis.com https://api.cloudflare.com https://api-inference.huggingface.co https://api.studio.nebius.ai; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+  Header set Content-Security-Policy "default-src 'self'; script-src 'self' https://plausible.io; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://*.supabase.co https://api.groq.com https://openrouter.ai https://api.together.xyz https://api.cerebras.ai https://api.deepinfra.com https://api.sambanova.ai https://api.mistral.ai https://api.deepseek.com https://generativelanguage.googleapis.com https://api.cloudflare.com https://api-inference.huggingface.co https://api.studio.nebius.ai https://plausible.io https://*.ingest.sentry.io https://*.sentry.io wss://*.supabase.co; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
 
   # Prevent MIME sniffing
   Header set X-Content-Type-Options "nosniff"

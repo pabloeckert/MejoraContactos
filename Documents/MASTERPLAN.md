@@ -586,4 +586,4 @@ bash scripts/perf-check.sh                       # Performance budget check
 ---
 
 *Documento maestro — Actualizar al decir "documentar".*
-*2026-05-13 — 253 tests · 21 E2E · v12.9 · 12 proveedores IA · Google Contacts delete · CRM exports · Pipeline híbrido · GDPR · BETA · CTO Audit completa*
+*2026-05-13 — 301 tests · 21 E2E · v12.9 · 12 proveedores IA · Google Contacts delete · CRM exports · Pipeline híbrido · GDPR · BETA · GitHub Pages · CTO 4 sesiones*

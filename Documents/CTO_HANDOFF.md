@@ -1,91 +1,157 @@
 # 🤝 CTO Handoff — Session Summary
 
 > **Fecha:** 2026-05-13
-> **Sesiones:** 3 (misma fecha)
-> **Commits:** `f20e665` + `d894eb8` + `pending` (sesión 3)
+> **Sesiones:** 4 (misma fecha)
+> **Hosting:** GitHub Pages (permanente)
+> **Producción:** https://pabloeckert.github.io/MejoraContactos/
 
 ---
 
-## Resumen Ejecutivo 4 Sesiones
-
-### Sesión 4: GitHub Pages Deploy ✅
-- App alojada en https://pabloeckert.github.io/MejoraContactos/
-- GitHub Pages habilitado via API
-- SPA fallback con 404.html
-- Deploy automático en push a main
-
----
-
-## Resumen Ejecutivo 3 Sesiones
+## Resumen Ejecutivo
 
 ### Sesión 1: Auditoría & Fixes ✅
 - Auditoría completa del código fuente (~50 archivos)
-- 6 fixes críticos (APP_VERSION, flaky tests, HSTS, CSV dedup, etc.)
+- 6 fixes críticos (APP_VERSION, flaky tests, HSTS, CSV dedup, regex, SECURITY.md)
 - Documentación: CTO_AUDIT.md, CHANGELOG.md
 
 ### Sesión 2: Performance & Testing ✅
 - Supabase lazy init (getSupabase). Index: 312KB → 298KB
 - Toaster unificado (eliminado radix Toaster muerto)
 - 17 tests Google Contacts Edge Function
-- Staging environment (GitHub Actions workflow)
+- Staging environment
 
 ### Sesión 3: Testing & Documentation ✅
 - 31 tests clean-contacts Edge Function (301 total)
-- CONTRIBUTING.md reescrito con staging workflow y branching strategy
+- CONTRIBUTING.md reescrito con staging workflow
+
+### Sesión 4: GitHub Pages Migration ✅
+- Migración completa de Hostinger a GitHub Pages
+- Eliminados todos los workflows y configs de Hostinger
+- CORS origins actualizados en Edge Functions
+- SEO, PWA manifest, robots.txt, sitemap.xml actualizados
+- README.md reescrito
+- deploy-pages.yml: workflow completo (lint + tests + build + E2E + deploy)
 
 ---
 
 ## Estado del Repo
 
-| Aspecto | Sesión 1 | Sesión 2 | Sesión 3 | Sesión 4 |
-|---------|----------|----------|----------|----------|
-| Tests | 253 | 270 | 301 | 301 |
-| Index KB | 312 | 298 | 298 | 298 |
-| Commits | 1 | 2 | 3 | **5** |
-| Hosting | Hostinger | Hostinger | Hostinger | **GitHub Pages** |
-| Push | ✅ | ✅ | ✅ | ✅ |
-
-### URLs
-- **Producción (GitHub Pages):** https://pabloeckert.github.io/MejoraContactos/
-- **GitHub Repo:** https://github.com/pabloeckert/MejoraContactos
+| Aspecto | Estado |
+|---------|--------|
+| **Tests** | 301/301 ✅ |
+| **Lint** | 0 errores ✅ |
+| **Build** | 298KB index ✅ |
+| **Hosting** | GitHub Pages ✅ |
+| **Deploy** | Automático en push a main ✅ |
+| **Commits hoy** | 7 commits ✅ |
 
 ---
 
-## Archivos Modificados (Sesión 3)
+## URLs
 
+| Recurso | URL |
+|---------|-----|
+| **Producción** | https://pabloeckert.github.io/MejoraContactos/ |
+| **GitHub Repo** | https://github.com/pabloeckert/MejoraContactos |
+| **Masterplan** | [Documents/MASTERPLAN.md](./MASTERPLAN.md) |
+| **Auditoría CTO** | [Documents/CTO_AUDIT.md](./CTO_AUDIT.md) |
+| **Changelog** | [CHANGELOG.md](../CHANGELOG.md) |
+
+---
+
+## Archivos Modificados (Todas las Sesiones)
+
+### Sesión 1 — Auditoría & Fixes
 ```
-A  src/lib/__tests__/clean-contacts-edge.test.ts  # 31 nuevos tests
-M  CONTRIBUTING.md                                 # Reescrito: staging, branching, PR template
-M  CHANGELOG.md                                    # Actualizado
+M  src/lib/error-reporter.ts
+M  src/lib/__tests__/phone-validator.test.ts
+M  src/lib/column-mapper.ts
+M  src/lib/export-utils.ts
+M  public/.htaccess
+M  SECURITY.md
+M  Documents/MASTERPLAN.md
+A  Documents/CTO_AUDIT.md
+A  CHANGELOG.md
 ```
+
+### Sesión 2 — Performance & Testing
+```
+M  src/integrations/supabase/client.ts
+M  src/lib/ai-validator.ts
+M  src/hooks/useAIPipeline.ts
+M  src/components/GoogleContactsPanel.tsx
+M  src/components/ApiKeysPanel.tsx
+M  src/components/HealthCheckPanel.tsx
+M  src/lib/error-reporter.ts
+M  src/App.tsx
+A  src/lib/__tests__/google-contacts-edge.test.ts
+A  .github/workflows/deploy-staging.yml
+M  CHANGELOG.md
+```
+
+### Sesión 3 — Testing & Documentation
+```
+A  src/lib/__tests__/clean-contacts-edge.test.ts
+M  CONTRIBUTING.md
+M  CHANGELOG.md
+```
+
+### Sesión 4 — GitHub Pages Migration
+```
+D  .github/workflows/deploy.yml
+D  .github/workflows/deploy-staging.yml
+D  public/.htaccess
+D  Documents/CLOUDFLARE_SETUP.md
+D  scripts/uptime-check.sh
+A  .github/workflows/deploy-pages.yml
+M  README.md
+M  CONTRIBUTING.md
+M  Documents/MASTERPLAN.md
+M  Documents/PROMPT.md
+M  PLAN_GENERAL.md
+M  CHANGELOG.md
+M  index.html
+M  public/manifest.json
+M  public/robots.txt
+M  public/sitemap.xml
+M  public/health.json
+M  supabase/functions/clean-contacts/index.ts
+M  supabase/functions/google-contacts-auth/index.ts
+M  supabase/functions/log-error/index.ts
+M  src/lib/__tests__/clean-contacts-edge.test.ts
+M  src/pages/BlogPost.tsx
+M  src/pages/Pricing.tsx
+M  src/lib/analytics.ts
+```
+
+---
+
+## Métricas Acumuladas
+
+| Métrica | Inicio | Después | Delta |
+|---------|--------|---------|-------|
+| Tests | 253 | 301 | +48 (+19%) |
+| Index KB | 312 | 298 | -14 (-4.5%) |
+| Edge Function tests | 0 | 48 | +48 |
+| Documentación | 3 docs | 7 docs | +4 |
+| Hosting | Hostinger | GitHub Pages | Migrado |
+| Commits | 0 | 7 | — |
 
 ---
 
 ## Próximos Pasos Recomendados
 
 ### Próxima sesión
-1. **useReducer para useContactProcessing** — Refactor del hook principal (riesgo medio)
-2. **Lazy import de Sentry** — Verificar que Sentry no se carga innecesariamente
-3. **Staging .htaccess** — CSP diferente para staging
-4. **Tests de integración E2E para Google Contacts** — Flujo completo OAuth → import → delete
+1. **useReducer para useContactProcessing** — Refactor del hook principal
+2. **Lazy import de Sentry** — Verificar que no se carga innecesariamente
+3. **E2E tests Google Contacts** — Flujo OAuth completo
+4. **CHANGELOG automation** — conventional-commits
 
 ### Futuro
-5. **Harden JWT verification** — fail-open configurable
-6. **CHANGELOG automation** — conventional-commits + changelog automático
-7. **Product Hunt launch** — Preparar launch materials
-8. **Comunidad** — Twitter/X presencia
+5. **Product Hunt launch** — Preparar launch materials
+6. **Comunidad** — Twitter/X presencia
+7. **Custom domain** — Configurar dominio propio si se necesita
 
 ---
 
-## Métricas Acumuladas (3 Sesiones)
-
-| Métrica | Antes | Después | Delta |
-|---------|-------|---------|-------|
-| Tests | 253 | 301 | +48 (+19%) |
-| Index KB | 312 | 298 | -14 (-4.5%) |
-| Edge Function tests | 0 | 48 | +48 |
-| Documentación | 3 docs | 7 docs | +4 |
-
----
-
-*CTO Agent — 2026-05-13 — Sesión 3*
+*CTO Agent — 2026-05-13 — 4 sesiones, 7 commits, migración completa a GitHub Pages*

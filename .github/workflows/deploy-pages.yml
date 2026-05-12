@@ -32,9 +32,10 @@ jobs:
         env:
           BASE_PATH: /MejoraContactos/
 
-      # SPA fallback: copy index.html to 40.html for client-side routing
-      - name: SPA fallback (40.html)
-        run: cp dist/index.html dist/40.html
+      # SPA fallback: copy index.html to 404.html for client-side routing
+      # GitHub Pages serves 404.html for any missing path — the SPA picks up the route
+      - name: SPA fallback (404.html)
+        run: cp dist/index.html dist/404.html
 
       - name: Setup Pages
         uses: actions/configure-pages@v5

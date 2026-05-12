@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
+  build-and-test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -27,13 +27,42 @@ jobs:
 
       - run: npm ci --legacy-peer-deps
 
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm test
+
       - name: Build for GitHub Pages
         run: npm run build
         env:
           BASE_PATH: /MejoraContactos/
 
+      - name: Performance budget
+        run: bash scripts/perf-check.sh
+
+      - name: Build smoke test
+        run: |
+          test -f dist/index.html || (echo "ERROR: dist/index.html not found" && exit 1)
+          echo "✅ Build OK — $(find dist -type f | wc -l) files"
+
+      # E2E tests
+      - name: Build for E2E (root base)
+        run: npm run build:test
+
+      - name: Install Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: E2E tests
+        run: npx playwright test --reporter=list
+
+      # Rebuild with production base path
+      - name: Rebuild for production
+        run: npm run build
+        env:
+          BASE_PATH: /MejoraContactos/
+
       # SPA fallback: copy index.html to 404.html for client-side routing
-      # GitHub Pages serves 404.html for any missing path — the SPA picks up the route
       - name: SPA fallback (404.html)
         run: cp dist/index.html dist/404.html
 
@@ -46,7 +75,7 @@ jobs:
           path: dist
 
   deploy:
-    needs: build
+    needs: build-and-test
     runs-on: ubuntu-latest
     environment:
       name: github-pages

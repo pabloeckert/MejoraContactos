@@ -29,7 +29,7 @@ Esto pasa porque Google Contacts no valida ni normaliza los datos cuando los imp
 
 ## Paso 2: Limpiar con MejoraContactos
 
-1. Abrí [MejoraContactos](https://util.mejoraok.com/mejoracontactos/)
+1. Abrí [MejoraContactos](https://pabloeckert.github.io/MejoraContactos/)
 2. Arrastrá tu archivo CSV o VCF a la zona de importación
 3. La app detectará automáticamente las columnas (nombre, email, teléfono)
 4. Hacé clic en **Procesar**
@@ -306,7 +306,7 @@ export default function BlogPost() {
         "datePublished": post.date,
         "author": { "@type": "Organization", "name": "MejoraOK" },
         "publisher": { "@type": "Organization", "name": "MejoraOK" },
-        "mainEntityOfPage": `https://util.mejoraok.com/mejoracontactos/blog/${post.slug}`,
+        "mainEntityOfPage": `https://pabloeckert.github.io/MejoraContactos/blog/${post.slug}`,
         "keywords": post.keywords.join(", "),
       });
       document.head.appendChild(script);

@@ -4,14 +4,27 @@ All notable changes to MejoraContactos will be documented in this file.
 
 Format: [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/)
 
-## [12.9.4] - 2026-05-13 — CTO Session 4: GitHub Pages Deploy
+## [12.9.4] - 2026-05-13 — CTO Session 4: GitHub Pages Migration
 
 ### Added
 - **GitHub Pages deploy:** App alojada en https://pabloeckert.github.io/MejoraContactos/
 - **SPA fallback:** 404.html para client-side routing en GitHub Pages
+- **deploy-pages.yml:** Workflow completo con lint, tests, build, E2E, deploy
 
 ### Changed
-- **Deploy:** Migrado de Hostinger a GitHub Pages (temporal)
+- **Hosting:** Migrado de Hostinger a GitHub Pages (permanente)
+- **CORS origins:** Edge Functions apuntan a GitHub Pages
+- **README.md:** Reescrito con nueva URL y arquitectura
+- **CONTRIBUTING.md:** Actualizado con nuevo deploy pipeline
+- **MASTERPLAN.md:** URLs y arquitectura actualizadas
+- **All docs:** URLs migradas de util.mejoraok.com a pabloeckert.github.io
+
+### Removed
+- **deploy.yml:** Workflow de Hostinger (SSH/SCP) eliminado
+- **deploy-staging.yml:** Workflow de staging Hostinger eliminado
+- **.htaccess:** Eliminado (GitHub Pages no lo usa)
+- **CLOUDFLARE_SETUP.md:** Eliminado (no relevante con GitHub Pages)
+- **uptime-check.sh:** Eliminado (apuntaba a Hostinger)
 
 ---
 

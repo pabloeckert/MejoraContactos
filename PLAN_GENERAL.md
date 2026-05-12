@@ -15,7 +15,7 @@
 | **Tests** | ✅ 219 unit + 21 E2E | Todos pasando, coverage 70%+ |
 | **Build** | ✅ OK | Vite 5, chunks optimizados, budget < 2MB |
 | **Lint** | ✅ 0 errores | 4 warnings pre-existentes (no críticos) |
-| **Deploy** | ✅ Automático | GitHub Actions → SCP → Hostinger, rollback incluido |
+| **Deploy** | ✅ Automático | GitHub Actions → GitHub Pages, rollback incluido |
 | **Seguridad** | ✅ Sólido | AES-GCM, CSP, JWT, rate limiting, CORS whitelist, Sentry |
 | **Performance** | ✅ Optimizado | Web Workers, chunk splitting, lazy loading, virtualización |
 | **UX** | ✅ Completo | Onboarding, dark mode, keyboard shortcuts, responsive |

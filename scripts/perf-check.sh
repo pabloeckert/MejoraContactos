@@ -1,4 +1,5 @@
 #!/bin/bash
+#!/bin/bash
 # Performance budget checker
 set -e
 

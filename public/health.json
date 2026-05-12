@@ -1,6 +1,6 @@
 {
   "service": "mejoracontactos",
-  "version": "v10.2",
+  "version": "v12.9",
   "status": "ok",
   "checks": {
     "frontend": "ok",

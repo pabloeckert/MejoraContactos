@@ -49,7 +49,7 @@ function buildCorrectPrompt(verified: Record<string, unknown>[]): string {
 // ── CORS logic ──
 
 const ALLOWED_ORIGINS = [
-  "https://util.mejoraok.com",
+  "https://pabloeckert.github.io",
   "https://mejoraok.com",
   "http://localhost:8080",
   "http://localhost:5173",
@@ -174,8 +174,8 @@ describe("Clean Contacts Edge Function — Prompts", () => {
 
 describe("Clean Contacts Edge Function — CORS", () => {
   it("allows production origin", () => {
-    const headers = getCorsHeaders("https://util.mejoraok.com");
-    expect(headers["Access-Control-Allow-Origin"]).toBe("https://util.mejoraok.com");
+    const headers = getCorsHeaders("https://pabloeckert.github.io");
+    expect(headers["Access-Control-Allow-Origin"]).toBe("https://pabloeckert.github.io");
   });
 
   it("allows localhost:8080", () => {
@@ -185,16 +185,16 @@ describe("Clean Contacts Edge Function — CORS", () => {
 
   it("falls back to first origin for unknown", () => {
     const headers = getCorsHeaders("https://evil.com");
-    expect(headers["Access-Control-Allow-Origin"]).toBe("https://util.mejoraok.com");
+    expect(headers["Access-Control-Allow-Origin"]).toBe("https://pabloeckert.github.io");
   });
 
   it("falls back to first origin for null", () => {
     const headers = getCorsHeaders(null);
-    expect(headers["Access-Control-Allow-Origin"]).toBe("https://util.mejoraok.com");
+    expect(headers["Access-Control-Allow-Origin"]).toBe("https://pabloeckert.github.io");
   });
 
   it("includes required headers", () => {
-    const headers = getCorsHeaders("https://util.mejoraok.com");
+    const headers = getCorsHeaders("https://pabloeckert.github.io");
     expect(headers["Access-Control-Allow-Headers"]).toContain("authorization");
     expect(headers["Access-Control-Allow-Headers"]).toContain("content-type");
   });

@@ -1,5 +1,5 @@
 const ALLOWED_ORIGINS = [
-  "https://util.mejoraok.com",
+  "https://pabloeckert.github.io",
   "https://mejoraok.com",
   "http://localhost:8080",
   "http://localhost:5173",

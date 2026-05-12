@@ -28,8 +28,7 @@ npm run dev          # http://localhost:8080
 
 | Branch | Deploy | URL | Uso |
 |--------|--------|-----|-----|
-| `main` | ✅ Producción | https://util.mejoraok.com/mejoracontactos/ | Releases estables |
-| `staging` | ✅ Staging | https://util.mejoraok.com/mejoracontactos-staging/ | Testing pre-release |
+| `main` | ✅ Producción | https://pabloeckert.github.io/MejoraContactos/ | Releases estables |
 | `feature/*` | ❌ | — | Desarrollo local |
 
 ### Flujo de trabajo
@@ -37,8 +36,7 @@ npm run dev          # http://localhost:8080
 1. Crear branch desde `main`: `git checkout -b feature/mi-feature`
 2. Hacer commits con convención
 3. Push y abrir PR a `main`
-4. Si querés probar en staging: mergear a `staging` primero
-5. Cuando esté listo: mergear PR a `main` (deploy automático a producción)
+4. Cuando esté listo: mergear PR a `main` (deploy automático a GitHub Pages)
 
 ## Pull Requests
 
@@ -101,7 +99,7 @@ npm run test:coverage      # Con coverage report
 | Persistencia | IndexedDB via `idb` |
 | Backend (IA) | Supabase Edge Functions (Deno) |
 | Tests | Vitest + Playwright |
-| CI/CD | GitHub Actions → SCP → Hostinger |
+| CI/CD | GitHub Actions → GitHub Pages |
 
 ## Contacto
 

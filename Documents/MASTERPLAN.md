@@ -5,7 +5,7 @@
 **Última actualización:** 2026-05-05 04:11 GMT+8
 **Versión actual:** v12.8
 **Repo:** [pabloeckert/MejoraContactos](https://github.com/pabloeckert/MejoraContactos)
-**Live:** https://util.mejoraok.com/mejoracontactos/
+**Live:** https://pabloeckert.github.io/MejoraContactos/
 **Tests:** 253 unit pasando ✅ | E2E: 21 pasando ✅ | Build: 312KB index ✅ | Lint: 0 errores (5 warnings) ✅
 
 ---
@@ -69,7 +69,7 @@ MejoraContactos es una SPA para limpiar, deduplicar y unificar contactos desde m
 | Virtualización | `@tanstack/react-virtual` |
 | Temas | `next-themes` (dark/light) |
 | Error tracking | Sentry (lazy-loaded, optional) |
-| Deploy frontend | GitHub Actions → SSH+SCP → Hostinger |
+| Deploy frontend | GitHub Actions → GitHub Pages |
 | Deploy Edge Functions | Supabase CLI |
 | Supabase project | `tzatuvxatsduuslxqdtm` |
 | Analytics | Plausible (GDPR-safe) + localStorage events |
@@ -78,8 +78,8 @@ MejoraContactos es una SPA para limpiar, deduplicar y unificar contactos desde m
 
 ```
 ┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
-│   GitHub        │────▶│  GitHub Actions   │────▶│  Hostinger VPS  │
-│   (source)      │     │  (CI/CD + E2E)    │     │  (SSH/SCP)      │
+│   GitHub        │────▶│  GitHub Actions   │────▶│  GitHub Pages  │
+│   (source)      │     │  (CI/CD + E2E)    │     │  (static host)      │
 └─────────────────┘     └──────────────────┘     └─────────────────┘
 
 ┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
@@ -363,13 +363,13 @@ Detección automática para nombres en español e inglés:
 
 | URL | Descripción |
 |-----|------------|
-| https://util.mejoraok.com/mejoracontactos/ | **App principal** |
-| https://util.mejoraok.com/mejoracontactos/landing | Landing page |
-| https://util.mejoraok.com/mejoracontactos/faq | FAQ |
-| https://util.mejoraok.com/mejoracontactos/privacy | Privacidad |
-| https://util.mejoraok.com/mejoracontactos/terms | Términos |
-| https://util.mejoraok.com/mejoracontactos/pricing | Precios |
-| https://util.mejoraok.com/mejoracontactos/blog | Blog |
+| https://pabloeckert.github.io/MejoraContactos/ | **App principal** |
+| https://pabloeckert.github.io/MejoraContactos/landing | Landing page |
+| https://pabloeckert.github.io/MejoraContactos/faq | FAQ |
+| https://pabloeckert.github.io/MejoraContactos/privacy | Privacidad |
+| https://pabloeckert.github.io/MejoraContactos/terms | Términos |
+| https://pabloeckert.github.io/MejoraContactos/pricing | Precios |
+| https://pabloeckert.github.io/MejoraContactos/blog | Blog |
 
 ### CI/CD Pipeline
 

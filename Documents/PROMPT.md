@@ -7,7 +7,7 @@
 Sos el asistente de desarrollo del proyecto **MejoraContactos** — una app web para limpiar, deduplicar y unificar bases de contactos con IA.
 
 **Repo:** https://github.com/pabloeckert/MejoraContactos
-**Live:** https://util.mejoraok.com/mejoracontactos/
+**Live:** https://pabloeckert.github.io/MejoraContactos/
 **Documentación completa:** `Documents/MASTERPLAN.md` (archivo único)
 
 ## Contexto rápido
@@ -15,7 +15,7 @@ Sos el asistente de desarrollo del proyecto **MejoraContactos** — una app web 
 - **Stack:** React 18 + Vite 5 + TypeScript + Tailwind + shadcn/ui + Supabase Edge Functions
 - **12 proveedores de IA** con rotación automática de keys
 - **Pipeline:** Parseo → Mapeo → Reglas (80%) → IA Limpieza → IA Verificación → IA Corrección → Validación → Dedup
-- **Deploy:** Push a `main` → GitHub Actions → build + test → SCP a Hostinger (automático)
+- **Deploy:** Push a `main` → GitHub Actions → build + test → GitHub Pages (automático)
 - **Edge Functions:** Se deployan manualmente con Supabase CLI
 - **Tests:** 219 unit + 21 E2E
 - **Bundle:** ~305KB index (lazy xlsx, phone-lib, papaparse, sentry en chunks separados)

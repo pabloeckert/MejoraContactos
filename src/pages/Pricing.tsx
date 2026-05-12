@@ -32,7 +32,7 @@ export default function Pricing() {
       "@type": "SoftwareApplication",
       "name": "MejoraContactos",
       "description": "Limpieza de contactos con IA — Plan gratuito y Pro",
-      "url": "https://util.mejoraok.com/mejoracontactos/pricing",
+      "url": "https://pabloeckert.github.io/MejoraContactos/pricing",
       "applicationCategory": "BusinessApplication",
       "offers": [
         {

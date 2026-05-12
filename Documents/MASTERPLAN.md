@@ -2,11 +2,11 @@
 
 > **⚡ INSTRUCCIÓN:** Cuando el usuario diga **"documentar"**, actualizar este archivo con el estado actual del proyecto, trabajos realizados, pendientes y cualquier cambio relevante. Todos los documentos viven en `Documents/`.
 
-**Última actualización:** 2026-05-05 04:11 GMT+8
-**Versión actual:** v12.8
+**Última actualización:** 2026-05-13 07:15 GMT+8
+**Versión actual:** v12.9
 **Repo:** [pabloeckert/MejoraContactos](https://github.com/pabloeckert/MejoraContactos)
 **Live:** https://pabloeckert.github.io/MejoraContactos/
-**Tests:** 253 unit pasando ✅ | E2E: 21 pasando ✅ | Build: 312KB index ✅ | Lint: 0 errores (5 warnings) ✅
+**Tests:** 326 unit pasando ✅ | E2E: 21 pasando ✅ | Build: 298KB index ✅ | Lint: 0 errores ✅
 
 ---
 
@@ -90,11 +90,11 @@ MejoraContactos es una SPA para limpiar, deduplicar y unificar contactos desde m
 └─────────────────┘
 ```
 
-### Bundle Production (v12.8)
+### Bundle Production (v12.9)
 
 | Chunk | Tamaño | gzip |
 |-------|--------|------|
-| index (main) | 305 KB | 87 KB |
+| index (main) | 298 KB | 85 KB |
 | xlsx | 429 KB | 143 KB |
 | phone-lib | 183 KB | 45 KB |
 | supabase | 194 KB | 51 KB |
@@ -355,6 +355,38 @@ Detección automática para nombres en español e inglés:
 - Export: 5 formatos CRM (Google, HubSpot, Salesforce, Zoho, Airtable)
 - 219 tests, build 305KB
 
+### Sesión 10 — 2026-05-07 — Limpieza Multidisciplinaria
+- Dead code, deps, docs cleanup
+
+### Sesión 11 — 2026-05-13 — CTO Audit & Fixes
+- Auditoría completa del código fuente (~50 archivos)
+- 6 fixes críticos: APP_VERSION, flaky tests, HSTS, CSV dedup, regex, SECURITY.md
+- Documentación: CTO_AUDIT.md, CHANGELOG.md
+
+### Sesión 12 — 2026-05-13 — Performance & Testing
+- Supabase lazy init (`getSupabase`). Index: 312KB → 298KB
+- Toaster unificado (eliminado radix Toaster muerto)
+- 17 tests Google Contacts Edge Function
+- Staging environment setup
+
+### Sesión 13 — 2026-05-13 — Testing & Documentation
+- 31 tests clean-contacts Edge Function (301 total)
+- CONTRIBUTING.md reescrito con staging workflow
+
+### Sesión 14 — 2026-05-13 — GitHub Pages Migration
+- Migración completa de Hostinger a GitHub Pages
+- Eliminados workflows y configs de Hostinger
+- CORS origins actualizados en Edge Functions
+- SEO, PWA manifest, robots.txt, sitemap.xml actualizados
+- README.md reescrito
+- deploy-pages.yml: workflow completo
+
+### Sesión 15 — 2026-05-13 — Test Coverage + Doc Sync
+- 25 nuevos tests para field-validator y parsers (326 total)
+- coverage/ añadido a .gitignore
+- Sincronización completa de documentación (PROMPT, MASTERPLAN, PLAN_GENERAL)
+- package.json actualizado a v12.9
+
 ---
 
 ## 10. Infraestructura y Deploy
@@ -586,4 +618,4 @@ bash scripts/perf-check.sh                       # Performance budget check
 ---
 
 *Documento maestro — Actualizar al decir "documentar".*
-*2026-05-13 — 301 tests · 21 E2E · v12.9 · 12 proveedores IA · Google Contacts delete · CRM exports · Pipeline híbrido · GDPR · BETA · GitHub Pages · CTO 4 sesiones*
+*2026-05-13 — 326 tests · 21 E2E · v12.9 · 12 proveedores IA · Google Contacts delete · CRM exports · Pipeline híbrido · GDPR · BETA · GitHub Pages · CTO 5 sesiones · Doc sync completa*

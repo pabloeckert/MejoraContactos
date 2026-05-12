@@ -1,6 +1,6 @@
 # 🤖 Prompt de Continuidad — MejoraContactos
 
-> **Instrucción:** Cuando inicies una sesión y el usuario mencione "MejoraContactos", leé este archivo primero para retomar contexto completo.
+> **Instrucción:** Cuando inicies una sesión y el usuario mencione "MejoraContactos" o "continuemos", leé este archivo primero para retomar contexto completo.
 
 ## ¿Qué es esto?
 
@@ -9,6 +9,7 @@ Sos el asistente de desarrollo del proyecto **MejoraContactos** — una app web 
 **Repo:** https://github.com/pabloeckert/MejoraContactos
 **Live:** https://pabloeckert.github.io/MejoraContactos/
 **Documentación completa:** `Documents/MASTERPLAN.md` (archivo único)
+**Resumen de sesión:** `Documents/SESSION_RESUME.md` (leer para retomar)
 
 ## Contexto rápido
 
@@ -17,17 +18,17 @@ Sos el asistente de desarrollo del proyecto **MejoraContactos** — una app web 
 - **Pipeline:** Parseo → Mapeo → Reglas (80%) → IA Limpieza → IA Verificación → IA Corrección → Validación → Dedup
 - **Deploy:** Push a `main` → GitHub Actions → build + test → GitHub Pages (automático)
 - **Edge Functions:** Se deployan manualmente con Supabase CLI
-- **Tests:** 219 unit + 21 E2E
-- **Bundle:** ~305KB index (lazy xlsx, phone-lib, papaparse, sentry en chunks separados)
+- **Tests:** 326 unit + 21 E2E
+- **Bundle:** ~298KB index (lazy xlsx, phone-lib, papaparse, sentry en chunks separados)
 
-## Estado actual (v12.8 — 2026-05-05)
+## Estado actual (v12.9 — 2026-05-13)
 
 - ✅ Core completo (pipeline IA, dedup, exportación 10+ formatos, Google Contacts)
-- ✅ Deploy funcional en producción
+- ✅ Deploy funcional en GitHub Pages
 - ✅ 12 proveedores IA configurados con rotación automática
 - ✅ Health Check de proveedores
 - ✅ Historial/Undo con snapshots (TTL 30 días)
-- ✅ 219 unit + 21 E2E tests pasando
+- ✅ 326 unit + 21 E2E tests pasando
 - ✅ PWA installable
 - ✅ Landing page + SEO (OG tags, Schema.org)
 - ✅ Onboarding wizard + modo simple/avanzado
@@ -40,15 +41,21 @@ Sos el asistente de desarrollo del proyecto **MejoraContactos** — una app web 
 - ✅ Google Contacts delete + refresh token
 - ✅ Rate limiting DB-backed + L1 cache
 - ✅ GDPR completo
+- ✅ Supabase client lazy init (getSupabase)
+- ✅ CTO Audit completa (CTO_AUDIT.md)
+- ✅ Migración completa a GitHub Pages
+- ✅ CHANGELOG.md con historial completo
 
 ## Pendientes principales
 
-| # | Tarea | Prioridad |
-|---|-------|-----------|
-| 1 | Ejecutar migraciones SQL en Supabase Dashboard | 🟡 Alta |
-| 2 | Deploy Edge Functions actualizadas | 🟡 Alta |
-| 3 | Sentry DSN en producción | 🟢 Media |
-| 4 | Cloudflare CDN | 🟢 Media |
+| # | Tarea | Prioridad | Detalle |
+|---|-------|-----------|---------|
+| 1 | Ejecutar migraciones SQL en Supabase | 🔴 Alta | `20260429_rate_limits.sql` y `20260502_rate_limit_check.sql` |
+| 2 | Deploy Edge Functions actualizadas | 🔴 Alta | `npx supabase functions deploy google-contacts-auth` |
+| 3 | Eliminar branches remote obsoletas | 🟡 Media | `staging` + 5 dependabot (ver SESSION_RESUME.md) |
+| 4 | Sentry DSN en producción | 🟢 Media | Crear proyecto en sentry.io |
+| 5 | useReducer refactor | 🟢 Media | Hook useContactProcessing (~150 líneas) |
+| 6 | E2E Google Contacts | 🟢 Media | Flujo OAuth completo sin tests E2E |
 
 ## Comandos útiles
 
@@ -58,6 +65,7 @@ npx vitest run
 npx vite build
 git push origin main
 npx supabase functions deploy clean-contacts
+npx supabase functions deploy google-contacts-auth
 ```
 
 ## Convenciones
@@ -71,4 +79,4 @@ npx supabase functions deploy clean-contacts
 ---
 
 *Prompt de continuidad — actualizar con cada sesión.*
-*Última actualización: 2026-05-07 — v12.8*
+*Última actualización: 2026-05-13 — v12.9 — 326 tests*

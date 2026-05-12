@@ -1,8 +1,9 @@
 # 📋 MejoraContactos — PLAN GENERAL
 
-> **Última sesión:** Sesión 10 — 2026-05-07
+> **Última sesión:** Sesión 15 — 2026-05-13
 > **Versión:** v12.9
-> **Estado:** ✅ BETA — Producción activa
+> **Estado:** ✅ BETA — Producción activa en GitHub Pages
+> **Tests:** 326 unit + 21 E2E
 > **Documentación completa:** [`Documents/MASTERPLAN.md`](./Documents/MASTERPLAN.md)
 
 ---
@@ -12,7 +13,7 @@
 | Aspecto | Estado | Detalle |
 |---------|--------|---------|
 | **Funcionalidad** | ✅ Completo | Pipeline híbrido (reglas + IA), 12 proveedores, 10+ formatos exportación |
-| **Tests** | ✅ 219 unit + 21 E2E | Todos pasando, coverage 70%+ |
+| **Tests** | ✅ 326 unit + 21 E2E | Todos pasando, coverage 70%+ |
 | **Build** | ✅ OK | Vite 5, chunks optimizados, budget < 2MB |
 | **Lint** | ✅ 0 errores | 4 warnings pre-existentes (no críticos) |
 | **Deploy** | ✅ Automático | GitHub Actions → GitHub Pages, rollback incluido |
@@ -48,7 +49,9 @@ Ver [`Documents/MASTERPLAN.md`](./Documents/MASTERPLAN.md) — Sección 9: Histo
 | Sesión | Fecha | Tema | Tests |
 |--------|-------|------|-------|
 | 1-9 | 2026-05-01 a 2026-05-05 | Ver MASTERPLAN.md | 219 |
-| **10** | **2026-05-07** | **Limpieza multidisciplinaria: dead code, deps, docs** | **219** |
+| **10** | **2026-05-07** | **Limpieza multidisciplinaria** | **219** |
+| **11-14** | **2026-05-13** | **CTO Audit, Performance, Testing, GitHub Pages** | **301** |
+| **15** | **2026-05-13** | **Test coverage + Doc sync** | **326** |
 
 ---
 

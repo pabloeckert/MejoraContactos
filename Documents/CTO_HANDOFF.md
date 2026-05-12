@@ -6,6 +6,16 @@
 
 ---
 
+## Resumen Ejecutivo 4 Sesiones
+
+### Sesión 4: GitHub Pages Deploy ✅
+- App alojada en https://pabloeckert.github.io/MejoraContactos/
+- GitHub Pages habilitado via API
+- SPA fallback con 404.html
+- Deploy automático en push a main
+
+---
+
 ## Resumen Ejecutivo 3 Sesiones
 
 ### Sesión 1: Auditoría & Fixes ✅
@@ -27,12 +37,17 @@
 
 ## Estado del Repo
 
-| Aspecto | Sesión 1 | Sesión 2 | Sesión 3 |
-|---------|----------|----------|----------|
-| Tests | 253 | 270 | **301** (+31) |
-| Index KB | 312 | 298 | 298 |
-| Commits | 1 | 2 | **3** |
-| Push | ✅ | ✅ | ✅ |
+| Aspecto | Sesión 1 | Sesión 2 | Sesión 3 | Sesión 4 |
+|---------|----------|----------|----------|----------|
+| Tests | 253 | 270 | 301 | 301 |
+| Index KB | 312 | 298 | 298 | 298 |
+| Commits | 1 | 2 | 3 | **5** |
+| Hosting | Hostinger | Hostinger | Hostinger | **GitHub Pages** |
+| Push | ✅ | ✅ | ✅ | ✅ |
+
+### URLs
+- **Producción (GitHub Pages):** https://pabloeckert.github.io/MejoraContactos/
+- **GitHub Repo:** https://github.com/pabloeckert/MejoraContactos
 
 ---
 

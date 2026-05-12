@@ -4,6 +4,17 @@ All notable changes to MejoraContactos will be documented in this file.
 
 Format: [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/)
 
+## [12.9.4] - 2026-05-13 — CTO Session 4: GitHub Pages Deploy
+
+### Added
+- **GitHub Pages deploy:** App alojada en https://pabloeckert.github.io/MejoraContactos/
+- **SPA fallback:** 404.html para client-side routing en GitHub Pages
+
+### Changed
+- **Deploy:** Migrado de Hostinger a GitHub Pages (temporal)
+
+---
+
 ## [12.9.3] - 2026-05-13 — CTO Session 3: Testing & Documentation
 
 ### Added

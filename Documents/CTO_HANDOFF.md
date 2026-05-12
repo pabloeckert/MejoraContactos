@@ -38,7 +38,7 @@
 
 | Aspecto | Estado |
 |---------|--------|
-| **Tests** | 301/301 ✅ |
+| **Tests** | 326/326 ✅ |
 | **Lint** | 0 errores ✅ |
 | **Build** | 298KB index ✅ |
 | **Hosting** | GitHub Pages ✅ |
@@ -130,7 +130,7 @@ M  src/lib/analytics.ts
 
 | Métrica | Inicio | Después | Delta |
 |---------|--------|---------|-------|
-| Tests | 253 | 301 | +48 (+19%) |
+| Tests | 253 | 326 | +73 (+29%) |
 | Index KB | 312 | 298 | -14 (-4.5%) |
 | Edge Function tests | 0 | 48 | +48 |
 | Documentación | 3 docs | 7 docs | +4 |
@@ -139,13 +139,20 @@ M  src/lib/analytics.ts
 
 ---
 
+### Sesión 5: Test Coverage ✅
+- 25 nuevos tests para field-validator y parsers (326 total)
+- coverage/ añadido a .gitignore
+- Sentry ya estaba lazy-loaded (no action needed)
+
+---
+
 ## Próximos Pasos Recomendados
 
 ### Próxima sesión
 1. **useReducer para useContactProcessing** — Refactor del hook principal
-2. **Lazy import de Sentry** — Verificar que no se carga innecesariamente
-3. **E2E tests Google Contacts** — Flujo OAuth completo
-4. **CHANGELOG automation** — conventional-commits
+2. **E2E tests Google Contacts** — Flujo OAuth completo
+3. **CHANGELOG automation** — conventional-commits
+4. **Custom domain** — Configurar dominio propio si se necesita
 
 ### Futuro
 5. **Product Hunt launch** — Preparar launch materials

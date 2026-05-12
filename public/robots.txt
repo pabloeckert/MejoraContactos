@@ -14,4 +14,4 @@ User-agent: *
 Allow: /
 Disallow: /api/
 
-Sitemap: https://util.mejoraok.com/mejoracontactos/sitemap.xml
+Sitemap: https://pabloeckert.github.io/MejoraContactos/sitemap.xml

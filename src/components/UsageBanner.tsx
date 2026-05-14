@@ -4,7 +4,7 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { getUsageStats } from "@/lib/usage";
+import { getUsageStats } from "@/lib/usage-limits";
 import { Zap, Key, AlertTriangle } from "lucide-react";
 import { useState, useEffect } from "react";
 

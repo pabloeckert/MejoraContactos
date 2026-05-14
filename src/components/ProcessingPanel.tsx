@@ -9,7 +9,7 @@ import { ColumnMapper } from "./ColumnMapper";
 import { PipelineVisualizer } from "./PipelineVisualizer";
 import { useContactProcessing, suggestOptimalConfig } from "@/hooks/useContactProcessing";
 import { PROVIDERS } from "@/lib/providers";
-import { canProcess, recordBatch } from "@/lib/usage";
+import { canProcess } from "@/lib/usage-limits";
 import type { ParsedFile, UnifiedContact } from "@/types/contact";
 import { toast } from "sonner";
 
@@ -80,8 +80,6 @@ export function ProcessingPanel({ files, onProcessingComplete, onResetAll }: Pro
       return;
     }
     p.startProcessing((contacts) => {
-      // Record usage after successful processing
-      recordBatch(totalRows);
       onProcessingComplete(contacts);
     });
   };

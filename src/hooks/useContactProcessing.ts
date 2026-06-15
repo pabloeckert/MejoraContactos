@@ -10,6 +10,7 @@ import { autoDetectMappings } from "@/lib/column-mapper";
 import { runRuleCleanInWorker } from "@/workers/useWorkerPipeline";
 import { useAIPipeline, suggestOptimalConfig, type StageConfig } from "./useAIPipeline";
 import { useDedup } from "./useDedup";
+import { scoreRelevance, getSegment, needsAIScoring } from "@/lib/relevance-scorer";
 import type { CountryCode } from "libphonenumber-js";
 import type {
   ParsedFile,
@@ -296,8 +297,14 @@ export function useContactProcessing(files: ParsedFile[]) {
 
     // ── Stage 5: Deduplication (delegated to useDedup) ──
     dispatch({ type: "UPDATE_PIPELINE", payload: { dedup: "active" } });
-    const contacts = await deduplicate(typedContacts);
+    const dedupedContacts = await deduplicate(typedContacts);
     dispatch({ type: "UPDATE_PIPELINE", payload: { dedup: "done" } });
+
+    // ── Stage 6: Relevance scoring ──
+    const contacts = dedupedContacts.map(c => {
+      const score = scoreRelevance(c);
+      return { ...c, relevanceScore: score, segment: getSegment(score), needsAIScoring: needsAIScoring(c) };
+    });
 
     // ── Final stats ──
     const unique = contacts.filter((c) => !c.isDuplicate);

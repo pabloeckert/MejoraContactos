@@ -1,9 +1,9 @@
 import { memo } from "react";
-import { Download, FileSpreadsheet, FileText, File, BarChart3, Brain } from "lucide-react";
+import { Download, FileSpreadsheet, FileText, File, BarChart3, Brain, Layers } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { exportCSV, exportExcel, exportVCF, exportJSON, exportJSONL, exportGoogleContactsCSV, exportHubSpotCSV, exportSalesforceCSV, exportZohoCSV, exportAirtableCSV, generateHTMLReport, downloadFile } from "@/lib/export-utils";
+import { exportCSV, exportExcel, exportVCF, exportJSON, exportJSONL, exportGoogleContactsCSV, exportHubSpotCSV, exportSalesforceCSV, exportZohoCSV, exportAirtableCSV, generateHTMLReport, exportSegmentedCSV, downloadFile } from "@/lib/export-utils";
 import { analytics } from "@/lib/analytics";
 import type { UnifiedContact } from "@/types/contact";
 import { toast } from "sonner";
@@ -79,6 +79,32 @@ export const ExportPanel = memo(function ExportPanel({ contacts }: ExportPanelPr
     const label = { csv: 'CSV', excel: 'Excel', vcf: 'VCF', json: 'JSON', jsonl: 'JSONL', report: 'HTML', google: 'Google Contacts', hubspot: 'HubSpot', salesforce: 'Salesforce', zoho: 'Zoho', airtable: 'Airtable' }[format] || format;
     analytics.exportCompleted(format, clean.length);
     toast.success(`Exportado ${clean.length} contactos en formato ${label}`);
+  };
+
+  const handleSegmentExport = (segment: "A" | "B" | "C" | "all") => {
+    if (clean.length === 0) { toast.error("No hay contactos para exportar"); return; }
+    const { segmentA, segmentB, segmentC, summary } = exportSegmentedCSV(contacts);
+    const timestamp = new Date().toISOString().slice(0, 10);
+
+    if (segment === "A" || segment === "all") {
+      if (summary.segmentA.count > 0)
+        downloadFile(segmentA, `segmento_A_${timestamp}.csv`, "text/csv;charset=utf-8-bom");
+    }
+    if (segment === "B" || segment === "all") {
+      if (summary.segmentB.count > 0)
+        downloadFile(segmentB, `segmento_B_${timestamp}.csv`, "text/csv;charset=utf-8-bom");
+    }
+    if (segment === "C" || segment === "all") {
+      if (summary.segmentC.count > 0)
+        downloadFile(segmentC, `segmento_C_${timestamp}.csv`, "text/csv;charset=utf-8-bom");
+    }
+
+    if (segment === "all") {
+      toast.success(`3 archivos exportados: ${summary.segmentA.count} A · ${summary.segmentB.count} B · ${summary.segmentC.count} C`);
+    } else {
+      const count = segment === "A" ? summary.segmentA.count : segment === "B" ? summary.segmentB.count : summary.segmentC.count;
+      toast.success(`Segmento ${segment}: ${count} contactos exportados`);
+    }
   };
 
   return (
@@ -180,6 +206,9 @@ export const ExportPanel = memo(function ExportPanel({ contacts }: ExportPanelPr
         </CardContent>
       </Card>
 
+      {/* Segmented Export */}
+      <SegmentedExportCard contacts={contacts} onExport={handleSegmentExport} />
+
       {discarded.length > 0 && (
         <Card>
           <CardHeader className="pb-2">
@@ -210,5 +239,95 @@ function StatCard({ label, value, icon, color }: { label: string; value: number;
       <p className={`text-xl font-bold ${color || "text-foreground"}`}>{value.toLocaleString()}</p>
       <p className="text-xs text-muted-foreground">{label}</p>
     </div>
+  );
+}
+
+function SegmentedExportCard({
+  contacts,
+  onExport,
+}: {
+  contacts: UnifiedContact[];
+  onExport: (seg: "A" | "B" | "C" | "all") => void;
+}) {
+  const hasScores = contacts.some(c => c.relevanceScore !== undefined);
+  if (!hasScores) return null;
+
+  const { summary } = exportSegmentedCSV(contacts);
+  const totalScored = summary.segmentA.count + summary.segmentB.count + summary.segmentC.count;
+  const avgScore = totalScored === 0 ? 0 : Math.round(
+    (summary.segmentA.count * summary.segmentA.avgScore +
+     summary.segmentB.count * summary.segmentB.avgScore +
+     summary.segmentC.count * summary.segmentC.avgScore) / totalScored
+  );
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-sm flex items-center gap-2">
+          <Layers className="h-4 w-4" />
+          Exportación segmentada
+        </CardTitle>
+        <div className="flex flex-wrap gap-2 pt-1">
+          <Badge className="text-[10px] bg-green-100 text-green-800 border-green-300">
+            A: {summary.segmentA.count} contactos (score ≥70)
+          </Badge>
+          <Badge className="text-[10px] bg-yellow-100 text-yellow-800 border-yellow-300">
+            B: {summary.segmentB.count} contactos (40–69)
+          </Badge>
+          <Badge className="text-[10px] bg-gray-100 text-gray-700 border-gray-300">
+            C: {summary.segmentC.count} contactos (0–39)
+          </Badge>
+          <Badge variant="outline" className="text-[10px]">
+            Score promedio: {avgScore}
+          </Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <Button
+          variant="outline"
+          className="h-auto py-3 flex-col gap-1 border-green-300 hover:bg-green-50"
+          onClick={() => onExport("A")}
+          disabled={summary.segmentA.count === 0}
+          aria-label="Exportar Segmento A"
+        >
+          <span className="text-sm font-bold text-green-700">Segmento A</span>
+          <span className="text-[10px] text-muted-foreground">Score 70-100</span>
+          <span className="text-xs font-semibold text-green-600">{summary.segmentA.count} contactos</span>
+        </Button>
+        <Button
+          variant="outline"
+          className="h-auto py-3 flex-col gap-1 border-yellow-300 hover:bg-yellow-50"
+          onClick={() => onExport("B")}
+          disabled={summary.segmentB.count === 0}
+          aria-label="Exportar Segmento B"
+        >
+          <span className="text-sm font-bold text-yellow-700">Segmento B</span>
+          <span className="text-[10px] text-muted-foreground">Score 40-69</span>
+          <span className="text-xs font-semibold text-yellow-600">{summary.segmentB.count} contactos</span>
+        </Button>
+        <Button
+          variant="outline"
+          className="h-auto py-3 flex-col gap-1 border-gray-300 hover:bg-gray-50"
+          onClick={() => onExport("C")}
+          disabled={summary.segmentC.count === 0}
+          aria-label="Exportar Segmento C"
+        >
+          <span className="text-sm font-bold text-gray-600">Segmento C</span>
+          <span className="text-[10px] text-muted-foreground">Score 0-39</span>
+          <span className="text-xs font-semibold text-gray-500">{summary.segmentC.count} contactos</span>
+        </Button>
+        <Button
+          variant="default"
+          className="h-auto py-3 flex-col gap-1"
+          onClick={() => onExport("all")}
+          disabled={totalScored === 0}
+          aria-label="Exportar los 3 segmentos"
+        >
+          <Download className="h-4 w-4" />
+          <span className="text-xs font-semibold">Exportar los 3</span>
+          <span className="text-[10px] opacity-80">3 archivos CSV</span>
+        </Button>
+      </CardContent>
+    </Card>
   );
 }

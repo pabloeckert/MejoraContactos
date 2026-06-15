@@ -24,6 +24,9 @@ export type ContactField =
   | "company"
   | "jobTitle"
   | "email"
+  | "city"
+  | "notes"
+  | "origin"
   | "ignore";
 
 export const CONTACT_FIELDS: { value: ContactField; label: string }[] = [
@@ -33,6 +36,9 @@ export const CONTACT_FIELDS: { value: ContactField; label: string }[] = [
   { value: "company", label: "Empresa" },
   { value: "jobTitle", label: "Cargo" },
   { value: "email", label: "Email" },
+  { value: "city", label: "Ciudad" },
+  { value: "notes", label: "Notas" },
+  { value: "origin", label: "Origen" },
   { value: "ignore", label: "⊘ Ignorar" },
 ];
 
@@ -56,6 +62,14 @@ export interface UnifiedContact {
   // Field validation scores
   validationScore?: number;
   fieldValidations?: FieldValidation[];
+  // Extended fields (from TXT parser and enrichment)
+  city?: string;
+  notes?: string;
+  origin?: string;
+  // Relevance scoring
+  relevanceScore?: number;
+  segment?: "A" | "B" | "C";
+  needsAIScoring?: boolean;
 }
 
 export interface FieldValidation {

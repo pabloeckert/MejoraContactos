@@ -306,6 +306,75 @@ export function exportAirtableCSV(contacts: UnifiedContact[]): string {
   return buildCRMCSV(columns, contacts);
 }
 
+// ── Segmented Export ────────────────────────────────────────────
+
+const SEGMENT_HEADERS = ["nombre", "apellido", "empresa", "cargo", "email", "teléfono", "ciudad", "origen", "score", "notas"];
+
+function buildSegmentCSV(contacts: UnifiedContact[]): string {
+  const BOM = "﻿";
+  const rows = contacts.map(c => [
+    c.firstName || "",
+    c.lastName || "",
+    c.company || "",
+    c.jobTitle || "",
+    c.email || "",
+    c.whatsapp || "",
+    c.city || "",
+    c.origin || "",
+    String(c.relevanceScore ?? ""),
+    c.notes || "",
+  ]);
+  return BOM + buildCSV(SEGMENT_HEADERS, rows);
+}
+
+export interface SegmentSummary {
+  total: number;
+  segmentA: { count: number; avgScore: number };
+  segmentB: { count: number; avgScore: number };
+  segmentC: { count: number; avgScore: number };
+  byOrigin: Record<string, number>;
+  duplicatesRemoved: number;
+}
+
+export function exportSegmentedCSV(contacts: UnifiedContact[]): {
+  segmentA: string;
+  segmentB: string;
+  segmentC: string;
+  summary: SegmentSummary;
+} {
+  const unique = contacts.filter(c => !c.isDuplicate);
+  const duplicatesRemoved = contacts.length - unique.length;
+
+  const segA = unique.filter(c => c.segment === "A");
+  const segB = unique.filter(c => c.segment === "B");
+  const segC = unique.filter(c => c.segment === "C" || !c.segment);
+
+  const avg = (arr: UnifiedContact[]) =>
+    arr.length === 0 ? 0 : Math.round(arr.reduce((s, c) => s + (c.relevanceScore ?? 0), 0) / arr.length);
+
+  const byOrigin: Record<string, number> = {};
+  for (const c of unique) {
+    const o = c.origin || "sin origen";
+    byOrigin[o] = (byOrigin[o] || 0) + 1;
+  }
+
+  const summary: SegmentSummary = {
+    total: unique.length,
+    segmentA: { count: segA.length, avgScore: avg(segA) },
+    segmentB: { count: segB.length, avgScore: avg(segB) },
+    segmentC: { count: segC.length, avgScore: avg(segC) },
+    byOrigin,
+    duplicatesRemoved,
+  };
+
+  return {
+    segmentA: buildSegmentCSV(segA),
+    segmentB: buildSegmentCSV(segB),
+    segmentC: buildSegmentCSV(segC),
+    summary,
+  };
+}
+
 /**
  * Lista de todos los formatos de exportación disponibles.
  */

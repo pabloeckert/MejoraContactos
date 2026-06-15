@@ -136,10 +136,12 @@ describe("parseFile", () => {
     expect(result.type).toBe("CSV");
   });
 
-  it("should route .txt to parseCSV", async () => {
+  it("should route .txt to parseTxt (with delimiters → acts as CSV)", async () => {
     const txt = "A,B\n1,2";
     const result = await parseFile(makeFile(txt, "data.txt"));
-    expect(result.type).toBe("CSV");
+    expect(result.type).toBe("TXT");
+    expect(result.columns).toEqual(["A", "B"]);
+    expect(result.rows).toHaveLength(1);
   });
 
   it("should route .vcf to parseVCF", async () => {

@@ -36,8 +36,16 @@ describe("autoDetectMappings", () => {
     const mappings = autoDetectMappings(["Nombre", "Notas", "Dirección"]);
     const targets = Object.fromEntries(mappings.map(m => [m.source, m.target]));
     expect(targets["Nombre"]).toBe("firstName");
-    expect(targets["Notas"]).toBe("ignore");
+    expect(targets["Notas"]).toBe("notes");
     expect(targets["Dirección"]).toBe("ignore");
+  });
+
+  it("should detect city and origin aliases", () => {
+    const mappings = autoDetectMappings(["ciudad", "origen", "notas"]);
+    const targets = Object.fromEntries(mappings.map(m => [m.source, m.target]));
+    expect(targets["ciudad"]).toBe("city");
+    expect(targets["origen"]).toBe("origin");
+    expect(targets["notas"]).toBe("notes");
   });
 
   it("should detect various phone aliases", () => {

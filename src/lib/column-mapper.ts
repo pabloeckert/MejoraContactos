@@ -7,6 +7,9 @@ const PATTERNS: Record<ContactField, RegExp> = {
   company: /^(company|org|organization|empresa|organizaci[oó]n|compa[ñn][ií]a|compania)$/i,
   jobTitle: /^(job?.?title|title|cargo|puesto|position|rol)$/i,
   email: /^(e?.?mail|correo|email?.?address|e-mail)$/i,
+  city: /^(city|ciudad|locality|localidad|location|ubicaci[oó]n|ubicacion)$/i,
+  notes: /^(notes|notas|note|comments|comentarios|observaciones|obs)$/i,
+  origin: /^(origin|origen|source|fuente|canal|procedencia)$/i,
   ignore: /^$/,
 };
 

@@ -1,5 +1,6 @@
 // Lazy load: papaparse loaded on-demand (not in initial bundle)
 import { handleParseError } from "./error-handler";
+import { parseTxt } from "./txt-parser";
 import type { ParsedFile, RawContact } from "@/types/contact";
 
 function genId(): string {
@@ -213,8 +214,10 @@ export async function parseFile(file: File): Promise<ParsedFile> {
   const ext = file.name.toLowerCase().split(".").pop();
   switch (ext) {
     case "csv":
-    case "txt":
       return parseCSV(file);
+    case "txt":
+    case "text":
+      return parseTxt(file);
     case "xlsx":
     case "xls":
       return parseExcel(file);

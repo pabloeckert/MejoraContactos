@@ -1,0 +1,210 @@
+"""Motor de fusión: aplica las tres bandas de confianza de config.dedup a
+los pares candidatos de dedup/blocking.py, escribe decisiones_log, y
+materializa clusters. Nada se fusiona destructivamente — fusionar es
+asignar el mismo cluster_id a dos raw_records, deshacer es reasignarles un
+cluster_id propio de nuevo. El historial de decisiones_log nunca se borra,
+ni siquiera al deshacer.
+
+Tres bandas (ver también config.yaml):
+1. score alto  -> fusiona sola, logueada, reversible.
+2. score bajo  -> no fusiona, sin preguntar (dos tarjetas separadas es
+   barato y reversible; una fusión mala no siempre lo es).
+3. score medio -> se delega a LlmJudge (Groq, escalado a Anthropic si hace
+   falta); si tampoco resuelve con confianza, queda en revision_pendiente
+   para el revisor web en lote.
+
+Cada corrida de deduplicar_todo() se marca con un corrida_id propio
+(timestamp) en clusters y decisiones_log — permite deshacer_ultima_corrida()
+sin tener que revertir cluster por cluster (pedido explícito, Ficha 12.2:
+"crítico, necesito un deshacer todo de la última corrida completa").
+"""
+
+from __future__ import annotations
+
+import sqlite3
+import uuid
+from datetime import datetime, timezone
+
+from motor.config import Config
+from motor.dedup import learning, scoring
+from motor.dedup.blocking import generar_candidatos
+from motor.dedup.scoring import RegistroParaScoring
+from motor.dedup.union_find import UnionFind
+from motor.llm_judge import LlmJudge
+
+
+def deduplicar_todo(config: Config, conn: sqlite3.Connection) -> dict[str, int]:
+    corrida_id = _ahora()
+    ids = [fila["id"] for fila in conn.execute("SELECT id FROM normalized_records").fetchall()]
+    candidatos = generar_candidatos(conn, config.dedup.tope_bucket)
+    uf = UnionFind(ids)
+    judge = LlmJudge(config.llm) if config.llm.activar_para_dudosos else None
+
+    contadores: dict[str, int] = {"regla": 0, "revision_pendiente": 0, "separados": 0}
+
+    for id_a, id_b in sorted(candidatos):
+        reg_a = scoring.cargar_registro(conn, id_a)
+        reg_b = scoring.cargar_registro(conn, id_b)
+        score, patron = scoring.calcular_score(reg_a, reg_b, config.dedup)
+        score = min(max(score + learning.obtener_ajuste(conn, patron), 0.0), 1.0)
+
+        if score >= config.dedup.umbral_fusion_automatica:
+            uf.unir(id_a, id_b)
+            _loguear(conn, id_a, id_b, "fusionar", "regla", score, corrida_id, patron)
+            contadores["regla"] += 1
+        elif score <= config.dedup.umbral_no_fusionar:
+            _loguear(conn, id_a, id_b, "separar", "regla", score, corrida_id, patron)
+            contadores["separados"] += 1
+        else:
+            resuelto = _resolver_con_llm(conn, judge, uf, id_a, id_b, reg_a, reg_b, config, corrida_id)
+            clave = resuelto if resuelto else "revision_pendiente"
+            if not resuelto:
+                _loguear(conn, id_a, id_b, "revision_pendiente", "pendiente", score, corrida_id, patron)
+            contadores[clave] = contadores.get(clave, 0) + 1
+
+    _materializar_clusters(conn, uf, corrida_id)
+    conn.commit()
+    return contadores
+
+
+def _resolver_con_llm(
+    conn: sqlite3.Connection,
+    judge: LlmJudge | None,
+    uf: UnionFind,
+    id_a: int,
+    id_b: int,
+    reg_a: RegistroParaScoring,
+    reg_b: RegistroParaScoring,
+    config: Config,
+    corrida_id: str,
+) -> str | None:
+    if judge is None:
+        return None
+    veredicto = judge.decidir(_a_dict(reg_a), _a_dict(reg_b))
+    if veredicto is None or veredicto.confianza < config.llm.escalado.umbral_confianza_groq:
+        return None
+
+    decidido_por = f"llm_{veredicto.proveedor}"
+    if veredicto.misma_persona:
+        uf.unir(id_a, id_b)
+        _loguear(conn, id_a, id_b, "fusionar", decidido_por, veredicto.confianza, corrida_id, veredicto.razon)
+    else:
+        _loguear(conn, id_a, id_b, "separar", decidido_por, veredicto.confianza, corrida_id, veredicto.razon)
+    return decidido_por
+
+
+def deshacer(conn: sqlite3.Connection, cluster_id: str) -> int:
+    """Separa todos los raw_records de un cluster en clusters propios de
+    nuevo. No borra decisiones_log — queda como auditoría de que hubo una
+    fusión y se revirtió."""
+    filas = conn.execute(
+        "SELECT raw_record_id FROM clusters WHERE cluster_id = ?", (cluster_id,)
+    ).fetchall()
+    for fila in filas:
+        nuevo_cluster_id = f"c-{fila['raw_record_id']}"
+        conn.execute(
+            "UPDATE clusters SET cluster_id = ?, decidido_por = 'humano', actualizado_en = ? "
+            "WHERE raw_record_id = ?",
+            (nuevo_cluster_id, _ahora(), fila["raw_record_id"]),
+        )
+    conn.execute(
+        "INSERT INTO decisiones_log "
+        "(cluster_id, raw_record_id_a, raw_record_id_b, accion, decidido_por, confianza, detalle, creado_en) "
+        "VALUES (?, 0, NULL, 'deshacer', 'humano', NULL, NULL, ?)",
+        (cluster_id, _ahora()),
+    )
+    conn.commit()
+    return len(filas)
+
+
+def deshacer_ultima_corrida(conn: sqlite3.Connection) -> dict[str, int]:
+    """Revierte TODAS las fusiones de la corrida de deduplicar_todo() más
+    reciente de una sola vez — no cluster por cluster. Cada raw_record de
+    esa corrida vuelve a su propio cluster; decisiones_log no se toca (queda
+    como auditoría), solo se agrega una entrada 'deshacer_corrida'."""
+    fila = conn.execute(
+        "SELECT corrida_id FROM clusters WHERE corrida_id IS NOT NULL "
+        "ORDER BY corrida_id DESC LIMIT 1"
+    ).fetchone()
+    if fila is None:
+        return {"corrida_id": None, "clusters_afectados": 0, "raw_records_afectados": 0}
+
+    corrida_id = fila["corrida_id"]
+    filas = conn.execute(
+        "SELECT raw_record_id, cluster_id FROM clusters WHERE corrida_id = ?", (corrida_id,)
+    ).fetchall()
+    cluster_ids = {f["cluster_id"] for f in filas}
+
+    for f in filas:
+        nuevo_cluster_id = f"c-{f['raw_record_id']}"
+        conn.execute(
+            "UPDATE clusters SET cluster_id = ?, decidido_por = 'humano', corrida_id = NULL, actualizado_en = ? "
+            "WHERE raw_record_id = ?",
+            (nuevo_cluster_id, _ahora(), f["raw_record_id"]),
+        )
+    conn.execute(
+        "INSERT INTO decisiones_log "
+        "(cluster_id, raw_record_id_a, raw_record_id_b, accion, decidido_por, confianza, detalle, corrida_id, creado_en) "
+        "VALUES (?, 0, NULL, 'deshacer_corrida', 'humano', NULL, ?, ?, ?)",
+        (corrida_id, f"{len(filas)} raw_records revertidos", corrida_id, _ahora()),
+    )
+    conn.commit()
+    return {
+        "corrida_id": corrida_id,
+        "clusters_afectados": len(cluster_ids),
+        "raw_records_afectados": len(filas),
+    }
+
+
+def _materializar_clusters(conn: sqlite3.Connection, uf: UnionFind, corrida_id: str) -> None:
+    mapa_raw = {
+        fila["id"]: fila["raw_record_id"]
+        for fila in conn.execute("SELECT id, raw_record_id FROM normalized_records").fetchall()
+    }
+    for raiz, miembros in uf.grupos().items():
+        cluster_id = (
+            f"c-{raiz}" if len(miembros) == 1 else f"c-{uuid.uuid5(uuid.NAMESPACE_OID, str(sorted(miembros)))}"
+        )
+        for normalized_id in miembros:
+            raw_record_id = mapa_raw.get(normalized_id)
+            if raw_record_id is None:
+                continue
+            conn.execute(
+                "INSERT INTO clusters (raw_record_id, cluster_id, decidido_por, confianza, corrida_id, actualizado_en) "
+                "VALUES (?, ?, 'regla', NULL, ?, ?) "
+                "ON CONFLICT(raw_record_id) DO UPDATE SET "
+                "cluster_id=excluded.cluster_id, corrida_id=excluded.corrida_id, actualizado_en=excluded.actualizado_en",
+                (raw_record_id, cluster_id, corrida_id, _ahora()),
+            )
+
+
+def _loguear(
+    conn: sqlite3.Connection,
+    id_a: int,
+    id_b: int,
+    accion: str,
+    decidido_por: str,
+    confianza: float,
+    corrida_id: str,
+    detalle: str | None = None,
+) -> None:
+    conn.execute(
+        "INSERT INTO decisiones_log "
+        "(cluster_id, raw_record_id_a, raw_record_id_b, accion, decidido_por, confianza, detalle, corrida_id, creado_en) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (f"pair-{id_a}-{id_b}", id_a, id_b, accion, decidido_por, confianza, detalle, corrida_id, _ahora()),
+    )
+
+
+def _a_dict(reg: RegistroParaScoring) -> dict:
+    return {
+        "nombre": reg.nombre,
+        "apellido": reg.apellido,
+        "organizacion": reg.organizacion,
+        "telefonos": sorted(reg.telefonos),
+        "emails": sorted(reg.emails),
+    }
+
+
+def _ahora() -> str:
+    return datetime.now(timezone.utc).isoformat()

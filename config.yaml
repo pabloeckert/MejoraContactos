@@ -1,0 +1,90 @@
+# Configuración del motor de consolidación de contactos.
+# Lo que se puede querer ajustar sin tocar código vive acá.
+
+rutas:
+  carpeta_raiz: "../Data/Crudos"   # relativo a este archivo; se resuelve a absoluto al cargar
+  carpeta_salida: "../Data/Salida"
+  base_sqlite: "../Data/Salida/staging.sqlite"
+
+extensiones_permitidas:
+  - csv
+  - tsv
+  - txt
+  - xls
+  - xlsx
+  - xlsm
+  - ods
+  - vcf
+  - json
+  - html
+  - md
+  - log
+  - docx
+  - pdf
+  - png
+  - jpg
+  - jpeg
+
+telefono:
+  codigo_area_default: "376"       # Posadas — usado para completar números cortos (6-8 dígitos)
+  asumir_movil_por_defecto: true   # si no hay marca de móvil (15 / 9) ni pista de etiqueta, asumir celular
+
+email:
+  dominios_frecuentes:
+    - gmail.com
+    - hotmail.com
+    - hotmail.com.ar
+    - outlook.com
+    - outlook.com.ar
+    - yahoo.com
+    - yahoo.com.ar
+    - live.com
+    - live.com.ar
+    - icloud.com
+    - fibertel.com.ar
+    - speedy.com.ar
+    - arnet.com.ar
+    - ciudad.com.ar
+    - uol.com.ar
+  umbral_levenshtein: 2   # distancia máxima para corregir un dominio contra la lista de arriba
+
+dedup:
+  # Umbral "agresivo" (mismo teléfono fusiona directo) por decisión
+  # explícita del usuario — dedup/learning.py lo va afinando con evidencia
+  # real de sus propias decisiones de revisión, nunca se sale de estas
+  # bandas por sí solo.
+  umbral_fusion_automatica: 0.80
+  umbral_no_fusionar: 0.55
+  pesos:
+    telefono_exacto: 0.5
+    email_exacto: 0.3
+    nombre_similitud: 0.15
+    organizacion: 0.05
+  tope_bucket: 500
+
+llm:
+  # Casos en la banda ambigua (entre los dos umbrales de arriba) se le
+  # consultan a un LLM antes de mandarlos a la cola de revisión humana.
+  # Escalonado: Groq primero (gratis); si Groq no está seguro, se escala
+  # el mismo caso a Anthropic (mejor calidad, pago) — así el costo se paga
+  # solo en los casos genuinamente difíciles.
+  activar_para_dudosos: true
+  primario:
+    proveedor: "groq"
+    modelo: "llama-3.3-70b-versatile"
+  escalado:
+    proveedor: "anthropic"
+    modelo: "claude-sonnet-4-5"
+    umbral_confianza_groq: 0.6   # si Groq reporta menos confianza que esto, escala
+
+revisor:
+  puerto: 5000
+  tamano_lote: 25
+
+# Fase 3 — solo hace falta si el instalador de Tesseract-OCR no agregó el
+# binario al PATH de Windows. Ejemplo de ruta típica, comentado:
+# ocr:
+#   tesseract_cmd: "C:\\Program Files\\Tesseract-OCR\\tesseract.exe"
+
+# Las API keys (GROQ_API_KEY, ANTHROPIC_API_KEY) NUNCA van acá — se leen de
+# variables de entorno vía motor-contactos/.env (ver .env.example).

@@ -27,6 +27,12 @@
 
 $ErrorActionPreference = "Stop"
 
+# Windows PowerShell 5.1 lee texto con el codepage del sistema por default,
+# no UTF-8 -- sin esto, cualquier tilde/eñe de DECISIONES.md/PENDIENTES.md
+# se corrompe al leerla (y de nuevo al re-escribirla en el reporte).
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
+
 $ScriptDir = $PSScriptRoot
 $MotorDir = Split-Path -Parent $ScriptDir
 $RepoRoot = Split-Path -Parent $MotorDir
@@ -75,11 +81,11 @@ try {
     $pendientesPath = Join-Path $MotorDir "PENDIENTES.md"
     $ultimasDecisiones = ""
     if (Test-Path $decisionesPath) {
-        $contenido = Get-Content $decisionesPath -Raw
+        $contenido = Get-Content $decisionesPath -Raw -Encoding UTF8
         $bloques = $contenido -split "`n---`n"
         $ultimasDecisiones = ($bloques | Select-Object -Last 2) -join "`n---`n"
     }
-    $pendientes = if (Test-Path $pendientesPath) { Get-Content $pendientesPath -Raw } else { "(no existe PENDIENTES.md)" }
+    $pendientes = if (Test-Path $pendientesPath) { Get-Content $pendientesPath -Raw -Encoding UTF8 } else { "(no existe PENDIENTES.md)" }
 
     # 5. Armar el reporte
     $reporte = @"

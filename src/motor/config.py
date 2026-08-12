@@ -82,6 +82,11 @@ class LlmEscaladoConfig:
 class LlmConfig:
     activar_para_dudosos: bool = False
     primario: LlmProveedorConfig = field(default_factory=LlmProveedorConfig)
+    # Modelos gratis de OpenRouter (id completo, con ":free") que se turnan
+    # round-robin ANTES de escalar a Anthropic — reparte la carga entre
+    # varios proveedores gratis en vez de agotar la cuota de uno solo.
+    # Ver llm_judge.py y ESPECIFICACION.md § LLM-judge.
+    rotacion_gratis_openrouter: tuple[str, ...] = ()
     escalado: LlmEscaladoConfig = field(default_factory=LlmEscaladoConfig)
 
 
@@ -200,8 +205,11 @@ def _cargar_llm(raw: dict) -> LlmConfig:
         modelo=str(escalado_raw.get("modelo", "claude-sonnet-4-5")),
         umbral_confianza_groq=float(escalado_raw.get("umbral_confianza_groq", 0.6)),
     )
+    rotacion = tuple(raw.get("rotacion_gratis_openrouter", []))
+
     return LlmConfig(
         activar_para_dudosos=bool(raw.get("activar_para_dudosos", False)),
         primario=primario,
+        rotacion_gratis_openrouter=rotacion,
         escalado=escalado,
     )

@@ -127,3 +127,50 @@ su reporte automáticamente (busca las últimas bajo el separador `---`).
   sync de vuelta a Google).
 
 ---
+
+## 2026-08-12 (cont.) — Rotación de modelos gratis de OpenRouter
+
+- Mientras corría en background el `deduplicar` con LLM-judge (658 casos,
+  tardaba mucho por límites de tasa gratis), el usuario pidió aprovechar
+  el tiempo y armar la integración de OpenRouter que había pedido antes
+  ("que use todos los modelos de AI que sean free").
+- Antes de escribir código se verificó la lista REAL de modelos gratis en
+  vivo (`https://openrouter.ai/api/v1/models` vía `fetch()` en el Browser
+  pane, no confiar en la memoria del modelo — el ecosistema cambia rápido
+  y el conocimiento de Claude tiene fecha de corte). Resultado: 410
+  modelos totales, 19 gratis. Se excluyeron del pool 3: dos son modelos de
+  generación de MÚSICA (`google/lyria-3-pro-preview` y
+  `google/lyria-3-clip-preview`, aparecieron en el filtro por precio 0
+  pero no sirven para clasificar texto) y uno que la propia API marcaba
+  como por expirar al día siguiente (`inclusionai/ling-3.0-tiny:free`).
+  Quedaron 13 modelos utilizables (OpenAI gpt-oss-20b, dos Gemma 4 de
+  Google, cuatro Nemotron de Nvidia más chicos/rápidos, dos Nemotron
+  grandes, Liquid LFM-2.5, Cohere North-mini-code, y dos Poolside Laguna).
+- `LlmJudge` (`llm_judge.py`) pasó de una cadena fija de 2 pasos
+  (Groq → Anthropic) a: Groq + rotación round-robin de los 13 modelos
+  OpenRouter (cada llamada a `decidir()` arranca en el siguiente candidato
+  de la lista, no siempre el mismo, para repartir carga entre proveedores
+  en vez de agotar la cuota gratis de uno solo) → si ninguno de los
+  gratis resolvió con confianza suficiente, escala a Anthropic (pago)
+  igual que antes. Compatible hacia atrás: con `rotacion_gratis_openrouter`
+  vacío se comporta exactamente igual que la versión anterior.
+- `config.py`: nuevo campo `LlmConfig.rotacion_gratis_openrouter: tuple[str, ...]`.
+  `config.yaml`: la lista de 13 modelos, con comentario explícito de
+  cuándo se verificó y que hay que re-chequear si empiezan a fallar
+  seguido (la disponibilidad de modelos gratis en OpenRouter no es
+  estable en el tiempo).
+- 6 tests nuevos en `tests/test_llm_judge.py` (no existía antes ningún
+  test de este módulo) — todo mockeado con `unittest.mock.patch` sobre
+  `requests.post`, nunca se llama a una API real. Cubre: desactivado no
+  llama a nadie, Groq confiado no escala, si Groq no tiene key salta
+  directo al siguiente candidato, si nadie da confianza suficiente escala
+  a Anthropic, si todos fallan devuelve `None` sin romper, y que el
+  índice de rotación efectivamente avanza entre llamadas sucesivas.
+  **175 tests en total, todos en verde.**
+- Importante: la corrida de `deduplicar` que ya estaba corriendo en
+  background al momento de este cambio NO usa esta rotación (ya había
+  cargado la config vieja en memoria al arrancar) — sigue siendo
+  Groq→Anthropic nomás para esa corrida puntual. La rotación se aplica
+  recién en la PRÓXIMA vez que se corra `deduplicar`.
+
+---

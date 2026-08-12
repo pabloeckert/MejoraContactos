@@ -65,17 +65,38 @@ dedup:
 llm:
   # Casos en la banda ambigua (entre los dos umbrales de arriba) se le
   # consultan a un LLM antes de mandarlos a la cola de revisión humana.
-  # Escalonado: Groq primero (gratis); si Groq no está seguro, se escala
-  # el mismo caso a Anthropic (mejor calidad, pago) — así el costo se paga
-  # solo en los casos genuinamente difíciles.
+  # Orden: Groq (primario) -> rotación de modelos gratis de OpenRouter
+  # (round-robin, reparte carga para no agotar la cuota gratis de uno
+  # solo) -> si ninguno respondió con confianza suficiente, se escala a
+  # Anthropic (pago, mejor calidad) -- así el costo se paga solo en los
+  # casos genuinamente difíciles.
   activar_para_dudosos: true
   primario:
     proveedor: "groq"
     modelo: "llama-3.3-70b-versatile"
+  # Lista verificada contra https://openrouter.ai/api/v1/models el
+  # 2026-08-12 (410 modelos totales, 19 gratis) -- quedan afuera 2 modelos
+  # de generación de música (no sirven para esta tarea de texto) y 1 que
+  # figuraba por expirar al día siguiente. Esta lista cambia con el tiempo
+  # -- si empiezan a fallar muchos, volver a chequear esa URL.
+  rotacion_gratis_openrouter:
+    - "openai/gpt-oss-20b:free"
+    - "google/gemma-4-31b-it:free"
+    - "google/gemma-4-26b-a4b-it:free"
+    - "nvidia/nemotron-3-super-120b-a12b:free"
+    - "nvidia/nemotron-3-ultra-550b-a55b:free"
+    - "nvidia/nemotron-3-nano-30b-a3b:free"
+    - "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free"
+    - "nvidia/nemotron-nano-9b-v2:free"
+    - "nvidia/nemotron-nano-12b-v2-vl:free"
+    - "liquid/lfm-2.5-2.6b:free"
+    - "cohere/north-mini-code:free"
+    - "poolside/laguna-s-2.1:free"
+    - "poolside/laguna-xs-2.1:free"
   escalado:
     proveedor: "anthropic"
     modelo: "claude-sonnet-4-5"
-    umbral_confianza_groq: 0.6   # si Groq reporta menos confianza que esto, escala
+    umbral_confianza_groq: 0.6   # si ningún gratis respondió con al menos esta confianza, escala
 
 revisor:
   puerto: 5000

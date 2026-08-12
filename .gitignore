@@ -11,3 +11,7 @@ __pycache__/
 # UI nueva (ui/) -- no versionar dependencias ni build output
 node_modules/
 dist/
+
+# OAuth de Google Contacts -- secretos, nunca a git (ni siquiera al repo local)
+credentials.json
+token_*.json

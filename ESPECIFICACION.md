@@ -53,13 +53,34 @@ usuario ya aprobó/rechazó casos a mano vía `/decidir`, esas decisiones se
 pierden en la siguiente corrida completa. Orden correcto: cargar API keys →
 correr LLM-judge una vez → recién ahí arranca la revisión manual.
 
+## Fuente de datos: Google Contacts en vivo (no CSV manuales)
+
+**Decisión del usuario (2026-08-11)**: en vez de mantener exports CSV a
+mano en `Data/Crudos/`, el sistema se conecta directo a Google Contacts vía
+la People API (`src/motor/google_contacts_source.py`). Cada cuenta de
+Google (`pablo`, `sindy`, configurables en `config.yaml` → `google.
+cuentas`) se autoriza una vez con `motor importar-google <cuenta>` —
+requiere login del usuario en el navegador (lo único que Claude no puede
+hacer), después queda un `token_<cuenta>.json` local que se refresca solo.
+Ver `GOOGLE_SETUP.md` para el setup completo (Google Cloud Console +
+`credentials.json`, un solo archivo para todas las cuentas).
+
+`importar_google_contactos()` llena `raw_records` igual que cualquier
+extractor de `extractors/` — reusa la tabla `fuentes_procesadas` con una
+ruta sintética `google:<cuenta>:<resourceName>` y el `etag` de Google como
+"hash", así una corrida recurrente solo trae contactos nuevos o
+modificados. Los extractores de archivo (`extractors/`) siguen existiendo
+para el día que haga falta importar algo que no vive en Google Contacts.
+
 ## Pipeline (CLI: `python -m motor.cli <comando>`)
 
-`extraer → normalizar → deduplicar → exportar` (o `run` = las cuatro
-juntas). Comandos de revisión: `panel` (abre navegador) / `revisar` (no
-abre navegador) levantan el mismo Flask app en `:5000` (puerto en
-`config.yaml` → `revisor.puerto`). `deshacer <cluster_id>` / `deshacer-
-ultima-corrida` revierten fusiones.
+`importar-google <cuenta> → normalizar → deduplicar → exportar` (el
+comando `run` sigue siendo `extraer + normalizar + deduplicar + exportar`
+por compatibilidad con los extractores de archivo — **no** incluye
+`importar-google`, que se corre aparte por cuenta). Comandos de revisión:
+`panel` (abre navegador) / `revisar` (no abre navegador) levantan el mismo
+Flask app en `:5000` (puerto en `config.yaml` → `revisor.puerto`).
+`deshacer <cluster_id>` / `deshacer-ultima-corrida` revierten fusiones.
 
 ## Tres bandas de confianza (dedup)
 
@@ -116,14 +137,17 @@ keys.
 
 ```
 motor-contactos/
-├── config.yaml              # config editable (umbrales, rutas, LLM)
-├── .env                     # API keys (gitignored, el usuario lo completa)
+├── config.yaml              # config editable (umbrales, rutas, LLM, cuentas de Google)
+├── .env                     # API keys LLM (gitignored, el usuario lo completa)
+├── credentials.json         # client OAuth de Google (gitignored, ver GOOGLE_SETUP.md)
+├── token_<cuenta>.json       # token OAuth por cuenta (gitignored, se genera solo)
 ├── requirements.txt / pyproject.toml
 ├── src/motor/
 │   ├── cli.py                # entrypoint
 │   ├── config.py             # carga config.yaml a dataclasses
 │   ├── staging_db.py         # esquema SQLite + migraciones
-│   ├── ingest.py             # orquestador de extracción (incremental)
+│   ├── google_contacts_source.py  # People API -> raw_records (fuente principal)
+│   ├── ingest.py             # orquestador de extracción de ARCHIVOS (incremental, secundario)
 │   ├── extractors/           # csv, excel, vcard, json, html, docx, pdf,
 │   │                         # image_ocr, freetext + base/column_mapping
 │   ├── phone_normalizer.py / email_normalizer.py

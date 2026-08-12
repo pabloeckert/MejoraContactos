@@ -2,16 +2,21 @@
 
 Uso:
     python -m motor.cli panel            # abre el panel web (dashboard con botones) en el navegador — EMPEZAR ACÁ
+    python -m motor.cli importar-google <cuenta>  # trae contactos en vivo desde Google Contacts (ver GOOGLE_SETUP.md)
     python -m motor.cli extraer
     python -m motor.cli normalizar
     python -m motor.cli deduplicar
     python -m motor.cli exportar
-    python -m motor.cli run              # las cuatro anteriores en orden
+    python -m motor.cli run              # extraer + normalizar + deduplicar + exportar, en orden (NO incluye importar-google)
     python -m motor.cli deshacer <cluster_id>
     python -m motor.cli deshacer-ultima-corrida
 
 "panel" y "revisar" son el mismo servidor web (dashboard en "/", cola de
 revisión en "/revisar") — "panel" abre el navegador solo, "revisar" no.
+
+"importar-google" pide login la primera vez que se corre para cada cuenta
+(abre el navegador) — corridas siguientes reusan el token guardado sin
+pedir login de nuevo, salvo que el token se revoque o expire.
 """
 
 from __future__ import annotations
@@ -43,7 +48,18 @@ def main(argv: list[str] | None = None) -> int:
     conn = conectar(config.rutas.base_sqlite)
 
     try:
-        if comando == "extraer":
+        if comando == "importar-google":
+            if len(argv) < 2:
+                print("uso: importar-google <cuenta>  (cuentas configuradas: " f"{', '.join(config.google.cuentas) or '(ninguna en config.yaml)'})")
+                return 1
+            from motor.google_contacts_source import CredencialesFaltantesError, importar_google_contactos
+
+            try:
+                print(f"raw_records nuevos desde Google ({argv[1]}): {importar_google_contactos(config, conn, argv[1])}")
+            except CredencialesFaltantesError as exc:
+                print(f"error: {exc}")
+                return 1
+        elif comando == "extraer":
             print(f"raw_records nuevos: {extraer_todo(config, conn)}")
         elif comando == "normalizar":
             print(f"normalized_records nuevos: {normalizar_todo(config, conn)}")

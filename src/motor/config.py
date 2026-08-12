@@ -99,6 +99,15 @@ class OcrConfig:
 
 
 @dataclass(frozen=True)
+class GoogleConfig:
+    # Cada nombre en `cuentas` es una cuenta de Google Contacts propia
+    # (ej. "pablo", "sindy") — cada una se autoriza por separado (OAuth,
+    # requiere login del usuario) y guarda su propio token_<cuenta>.json.
+    # Ver google_contacts_source.py y GOOGLE_SETUP.md.
+    cuentas: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class Config:
     rutas: RutasConfig
     extensiones_permitidas: frozenset[str]
@@ -108,6 +117,7 @@ class Config:
     llm: LlmConfig
     revisor: RevisorConfig
     ocr: OcrConfig = field(default_factory=OcrConfig)
+    google: GoogleConfig = field(default_factory=GoogleConfig)
 
 
 def cargar_config(path: str | Path = "config.yaml") -> Config:
@@ -146,6 +156,9 @@ def cargar_config(path: str | Path = "config.yaml") -> Config:
     ocr_raw = raw.get("ocr", {})
     ocr = OcrConfig(tesseract_cmd=ocr_raw.get("tesseract_cmd") or None)
 
+    google_raw = raw.get("google", {})
+    google = GoogleConfig(cuentas=tuple(google_raw.get("cuentas", [])))
+
     return Config(
         rutas=rutas,
         extensiones_permitidas=frozenset(raw.get("extensiones_permitidas", [])),
@@ -155,6 +168,7 @@ def cargar_config(path: str | Path = "config.yaml") -> Config:
         llm=llm,
         revisor=revisor,
         ocr=ocr,
+        google=google,
     )
 
 

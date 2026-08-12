@@ -3,18 +3,33 @@
 Lista viva. Se tacha (no se borra) lo completado, se agrega lo nuevo. Es lo
 primero que lee una cuenta de Claude nueva después de `ESPECIFICACION.md`.
 
-## Bloqueante crítico (necesita al usuario, no se puede resolver solo)
+## Resuelto — pivote de fuente de datos (2026-08-11)
 
-- [ ] **Confirmar destino de `Data/Crudos/pablo.csv` y `Sindy.csv`**: el
-      usuario no confirmó todavía si tiene otra copia (ej. re-exportable
-      desde Google Contacts si aún tiene acceso a esas cuentas) o si acepta
-      la pérdida y arranca con un export nuevo. **No correr el pipeline
-      contra `motor-contactos/config.yaml` real hasta tener esto resuelto**
-      — conectar a un `staging.sqlite` inexistente crea uno vacío
-      automáticamente y complica cualquier intento de recuperación futura.
-- [ ] Una vez resuelto lo anterior: recrear `Data/Crudos/` con los archivos
-      fuente (los que el usuario provea) y correr `motor run` de punta a
-      punta para reconstruir `staging.sqlite`.
+- [x] ~~Confirmar destino de Data/Crudos/pablo.csv y Sindy.csv~~ — el
+      usuario confirmó que borró la Papelera A PROPÓSITO y NO quiere
+      regenerar los CSV. Decisión: el sistema se conecta directo a Google
+      Contacts (People API) en vez de depender de exports manuales. Ver
+      `google_contacts_source.py`, `GOOGLE_SETUP.md`, y § "Fuente de
+      datos" en `ESPECIFICACION.md`. `Data/Crudos/` queda como carpeta
+      secundaria para el día que haga falta importar algo que no vive en
+      Google Contacts (PDF, capturas, etc.) — no es más el camino
+      principal.
+
+## Bloqueante crítico ACTUAL (necesita al usuario, no se puede resolver solo)
+
+- [ ] **Setup de Google Cloud Console** (Paso 1 de `GOOGLE_SETUP.md`):
+      crear proyecto, habilitar People API, configurar pantalla de
+      consentimiento OAuth (modo Prueba, agregar los emails de Pablo y
+      Sindy como usuarios de prueba), crear credenciales de "Aplicación de
+      escritorio", descargar y guardar como `motor-contactos/
+      credentials.json`. Requiere su login en Google Cloud Console — Claude
+      no puede hacerlo.
+- [ ] **Autorizar cada cuenta** (Paso 2 de `GOOGLE_SETUP.md`): correr
+      `motor importar-google pablo` y `motor importar-google sindy` cada
+      uno con su propio login de Google (abre el navegador, pide permiso
+      de solo lectura). Genera `token_pablo.json`/`token_sindy.json`.
+- [ ] Una vez autorizado: correr `normalizar` → `deduplicar` → `exportar`
+      para reconstruir `staging.sqlite` desde cero con los datos reales.
 
 ## API keys (bloquea LLM-judge)
 
@@ -54,10 +69,12 @@ primero que lee una cuenta de Claude nueva después de `ESPECIFICACION.md`.
 - [x] `ESPECIFICACION.md`, `DECISIONES.md`, `PENDIENTES.md` creados.
 - [x] Repos git locales sin remoto para `motor-contactos/` y `Data/`
       (backup contra borrados accidentales).
-- [ ] `scripts/setup_project.ps1` — verificar que corre limpio.
-- [ ] `scripts/handoff.ps1` — verificar que genera un reporte usable.
-- [ ] `PROMPT_CONTINUACION.md` — verificar que es autosuficiente (una
-      cuenta nueva, sin memoria previa, lo puede seguir literal).
+- [x] `scripts/setup_project.ps1` — corrido, verificado (163 tests en verde
+      en esa corrida, antes del conector de Google).
+- [x] `scripts/handoff.ps1` — corrido, verificado, bug de encoding de
+      tildes encontrado y arreglado (`Get-Content -Encoding UTF8`).
+- [ ] `PROMPT_CONTINUACION.md` — escrito, todavía no probado con una cuenta
+      nueva de verdad.
 
 ## Pospuesto a propósito (no arrancar sin pedirlo explícitamente)
 

@@ -98,3 +98,32 @@ su reporte automáticamente (busca las últimas bajo el separador `---`).
   hacer Claude.
 
 ---
+
+## 2026-08-12 — MVP corriendo con datos reales por primera vez
+
+- El usuario hizo el setup de Google Cloud Console con ayuda de Claude
+  Desktop (`credentials.json` verificado, estructura correcta). Se
+  autorizaron ambas cuentas vía `motor importar-google <cuenta>` — Claude
+  disparó el comando (Bash de esta sesión controla la máquina real de
+  Pablo, confirmado en sesiones anteriores) y el usuario completó el login
+  en el navegador que se abrió solo.
+- **Resultado real**: 36.103 raw_records importados (18.135 Pablo +
+  17.968 Sindy) → 36.102 normalizados → **8.593 contactos finales** tras
+  dedup (92.533 fusiones por regla, 46.766 separados, 658 pendientes de
+  revisión — sin LLM-judge porque `.env` sigue sin API keys).
+  `lista-maestra.xlsx` exportado y respaldado en `Data/.git` (commit
+  `7ed78b7`).
+- **Hallazgo de tooling, no de código**: el CLI a veces imprime "raw_records
+  nuevos: 0" en la salida final aunque la importación/normalización sí
+  insertó filas reales — parece que el entorno de esta sesión ejecuta o
+  reporta comandos en background más de una vez. La cifra impresa al final
+  no es confiable por sí sola; siempre verificar contra la base
+  (`SELECT COUNT(*) FROM raw_records`, etc.) antes de asumir que un paso
+  no hizo nada. No se investigó la causa raíz — no bloquea el uso, solo
+  hay que saber no confiar ciegamente en el número impreso.
+- Con esto el MVP "funciona de punta a punta con datos reales": Google
+  Contacts → normalizar → dedup → export. Lo que queda es afinar (API
+  keys para bajar los 658 pendientes, revisión manual, probar Fase 4 de
+  sync de vuelta a Google).
+
+---

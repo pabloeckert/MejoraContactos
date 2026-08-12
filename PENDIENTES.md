@@ -15,30 +15,37 @@ primero que lee una cuenta de Claude nueva después de `ESPECIFICACION.md`.
       Google Contacts (PDF, capturas, etc.) — no es más el camino
       principal.
 
-## Bloqueante crítico ACTUAL (necesita al usuario, no se puede resolver solo)
+## Resuelto — primera carga real desde Google Contacts (2026-08-12)
 
-- [ ] **Setup de Google Cloud Console** (Paso 1 de `GOOGLE_SETUP.md`):
-      crear proyecto, habilitar People API, configurar pantalla de
-      consentimiento OAuth (modo Prueba, agregar los emails de Pablo y
-      Sindy como usuarios de prueba), crear credenciales de "Aplicación de
-      escritorio", descargar y guardar como `motor-contactos/
-      credentials.json`. Requiere su login en Google Cloud Console — Claude
-      no puede hacerlo.
-- [ ] **Autorizar cada cuenta** (Paso 2 de `GOOGLE_SETUP.md`): correr
-      `motor importar-google pablo` y `motor importar-google sindy` cada
-      uno con su propio login de Google (abre el navegador, pide permiso
-      de solo lectura). Genera `token_pablo.json`/`token_sindy.json`.
-- [ ] Una vez autorizado: correr `normalizar` → `deduplicar` → `exportar`
-      para reconstruir `staging.sqlite` desde cero con los datos reales.
+- [x] ~~Setup de Google Cloud Console~~ — `credentials.json` verificado
+      (tipo "installed"/Desktop app correcto).
+- [x] ~~Autorizar cada cuenta~~ — `token_pablo.json` y `token_sindy.json`
+      generados, ambas cuentas autorizadas.
+- [x] ~~importar-google pablo/sindy~~ — **36.103 raw_records reales**
+      importados (18.135 Pablo + 17.968 Sindy). Nota para la próxima
+      cuenta: el mensaje final "raw_records nuevos: 0" que a veces imprime
+      el comando es ENGAÑOSO (parece un artefacto de este entorno donde el
+      comando en background se ejecuta/reporta más de una vez) — **no
+      confiar en ese número impreso, siempre verificar contra la base**
+      (`SELECT COUNT(*) FROM raw_records`) antes de asumir que algo falló.
+- [x] ~~normalizar / deduplicar / exportar~~ — corridos sobre los datos
+      reales. Resultado: 36.102 normalizados (1 excluido, contacto técnico
+      de Contacts+), **8.593 contactos finales**, 92.533 fusiones por
+      regla, 46.766 separados, **658 en cola de revisión pendiente**.
+      `Data/Salida/lista-maestra.xlsx` generado (815KB) y respaldado en el
+      repo git local de `Data/` (commit `7ed78b7`).
 
-## API keys (bloquea LLM-judge)
+## Bloqueante ACTUAL — necesita al usuario (no bloquea el resto)
 
-- [ ] Cargar `GROQ_API_KEY` y `ANTHROPIC_API_KEY` en `motor-contactos/.env`
-      (copiar de `.env.example`) — el usuario lo hace directo en el
-      archivo, nunca pegado en el chat.
-- [ ] Una vez cargadas: correr `deduplicar` + `exportar` UNA sola vez antes
-      de arrancar la revisión manual (ver ESPECIFICACION.md § dedup —
-      correr de nuevo después pisa las decisiones humanas).
+- [ ] **API keys** (`GROQ_API_KEY`/`ANTHROPIC_API_KEY` en `.env`, seguía sin
+      existir a esta fecha): sin esto, los 658 casos pendientes solo se
+      resuelven a mano en el panel — no bloquea el resto del pipeline, pero
+      cargarlas y volver a correr `deduplicar` UNA vez (antes de arrancar
+      revisión manual) reduciría bastante esos 658.
+- [ ] **Revisar los 658 pendientes**: a mano en el panel (`/revisar`,
+      lote por patrón) o esperar a cargar las keys primero. Una vez que
+      arranque la revisión manual, NO volver a correr `deduplicar` (pisa
+      las decisiones humanas — ver ESPECIFICACION.md § dedup).
 
 ## Fase 4 — Google Contacts
 

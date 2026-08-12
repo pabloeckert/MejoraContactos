@@ -1,6 +1,0 @@
-# Copiar a .env (nunca se commitea, ver .gitignore) y completar acá, nunca
-# en el chat ni en config.yaml.
-
-GROQ_API_KEY=
-ANTHROPIC_API_KEY=
-OPENROUTER_API_KEY=

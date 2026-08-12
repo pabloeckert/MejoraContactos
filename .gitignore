@@ -33,3 +33,17 @@ supabase/.temp/
 test-results/
 playwright-report/
 coverage/
+
+# Proyecto privado motor-contactos + datos personales de contactos —
+# nunca a este repo. motor-contactos/ y Data/ tienen SUS PROPIOS repos git
+# locales (sin remoto) para versionado/backup independiente — ver
+# motor-contactos/scripts/setup_project.ps1. Un blanket ignore acá evita
+# que un `git add -A` en la raíz los trate como submódulos por error.
+Data/
+motor-contactos/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Transcripción de sesión (puede contener datos personales reales) — nunca a git
+MejoraContactos.md

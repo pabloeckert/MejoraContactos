@@ -84,8 +84,6 @@ Push a `main` → GitHub Pages (automático).
 ## Documentación
 
 - **`Documents/MASTERPLAN.md`** — Documento maestro completo
-- **`Documents/CTO_AUDIT.md`** — Auditoría técnica del proyecto
-- **`Documents/CTO_HANDOFF.md`** — Resumen de sesiones CTO
 - **`CHANGELOG.md`** — Historial de cambios
 - **`CONTRIBUTING.md`** — Guía de contribución
 - **`SECURITY.md`** — Política de seguridad

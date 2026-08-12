@@ -119,8 +119,34 @@ Deploy (`.github/workflows/deploy-pages.yml`) additionally runs E2E tests before
 ### Documentation
 
 - `Documents/MASTERPLAN.md` — canonical technical reference, updated after each session
-- `Documents/CTO_AUDIT.md` — full code audit findings
-- `Documents/CTO_HANDOFF.md` — session-by-session history with decisions
 - `CHANGELOG.md` — version history
 
 When the user says "documentar", update `Documents/MASTERPLAN.md` with current state.
+
+### Session transcript (dogma — recurring)
+
+Every time this file (`CLAUDE.md`) is updated, also update `MejoraContactos.md` at the repo root: a full running transcript of the conversation up to that point. Rules for that file:
+- Continuous prose, no speaker labels (no "User:"/"Claude:" prefixes).
+- Literal and complete — decisions, findings, explanations, full HTML/MD/code blocks, terminal commands, raw tool JSON, and technical outputs (curl, git, SQL) all included verbatim. Do not filter or summarize.
+- If the conversation included attachments/pasted files/images, transcribe their content into text too.
+- `MejoraContactos.md` is gitignored (see `.gitignore`) because session transcripts can contain real personal data (e.g. third-party contact names surfaced while working on `motor-contactos/`) — never commit it.
+
+**Second trigger**: also update `MejoraContactos.md` (same rules as above) whenever the session appears to be approaching a token/usage limit — not only on CLAUDE.md edits. Purpose: the user can open an alternate Claude account, paste `MejoraContactos.md`, and continue with full context. Keep this file (`CLAUDE.md`) current as the handoff/status doc for that continuation.
+
+### Continuous work mode (dogma)
+
+Unless an action is irreversible/dangerous, requires credentials only the user can provide, or changes project scope in a way that needs his call — do not stop to ask permission or check in mid-task. Keep working through the full scope of the current request until it's actually done. This overrides the general instinct to pause for confirmation on ambiguous but low-stakes implementation choices.
+
+### PM autonomy (dogma)
+
+Act as an autonomous project manager on this whole repo (SPA and `motor-contactos/` alike): decide and proceed on design/architecture/scope calls without surveying the user first. Only stop to ask when the next step literally requires the user's hands/eyes/login (a browser OAuth flow, a physical action, money, a signature) — not for validating taste or implementation choices. State the decision made, don't turn it into a question.
+
+### motor-contactos — status handoff (private project, not otherwise documented here)
+
+`motor-contactos/` is a separate, private Python project (contact dedup/normalization pipeline for the repo owner's personal contacts) living alongside the SPA in this repo, gitignored/untracked on purpose — see `Data/decisiones-arquitectura.txt` if present locally. It is currently mid-expansion into a bigger scope (better UI, JSON API, Google Contacts sync migrated off a deprecated Google service) per a plan file under `C:\Users\Pablo\.claude\plans\`. As of the last session:
+
+- **Blocking issue, needs the user**: the project's real local database and raw source files ended up in the Windows Recycle Bin (confirmed intact there, not lost) and have not been restored yet. Do not start the Flask backend against the real `motor-contactos/config.yaml` until this is resolved — connecting SQLite to a missing db file silently creates an empty replacement, which complicates restoring the real one.
+- Code-side work (a new JSON API, a new React UI project under `motor-contactos/ui/`, a Google Apps Script migration, and a contact-editing feature) is written and its test suite passes, but hasn't been validated against real data since the above data issue surfaced.
+- Two more things need the user directly and can't be done by Claude: loading LLM provider API keys into `motor-contactos/.env`, and authorizing/testing the Google Contacts sync with their own Google login.
+
+Full narrative detail (commands run, findings, code) lives in `MejoraContactos.md` at the repo root (gitignored) — read that for the complete handoff if resuming this thread.

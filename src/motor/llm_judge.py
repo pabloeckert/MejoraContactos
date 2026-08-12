@@ -162,7 +162,17 @@ def _llamar_anthropic(api_key: str, modelo: str, prompt_usuario: str) -> str:
     return respuesta.json()["content"][0]["text"]
 
 
-def _extraer_json(texto: str) -> str:
+def _extraer_json(texto: str | None) -> str:
+    # Algunos modelos (sobre todo los gratis de OpenRouter, con formatos de
+    # respuesta menos estandarizados) devuelven "content": null en vez de
+    # texto -- sin esta guarda, texto.find() explota con AttributeError, que
+    # _consultar() NO atrapaba, y tira abajo la corrida COMPLETA de
+    # deduplicar_todo() por un solo modelo raro en un solo caso. Al
+    # convertir esto en ValueError, _consultar() lo atrapa como cualquier
+    # otra respuesta inválida y sigue con el próximo candidato de la
+    # rotación, sin perder el resto del trabajo.
+    if not texto:
+        raise ValueError("respuesta del LLM vacía")
     inicio, fin = texto.find("{"), texto.rfind("}")
     if inicio == -1 or fin == -1:
         raise ValueError("respuesta del LLM sin JSON")

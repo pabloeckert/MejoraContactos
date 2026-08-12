@@ -20,10 +20,11 @@ def _config(rotacion=(), umbral=0.6, activar=True):
 
 
 class _RespuestaFalsa:
-    def __init__(self, cuerpo_json=None, anthropic=False, status=200):
+    def __init__(self, cuerpo_json=None, anthropic=False, status=200, contenido_nulo=False):
         self.status_code = status
         self._cuerpo = cuerpo_json
         self._anthropic = anthropic
+        self._contenido_nulo = contenido_nulo
 
     def raise_for_status(self):
         if self.status_code >= 400:
@@ -33,6 +34,11 @@ class _RespuestaFalsa:
 
     def json(self):
         import json
+
+        if self._contenido_nulo:
+            # simula un modelo que responde "content": null (JSON real, no
+            # el string "null") -- ver test_content_null_no_rompe_la_corrida
+            return {"choices": [{"message": {"content": None}}]}
 
         texto = json.dumps(self._cuerpo)
         if self._anthropic:
@@ -88,6 +94,26 @@ def test_ninguno_confiado_escala_a_anthropic():
     assert veredicto.proveedor == "anthropic"
     assert veredicto.confianza == 0.95
     assert post.call_count == 3
+
+
+def test_content_null_no_rompe_la_corrida_prueba_el_siguiente():
+    """Regresión: un modelo gratis de OpenRouter devolvió "content": null en
+    vez de texto (formato de respuesta no estándar) y eso tiraba abajo TODA
+    la corrida de deduplicar_todo() con un AttributeError sin atrapar, no
+    solo ese caso puntual. No debe pasar más -- el candidato con
+    content=null se descarta como cualquier otro fallo y se prueba el
+    siguiente de la rotación."""
+    config = _config(rotacion=("modelo-raro:free",))
+    judge = LlmJudge(config)
+    respuestas = [
+        _RespuestaFalsa(contenido_nulo=True),  # groq: "content": null
+        _RespuestaFalsa({"misma_persona": False, "confianza": 0.85, "razon": "distinta persona"}),
+    ]
+    with patch("requests.post", side_effect=respuestas):
+        veredicto = judge.decidir({}, {})
+    assert veredicto is not None
+    assert veredicto.proveedor == "openrouter"
+    assert veredicto.misma_persona is False
 
 
 def test_si_nadie_responde_devuelve_none():

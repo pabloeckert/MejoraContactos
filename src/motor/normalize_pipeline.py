@@ -73,6 +73,8 @@ def _normalizar_registro(
     provincia = limpiar_lugar(campos.get("provincia")) or None
     pais = limpiar_lugar(campos.get("pais")) or None
     notas = limpiar_texto_libre(campos.get("notas")) or None
+    cumpleanos = (campos.get("cumpleanos") or "").strip() or None
+    foto_url = (campos.get("foto_url") or "").strip() or None
     nombre = nombre or None
     apellido = apellido or None
     organizacion = organizacion or None
@@ -104,8 +106,9 @@ def _normalizar_registro(
     cursor = conn.execute(
         "INSERT INTO normalized_records "
         "(raw_record_id, nombre, apellido, organizacion, cargo, telefonos_e164, "
-        "telefonos_fijo_e164, emails, domicilio, ciudad, provincia, pais, tag, notas, flags, creado_en) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "telefonos_fijo_e164, emails, domicilio, ciudad, provincia, pais, tag, "
+        "cumpleanos, foto_url, notas, flags, creado_en) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
             raw_record_id,
             nombre,
@@ -120,6 +123,8 @@ def _normalizar_registro(
             provincia,
             pais,
             tag,
+            cumpleanos,
+            foto_url,
             notas,
             json.dumps(flags),
             _ahora(),

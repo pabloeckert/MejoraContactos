@@ -8,6 +8,7 @@ minutos, incluso con los ~35.000 contactos reales."""
 
 from __future__ import annotations
 
+import json
 import sqlite3
 from datetime import datetime
 
@@ -100,9 +101,24 @@ _PLANTILLA_REVISOR = _ESTILO + """
     <legend>{{ grupo.patron }} ({{ grupo.pares|length }} casos)</legend>
     <button onclick="decidir('{{ grupo.patron }}', true)">Aprobar fusión de todo el lote</button>
     <button class="secundario" onclick="decidir('{{ grupo.patron }}', false)">Rechazar fusión de todo el lote</button>
-    <ul>
+    <ul style="list-style:none; padding:0;">
     {% for par in grupo.pares %}
-      <li>normalized #{{ par.a }} — #{{ par.b }} (score {{ '%.2f'|format(par.score) }})</li>
+      <li style="border:1px solid #E4E6EA; border-radius:6px; padding:0.6rem 0.8rem; margin-bottom:0.4rem; display:flex; gap:1.5rem; align-items:center;">
+        <span style="color:#6B7280; font-size:0.8rem; min-width:3.5rem;">{{ '%.2f'|format(par.score) }}</span>
+        {% for c in (par.contacto_a, par.contacto_b) %}
+          {% if c %}
+            <span style="flex:1;">
+              <strong>{{ c.nombre }}</strong>{% if c.organizacion %} — {{ c.organizacion }}{% endif %}<br>
+              <span style="color:#6B7280; font-size:0.8rem;">
+                {{ c.telefono }}{% if c.email %} · {{ c.email }}{% endif %} · <em>{{ c.fuente }}</em>
+                {% if c.foto_url %} · <a href="{{ c.foto_url }}" target="_blank" rel="noopener">foto</a>{% endif %}
+              </span>
+            </span>
+          {% else %}
+            <span style="flex:1; color:#6B7280;">(registro no encontrado)</span>
+          {% endif %}
+        {% endfor %}
+      </li>
     {% endfor %}
     </ul>
   </fieldset>
@@ -324,6 +340,36 @@ def _agrupar_pendientes(conn: sqlite3.Connection) -> list[dict]:
     for fila in filas:
         patron = fila["detalle"] or "sin_patron"
         por_patron.setdefault(patron, []).append(
-            {"a": fila["raw_record_id_a"], "b": fila["raw_record_id_b"], "score": fila["confianza"] or 0.0}
+            {
+                "a": fila["raw_record_id_a"],
+                "b": fila["raw_record_id_b"],
+                "score": fila["confianza"] or 0.0,
+                "contacto_a": _resumen_normalized(conn, fila["raw_record_id_a"]),
+                "contacto_b": _resumen_normalized(conn, fila["raw_record_id_b"]),
+            }
         )
     return [{"patron": patron, "pares": pares} for patron, pares in por_patron.items()]
+
+
+def _resumen_normalized(conn: sqlite3.Connection, normalized_id: int) -> dict | None:
+    """Ficha 6.1 de la encuesta original: al revisar un caso dudoso hace
+    falta ver nombre/teléfono/email/organización/de qué fuente salió/foto
+    de cada lado del par, no solo el id numérico y el score."""
+    fila = conn.execute(
+        "SELECT n.nombre, n.apellido, n.organizacion, n.telefonos_e164, n.telefonos_fijo_e164, "
+        "n.emails, n.foto_url, r.source_file "
+        "FROM normalized_records n JOIN raw_records r ON r.id = n.raw_record_id "
+        "WHERE n.id = ?",
+        (normalized_id,),
+    ).fetchone()
+    if fila is None:
+        return None
+    telefonos = json.loads(fila["telefonos_e164"]) + json.loads(fila["telefonos_fijo_e164"])
+    return {
+        "nombre": " ".join(filter(None, [fila["nombre"], fila["apellido"]])) or "(sin nombre)",
+        "organizacion": fila["organizacion"] or "",
+        "telefono": telefonos[0] if telefonos else "",
+        "email": (json.loads(fila["emails"]) or [""])[0],
+        "fuente": fila["source_file"],
+        "foto_url": fila["foto_url"] or "",
+    }

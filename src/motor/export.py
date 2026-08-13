@@ -47,6 +47,8 @@ _COLUMNAS = [
     "ciudad",
     "provincia",
     "pais",
+    "cumpleanos",
+    "foto_url",
     "nota_referencia",
 ]
 
@@ -63,6 +65,8 @@ _ENCABEZADOS = {
     "ciudad": "Ciudad",
     "provincia": "Provincia",
     "pais": "País",
+    "cumpleanos": "Cumpleaños",
+    "foto_url": "Foto",
     "nota_referencia": "Nota de referencia",
 }
 
@@ -79,6 +83,8 @@ _ANCHO_COLUMNA = {
     "ciudad": 16,
     "provincia": 16,
     "pais": 14,
+    "cumpleanos": 14,
+    "foto_url": 30,
     "nota_referencia": 34,
 }
 
@@ -317,6 +323,8 @@ def _expandir_filas(cluster: dict) -> list[dict]:
                 "ciudad": cluster["ciudad"],
                 "provincia": cluster["provincia"],
                 "pais": cluster["pais"],
+                "cumpleanos": cluster["cumpleanos"],
+                "foto_url": cluster["foto_url"],
                 "nota_referencia": cluster["nota_referencia"],
             }
         )
@@ -327,7 +335,7 @@ def _materializar_clusters(conn: sqlite3.Connection) -> list[dict]:
     filas = conn.execute(
         "SELECT c.cluster_id, n.nombre, n.apellido, n.organizacion, n.cargo, "
         "n.telefonos_e164, n.telefonos_fijo_e164, n.emails, n.tag, "
-        "n.domicilio, n.ciudad, n.provincia, n.pais, n.notas "
+        "n.domicilio, n.ciudad, n.provincia, n.pais, n.cumpleanos, n.foto_url, n.notas "
         "FROM clusters c "
         "JOIN raw_records r ON r.id = c.raw_record_id "
         "JOIN normalized_records n ON n.raw_record_id = r.id"
@@ -351,6 +359,8 @@ def _materializar_clusters(conn: sqlite3.Connection) -> list[dict]:
                 "ciudad": "",
                 "provincia": "",
                 "pais": "",
+                "cumpleanos": "",
+                "foto_url": "",
                 "notas": [],
             },
         )
@@ -366,6 +376,8 @@ def _materializar_clusters(conn: sqlite3.Connection) -> list[dict]:
         cluster["ciudad"] = cluster["ciudad"] or fila["ciudad"] or ""
         cluster["provincia"] = cluster["provincia"] or fila["provincia"] or ""
         cluster["pais"] = cluster["pais"] or fila["pais"] or ""
+        cluster["cumpleanos"] = cluster["cumpleanos"] or fila["cumpleanos"] or ""
+        cluster["foto_url"] = cluster["foto_url"] or fila["foto_url"] or ""
         if fila["notas"]:
             cluster["notas"].append(fila["notas"])
 

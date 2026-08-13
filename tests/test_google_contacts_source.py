@@ -37,6 +37,8 @@ def test_persona_a_campos_mapea_todos_los_campos():
         "emailAddresses": [{"value": "juan@gmail.com"}],
         "addresses": [{"streetAddress": "San Martin 123", "city": "Posadas", "region": "Misiones", "country": "Argentina"}],
         "biographies": [{"value": "amigo del club"}],
+        "birthdays": [{"date": {"day": 5, "month": 3, "year": 1990}}],
+        "photos": [{"url": "https://foto.google.com/juan.jpg", "default": False}],
     }
 
     campos = _persona_a_campos(persona)
@@ -54,6 +56,23 @@ def test_persona_a_campos_mapea_todos_los_campos():
     assert campos["provincia"] == "Misiones"
     assert campos["pais"] == "Argentina"
     assert campos["notas"] == "amigo del club"
+    assert campos["cumpleanos"] == "05/03/1990"
+    assert campos["foto_url"] == "https://foto.google.com/juan.jpg"
+
+
+def test_persona_a_campos_cumpleanos_sin_anio_se_guarda_sin_anio():
+    # Google permite compartir el cumpleaños sin decir el año.
+    persona = {"birthdays": [{"date": {"day": 25, "month": 12}}]}
+    campos = _persona_a_campos(persona)
+    assert campos["cumpleanos"] == "25/12"
+
+
+def test_persona_a_campos_foto_default_no_se_guarda():
+    # "default": true es la silueta genérica que pone Google cuando el
+    # contacto no tiene foto real -- no es información real del contacto.
+    persona = {"photos": [{"url": "https://foto.google.com/silueta.png", "default": True}]}
+    campos = _persona_a_campos(persona)
+    assert "foto_url" not in campos
 
 
 def test_persona_a_campos_persona_vacia_da_diccionario_vacio():

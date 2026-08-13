@@ -48,6 +48,8 @@ CREATE TABLE IF NOT EXISTS normalized_records (
     provincia TEXT,
     pais TEXT,
     tag TEXT,
+    cumpleanos TEXT,
+    foto_url TEXT,
     notas TEXT,
     flags TEXT NOT NULL DEFAULT '[]',
     creado_en TEXT NOT NULL
@@ -120,15 +122,20 @@ CREATE TABLE IF NOT EXISTS ediciones_manuales (
 );
 """
 
-# Columnas sumadas después de la creación original de ediciones_manuales
-# (edición manual de WhatsApp/Teléfono fijo/Email desde el revisor web).
+# Columnas sumadas después de la creación original de cada tabla.
 # CREATE TABLE IF NOT EXISTS no alcanza para bases ya existentes (la real,
-# Data/Salida/staging.sqlite, ya tenía la tabla vieja) — se agregan con
-# ALTER TABLE, una sola vez, chequeando antes si ya están.
-_COLUMNAS_NUEVAS_EDICIONES_MANUALES = {
-    "whatsapp_json": "TEXT",
-    "telefono_fijo_json": "TEXT",
-    "emails_json": "TEXT",
+# Data/Salida/staging.sqlite, ya tenía estas tablas sin estas columnas) —
+# se agregan con ALTER TABLE, una sola vez, chequeando antes si ya están.
+_COLUMNAS_NUEVAS = {
+    "ediciones_manuales": {
+        "whatsapp_json": "TEXT",
+        "telefono_fijo_json": "TEXT",
+        "emails_json": "TEXT",
+    },
+    "normalized_records": {
+        "cumpleanos": "TEXT",
+        "foto_url": "TEXT",
+    },
 }
 
 
@@ -150,7 +157,8 @@ def crear_esquema(conn: sqlite3.Connection) -> None:
 
 
 def _migrar_columnas_nuevas(conn: sqlite3.Connection) -> None:
-    existentes = {fila["name"] for fila in conn.execute("PRAGMA table_info(ediciones_manuales)")}
-    for columna, tipo in _COLUMNAS_NUEVAS_EDICIONES_MANUALES.items():
-        if columna not in existentes:
-            conn.execute(f"ALTER TABLE ediciones_manuales ADD COLUMN {columna} {tipo}")
+    for tabla, columnas in _COLUMNAS_NUEVAS.items():
+        existentes = {fila["name"] for fila in conn.execute(f"PRAGMA table_info({tabla})")}
+        for columna, tipo in columnas.items():
+            if columna not in existentes:
+                conn.execute(f"ALTER TABLE {tabla} ADD COLUMN {columna} {tipo}")

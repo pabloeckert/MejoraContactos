@@ -409,3 +409,96 @@ su reporte automáticamente (busca las últimas bajo el separador `---`).
   mismo remoto que la SPA pública/semi-pública.
 
 ---
+
+## 2026-08-13 (cont. 4) — Auditoría contra la encuesta original: 2 gaps reales encontrados y cerrados
+
+- El usuario volvió a pegar el resumen completo de la encuesta original de
+  16 fichas (la misma que dio origen a "Spec cerrada v2") y pidió
+  confirmar si de verdad estaba todo resuelto antes de "olvidarse". Se
+  auditó ficha por ficha contra el código y la base real, no de memoria.
+- **Confirmado sin cambios** (ya satisfecho): 4.1 vs 4.2 (LLM decide en la
+  banda media, coincide con "que la IA decida sola"); Nombre/Apellido como
+  columnas separadas en el export (verificado en el xlsx real); una fila
+  por WhatsApp/fijo/email, nunca dos valores en la misma celda (verificado
+  con un barrido completo del xlsx real, 0 celdas con separadores).
+- **Gap real #1 — Ficha 7.1, "campos imprescindibles"**: Cumpleaños y
+  Foto estaban en la lista de campos imprescindibles del usuario pero
+  nunca se pidieron a la People API ni se exportaron — un olvido de scope
+  real, no una decisión consciente. Fix: `_CAMPOS_PERSONA` ahora pide
+  `birthdays,photos`; `_persona_a_campos()` los mapea (cumpleaños como
+  `DD/MM/AAAA` o `DD/MM` si Google no comparte el año; foto como URL,
+  descartando la silueta genérica que Google marca con `"default": true`
+  cuando el contacto no tiene foto real); `normalized_records` suma las
+  columnas `cumpleanos`/`foto_url` (con migración `ALTER TABLE` real,
+  generalizada — antes solo migraba `ediciones_manuales`, ahora
+  `_COLUMNAS_NUEVAS` es un dict de tabla→columnas, cualquier tabla puede
+  sumar columnas nuevas sin romper una base ya existente); `export.py`
+  y `api.py` (`_serializar_contacto`) los exponen. 5 tests nuevos.
+- **Backfill de los 36.103 contactos ya importados**: el mecanismo
+  incremental normal (`importar_google_contactos`, salta contactos cuyo
+  `etag` de Google no cambió) NO iba a traer estos dos campos solo porque
+  el código ahora los pide — el etag de un contacto en Google no cambia
+  porque NOSOTROS decidamos pedir un campo más. Reimportar todo de cero
+  tampoco servía: `importar_google_contactos` solo sabe INSERTAR, no
+  "actualizar si ya existe", así que hubiera duplicado los 36.103
+  `raw_records`. Se escribió `scripts/backfill_cumpleanos_foto.py`: pide
+  SOLO `birthdays,photos` en una pasada paginada de `connections.list`
+  (liviana, mismo volumen de páginas que un import normal pero sin traer
+  el resto de los campos), matchea por `resourceName` contra los
+  `raw_records` ya existentes, y actualiza `raw_json` +
+  `normalized_records` directamente. **Excepción deliberada y acotada**
+  a la regla "raw_records nunca se edita": acá se edita, pero solo para
+  completar dos campos que deberían haber estado desde el import original
+  y se cayeron por un olvido de scope — no es un precedente para editar
+  raw_records por ningún otro motivo (limpieza de datos, corrección de
+  errores, etc. siguen prohibidos ahí). Resultado real: **2.288
+  actualizados en la cuenta de Pablo, 3.267 en la de Sindy** (5.555 en
+  total — no todos los 36.103 tienen cumpleaños o foto cargados en
+  Google, esto es exactamente cuántos sí). Lista maestra reexportada:
+  **896 filas con cumpleaños, 2.824 con foto** (de 10.267 filas / 8.541
+  contactos).
+- **Gap real #2 — Ficha 6.1, "info visible por contacto dudoso"**: la
+  cola de revisión (`/revisar`) mostraba solo `normalized #123 — #456
+  (score 0.61)` — un usuario no tiene forma de decidir "fusionar o no"
+  mirando dos ids numéricos pelados. La encuesta pedía explícitamente
+  nombre completo, teléfono, email, organización, de qué fuente salió
+  cada uno, y foto si tiene. Fix: `_agrupar_pendientes()` ahora arma un
+  `_resumen_normalized()` por cada lado del par (nombre+apellido,
+  organización, primer teléfono, primer email, `source_file` — hoy
+  `google:pablo:...`/`google:sindy:...` en vez de `pablo.csv`/`Sindy.csv`
+  porque cambió la fuente, ver pivote del 2026-08-11 — y link a la foto
+  si tiene). La plantilla de `/revisar` pasó de una lista de ids a una
+  tarjeta por par con toda esa info. Mismo fix sirve para el panel
+  clásico Y la API de la UI nueva (`api.py` importa la misma función). No
+  había ningún caso pendiente para probar esto en vivo contra la base
+  real (0 pendientes después del cierre de la sesión anterior) — se
+  probó con un caso sintético que reproduce el patrón real (mismo
+  teléfono, nombres claramente distintos) en el test nuevo
+  `test_pagina_revisar_muestra_datos_de_contacto_no_solo_ids`.
+- **184 tests en verde** (180 → 184: 2 de `google_contacts_source`
+  (cumpleaños con/sin año, foto default descartada), 1 de
+  `normalize_pipeline` (los campos nuevos pasan de raw a normalizado), 1
+  de `reviewer_app` (la cola de revisión muestra datos, no ids)).
+- **Nota sobre "guardar en memoria" (Ficha 15.1)**: el usuario pidió
+  explícitamente que se guarde en la memoria persistente de Claude Code
+  (no en este repo) el contexto de que este proyecto existe y sus
+  patrones son reusables para desarrollos futuros (un CRM parecido para
+  un cliente, una versión portable para llevar a otros clientes, etc.).
+  Se guardó una memoria de tipo "project" fuera de este repo (en el
+  perfil de Windows del usuario, `C:\Users\Pablo\.claude\...\memory\`) —
+  no acá, porque memoria y código son sistemas de persistencia distintos
+  y esa carpeta no es parte de ningún repo git.
+- **Ficha 15 (el resto del wishlist)**: extracción de Facebook/Instagram/
+  TikTok/sitios web, importación directa de HubSpot/Mailchimp/Brevo,
+  lectura de cuentas de mail, integración con "MejoraWS" (WhatsApp),
+  agente autónomo en segundo plano que aprende y se anticipa, identidad
+  visual de marca Mejora Continua en la interfaz, y la idea de
+  productizar esto como CRM/herramienta portable para clientes — **nada
+  de esto está construido ni forma parte del alcance actual**. Es
+  explícitamente un wishlist a futuro (así lo tituló el propio usuario:
+  "lo que faltó preguntar"), no una carencia del MVP cerrado. No se
+  inventa ni se empieza nada de esto sin que el usuario lo pida de nuevo,
+  puntual y explícito, en una conversación aparte — mismo criterio que ya
+  se aplicó con Fase 5.
+
+---

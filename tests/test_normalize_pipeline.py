@@ -78,6 +78,26 @@ def test_contacto_real_no_se_confunde_con_la_plantilla(tmp_path):
     assert fila["apellido"] == "Perez"
 
 
+def test_cumpleanos_y_foto_pasan_de_raw_a_normalizado(tmp_path):
+    config = _config_prueba(tmp_path)
+    conn = conectar(config.rutas.base_sqlite)
+    _insertar_raw(
+        conn,
+        {
+            "nombre": "Juan",
+            "apellido": "Perez",
+            "cumpleanos": "05/03/1990",
+            "foto_url": "https://foto.google.com/juan.jpg",
+        },
+    )
+
+    normalizar_todo(config, conn)
+
+    fila = conn.execute("SELECT cumpleanos, foto_url FROM normalized_records").fetchone()
+    assert fila["cumpleanos"] == "05/03/1990"
+    assert fila["foto_url"] == "https://foto.google.com/juan.jpg"
+
+
 def test_tag_se_autocompleta_al_normalizar(tmp_path):
     config = _config_prueba(tmp_path)
     conn = conectar(config.rutas.base_sqlite)

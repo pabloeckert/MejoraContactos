@@ -129,5 +129,7 @@ def _serializar_contacto(c: dict) -> dict:
         "ciudad": c.get("ciudad", ""),
         "provincia": c.get("provincia", ""),
         "pais": c.get("pais", ""),
+        "cumpleanos": c.get("cumpleanos", ""),
+        "foto_url": c.get("foto_url", ""),
         "nota_referencia": c.get("nota_referencia", ""),
     }

@@ -127,6 +127,29 @@ def test_editar_contacto_permite_corregir_whatsapp_desde_el_panel(tmp_path):
     assert fila["whatsapp_json"] == '["+5493764368724"]'
 
 
+def test_pagina_revisar_muestra_datos_de_contacto_no_solo_ids(tmp_path):
+    # Ficha 6.1 de la encuesta original: al revisar un caso dudoso hace
+    # falta ver nombre/teléfono/organización/fuente, no un id numérico
+    # pelado -- caso real: mismo teléfono, nombres que la salvaguarda de
+    # scoring.py lee como claramente distintos (misma combinación usada en
+    # test_pipeline_integration.py para forzar revision_pendiente).
+    config = _config_prueba(tmp_path)
+    (config.rutas.carpeta_raiz / "compartido.csv").write_text(
+        "Nombre,Apellido,Telefono\nLucia,Fernandez,3743504517\nGustavo,Lopez,3743504517\n",
+        encoding="utf-8",
+    )
+    conn = conectar(config.rutas.base_sqlite)
+    cliente = crear_app(config, conn).test_client()
+    cliente.post("/accion/run")
+
+    respuesta = cliente.get("/revisar")
+
+    assert respuesta.status_code == 200
+    assert b"Lucia Fernandez" in respuesta.data
+    assert b"Gustavo Lopez" in respuesta.data
+    assert b"compartido.csv" in respuesta.data
+
+
 def test_editar_contacto_inexistente_redirige_a_buscar(tmp_path):
     config = _config_prueba(tmp_path)
     conn = conectar(config.rutas.base_sqlite)

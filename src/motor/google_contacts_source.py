@@ -36,7 +36,7 @@ from pathlib import Path
 from motor.config import Config
 
 _SCOPES = ["https://www.googleapis.com/auth/contacts.readonly"]
-_CAMPOS_PERSONA = "names,phoneNumbers,emailAddresses,organizations,addresses,biographies"
+_CAMPOS_PERSONA = "names,phoneNumbers,emailAddresses,organizations,addresses,biographies,birthdays,photos"
 _RUTA_CREDENCIALES = Path("credentials.json")
 
 
@@ -178,6 +178,25 @@ def _persona_a_campos(persona: dict) -> dict[str, str]:
     biografias = persona.get("biographies") or []
     if biografias and biografias[0].get("value"):
         campos["notas"] = biografias[0]["value"]
+
+    cumpleanos = persona.get("birthdays") or []
+    if cumpleanos:
+        fecha = cumpleanos[0].get("date") or {}
+        dia, mes, anio = fecha.get("day"), fecha.get("month"), fecha.get("year")
+        if dia and mes:
+            # Google permite guardar el cumpleaños sin año (no siempre lo
+            # sabe/comparte el contacto) -- se guarda igual, DD/MM sin año,
+            # en vez de descartarlo.
+            campos["cumpleanos"] = f"{dia:02d}/{mes:02d}/{anio}" if anio else f"{dia:02d}/{mes:02d}"
+
+    fotos = persona.get("photos") or []
+    for foto in fotos:
+        # Google marca con "default": true la silueta genérica que pone
+        # cuando el contacto no tiene foto real -- no vale la pena
+        # guardarla como si fuera una foto de verdad.
+        if foto.get("url") and not foto.get("default"):
+            campos["foto_url"] = foto["url"]
+            break
 
     return campos
 

@@ -174,3 +174,52 @@ su reporte automáticamente (busca las últimas bajo el separador `---`).
   recién en la PRÓXIMA vez que se corra `deduplicar`.
 
 ---
+
+## 2026-08-13 — Dedup reanudable: el corte overnight no fue un bug, fue el entorno
+
+- Se relanzó `deduplicar` como proceso desprendido de Windows
+  (`Start-Process -WindowStyle Hidden`, no el `run_in_background` del
+  harness) para que sobreviva mejor a un corte de sesión de Claude por
+  cuota — motivado por evidencia real de esta misma sesión (el backend
+  Flask murió solo entre turnos, dos veces antes). Se armó un `Monitor`
+  tail-eando el log para avisar el progreso sin tener que sondear a mano.
+- Igual murió: se cortó en el caso 40/596, sin ningún traceback en
+  `dedup-corrida.err.log`. Conclusión: no fue un bug de código ni del
+  proceso desprendido en particular — todo indica que el entorno/máquina
+  se reinició de noche completo, matando también procesos desprendidos.
+  Eso está fuera del control de este proyecto. La base se verificó
+  intacta en el último estado bueno (596 pendientes, sin corrupción,
+  gracias a que SQLite en modo WAL revierte solo las transacciones no
+  commiteadas) — pero el trabajo de esos 40 casos se perdió igual, porque
+  antes de este cambio `deduplicar_todo()` solo commiteaba una vez, al
+  terminar TODO el lote completo.
+- Decisión: en vez de seguir peleando con la supervivencia del proceso
+  (variable fuera de control), se atacó el costo real de una
+  interrupción. `deduplicar_todo()` (`merge_engine.py`) ahora:
+  1. Commitea cada 50 pares procesados (antes: una sola vez al final).
+  2. Al arrancar, busca una "corrida incompleta" — un `corrida_id` en
+     `decisiones_log` que nunca llegó a tener clusters materializados
+     (eso solo pasa al completar una corrida entera, así que su ausencia
+     es señal inequívoca de corte a mitad de camino) — y la retoma con el
+     MISMO `corrida_id`, reusando la decisión ya guardada para cada par
+     ya procesado (incluye el union-find: si el par ya se había fusionado,
+     se vuelve a unir sin re-preguntar) en vez de gastar de nuevo una
+     llamada a reglas/LLM.
+  3. Nuevo parámetro `continuar: bool = True` en `deduplicar_todo()` —
+     default reanuda, `continuar=False` fuerza una corrida 100% fresca
+     ignorando cualquier corrida incompleta previa (por si alguna vez hace
+     falta descartar un intento a medio hacer en vez de retomarlo).
+- 2 tests nuevos en `test_pipeline_integration.py`: uno fuerza una
+  decisión vieja deliberadamente DISTINTA de lo que la regla calcularía
+  fresca (mismo teléfono debería fusionar por regla, pero se pre-loguea
+  como `revision_pendiente`) y confirma que gana la vieja — prueba real de
+  que se está reusando, no de que casualmente da el mismo resultado. El
+  otro confirma que `continuar=False` la ignora y recalcula fresco.
+  **179 tests en verde.**
+- Con esto, a partir de ahora un corte de sesión/máquina cuesta como
+  mucho 50 pares de trabajo repetido, no la corrida entera — el problema
+  de fondo (que el entorno puede reiniciarse sin aviso) sigue sin
+  solución posible de este lado, pero el costo de que pase bajó
+  muchísimo.
+
+---

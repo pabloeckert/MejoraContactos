@@ -299,3 +299,77 @@ def test_edicion_manual_campo_vacio_borra_la_correccion(tmp_path):
         "SELECT emails_json FROM ediciones_manuales WHERE cluster_id = ?", (cluster_id,)
     ).fetchone()
     assert fila["emails_json"] is None
+
+
+def test_deduplicar_retoma_corrida_incompleta_sin_recalcular(tmp_path):
+    """Regresión: dos corridas reales se cortaron a mitad de camino (la
+    máquina se reinició) y se perdió TODO el trabajo hecho hasta ese punto,
+    porque antes solo se comiteaba al terminar. Simula una corrida
+    interrumpida (decisiones_log con un corrida_id que nunca llegó a
+    materializar clusters) y confirma que deduplicar_todo() la retoma:
+    NO vuelve a calcular ese par (usa la decisión ya guardada, aunque sea
+    distinta de lo que la regla calcularía fresca -- así se prueba que de
+    verdad la está reusando y no recalculando por casualidad)."""
+    from datetime import datetime, timezone
+
+    from motor.dedup.blocking import generar_candidatos
+
+    config = _config_prueba(tmp_path)
+    (config.rutas.carpeta_raiz / "uno.csv").write_text(
+        "Nombre,Apellido,Telefono\nJuan,Perez,3743504517\nJ,P,3743504517\n", encoding="utf-8"
+    )
+    conn = conectar(config.rutas.base_sqlite)
+    extraer_todo(config, conn)
+    normalizar_todo(config, conn)
+
+    (id_a, id_b) = next(iter(generar_candidatos(conn, config.dedup.tope_bucket)))
+    corrida_vieja = "corrida-interrumpida-de-prueba"
+    conn.execute(
+        "INSERT INTO decisiones_log "
+        "(cluster_id, raw_record_id_a, raw_record_id_b, accion, decidido_por, confianza, detalle, corrida_id, creado_en) "
+        "VALUES (?, ?, ?, 'revision_pendiente', 'pendiente', NULL, 'forzado-en-el-test', ?, ?)",
+        (f"pair-{id_a}-{id_b}", id_a, id_b, corrida_vieja, datetime.now(timezone.utc).isoformat()),
+    )
+    conn.commit()
+    # Sin esto, un teléfono idéntico fusionaría por regla -- si el resultado
+    # sigue siendo "revision_pendiente" es porque reusó la decisión vieja.
+
+    resultado = deduplicar_todo(config, conn)
+
+    assert resultado["revision_pendiente"] == 1
+    assert resultado.get("regla", 0) == 0
+    fila = conn.execute(
+        "SELECT COUNT(*) AS c FROM decisiones_log WHERE corrida_id = ? AND raw_record_id_a = ? AND raw_record_id_b = ?",
+        (corrida_vieja, id_a, id_b),
+    ).fetchone()
+    assert fila["c"] == 1  # no se logueó una segunda vez, se reusó la existente
+    assert conn.execute("SELECT COUNT(*) FROM clusters WHERE corrida_id = ?", (corrida_vieja,)).fetchone()[0] == 2
+
+
+def test_deduplicar_continuar_false_ignora_corrida_incompleta(tmp_path):
+    from datetime import datetime, timezone
+
+    from motor.dedup.blocking import generar_candidatos
+    from motor.dedup.merge_engine import deduplicar_todo as _deduplicar_todo
+
+    config = _config_prueba(tmp_path)
+    (config.rutas.carpeta_raiz / "uno.csv").write_text(
+        "Nombre,Apellido,Telefono\nJuan,Perez,3743504517\nJ,P,3743504517\n", encoding="utf-8"
+    )
+    conn = conectar(config.rutas.base_sqlite)
+    extraer_todo(config, conn)
+    normalizar_todo(config, conn)
+
+    (id_a, id_b) = next(iter(generar_candidatos(conn, config.dedup.tope_bucket)))
+    conn.execute(
+        "INSERT INTO decisiones_log "
+        "(cluster_id, raw_record_id_a, raw_record_id_b, accion, decidido_por, confianza, detalle, corrida_id, creado_en) "
+        "VALUES (?, ?, ?, 'revision_pendiente', 'pendiente', NULL, 'forzado-en-el-test', 'corrida-vieja', ?)",
+        (f"pair-{id_a}-{id_b}", id_a, id_b, datetime.now(timezone.utc).isoformat()),
+    )
+    conn.commit()
+
+    resultado = _deduplicar_todo(config, conn, continuar=False)
+
+    assert resultado["regla"] == 1  # recalculó fresco, mismo teléfono fusiona por regla
+    assert resultado.get("revision_pendiente", 0) == 0

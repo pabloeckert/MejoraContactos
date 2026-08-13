@@ -33,8 +33,24 @@ from motor.dedup.union_find import UnionFind
 from motor.llm_judge import LlmJudge
 
 
-def deduplicar_todo(config: Config, conn: sqlite3.Connection) -> dict[str, int]:
-    corrida_id = _ahora()
+def deduplicar_todo(config: Config, conn: sqlite3.Connection, continuar: bool = True) -> dict[str, int]:
+    """continuar=True (default): si la corrida anterior se cortó a mitad de
+    camino (proceso matado/máquina reiniciada antes de llegar a
+    _materializar_clusters), retoma el mismo corrida_id y NO vuelve a
+    preguntarle a las reglas/LLM por los pares que ya quedaron logueados
+    -- solo replica esa decisión ya tomada. Encontrado en la práctica: dos
+    corridas seguidas se cortaron por reinicios del entorno (no por un bug)
+    y se perdió TODO el trabajo hecho hasta ese punto porque antes solo se
+    comiteaba al final. Con esto + el commit periódico de abajo, un corte
+    a mitad de camino cuesta como máximo COMMIT_CADA_N pares, no todos."""
+    COMMIT_CADA_N = 50
+
+    corrida_previa = _corrida_incompleta(conn) if continuar else None
+    corrida_id = corrida_previa or _ahora()
+    decididos_previos = _pares_decididos(conn, corrida_id) if corrida_previa else {}
+    if corrida_previa:
+        print(f"  ...retomando corrida incompleta {corrida_id} ({len(decididos_previos)} pares ya decididos)", flush=True)
+
     ids = [fila["id"] for fila in conn.execute("SELECT id FROM normalized_records").fetchall()]
     candidatos = generar_candidatos(conn, config.dedup.tope_bucket)
     uf = UnionFind(ids)
@@ -42,8 +58,27 @@ def deduplicar_todo(config: Config, conn: sqlite3.Connection) -> dict[str, int]:
 
     contadores: dict[str, int] = {"regla": 0, "revision_pendiente": 0, "separados": 0}
     llamadas_llm = 0
+    sin_commitear = 0
 
     for id_a, id_b in sorted(candidatos):
+        previo = decididos_previos.get((id_a, id_b))
+        if previo is not None:
+            # Ya estaba decidido de una corrida anterior interrumpida --
+            # replicar el mismo resultado (uf.unir si corresponde) sin
+            # volver a gastar una llamada a reglas/LLM por algo que ya se
+            # sabía.
+            accion_previa, decidido_por_previo = previo
+            if accion_previa == "fusionar":
+                uf.unir(id_a, id_b)
+            if decidido_por_previo == "regla":
+                clave = "regla" if accion_previa == "fusionar" else "separados"
+            elif accion_previa == "revision_pendiente":
+                clave = "revision_pendiente"
+            else:
+                clave = decidido_por_previo  # "llm_groq" / "llm_openrouter" / "llm_anthropic"
+            contadores[clave] = contadores.get(clave, 0) + 1
+            continue
+
         reg_a = scoring.cargar_registro(conn, id_a)
         reg_b = scoring.cargar_registro(conn, id_b)
         score, patron = scoring.calcular_score(reg_a, reg_b, config.dedup)
@@ -70,9 +105,37 @@ def deduplicar_todo(config: Config, conn: sqlite3.Connection) -> dict[str, int]:
             if llamadas_llm % 10 == 0:
                 print(f"  ...LLM-judge: {llamadas_llm} casos ambiguos procesados", flush=True)
 
+        sin_commitear += 1
+        if sin_commitear >= COMMIT_CADA_N:
+            conn.commit()
+            sin_commitear = 0
+
     _materializar_clusters(conn, uf, corrida_id)
     conn.commit()
     return contadores
+
+
+def _corrida_incompleta(conn: sqlite3.Connection) -> str | None:
+    """El corrida_id más reciente en decisiones_log que NO llegó a
+    materializar clusters (_materializar_clusters escribe TODOS los
+    clusters de una corrida de una sola vez al final, así que "parcial" no
+    existe para esa tabla: o está completa o nunca llegó)."""
+    fila = conn.execute(
+        "SELECT dl.corrida_id FROM decisiones_log dl "
+        "WHERE dl.corrida_id IS NOT NULL "
+        "AND NOT EXISTS (SELECT 1 FROM clusters c WHERE c.corrida_id = dl.corrida_id) "
+        "ORDER BY dl.corrida_id DESC LIMIT 1"
+    ).fetchone()
+    return fila["corrida_id"] if fila else None
+
+
+def _pares_decididos(conn: sqlite3.Connection, corrida_id: str) -> dict[tuple[int, int], tuple[str, str]]:
+    filas = conn.execute(
+        "SELECT raw_record_id_a, raw_record_id_b, accion, decidido_por FROM decisiones_log "
+        "WHERE corrida_id = ? AND raw_record_id_b IS NOT NULL",
+        (corrida_id,),
+    ).fetchall()
+    return {(f["raw_record_id_a"], f["raw_record_id_b"]): (f["accion"], f["decidido_por"]) for f in filas}
 
 
 def _resolver_con_llm(

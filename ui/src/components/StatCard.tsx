@@ -10,7 +10,7 @@ interface Props {
 const TONOS: Record<NonNullable<Props["tono"]>, string> = {
   neutral: "bg-neutral-100 text-neutral-600",
   accent: "bg-accent/10 text-accent",
-  warn: "bg-amber-100 text-amber-700",
+  warn: "bg-marca-rojo/10 text-marca-rojo",
 };
 
 export default function StatCard({ etiqueta, valor, icono, tono = "neutral" }: Props) {

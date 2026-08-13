@@ -502,3 +502,132 @@ su reporte automáticamente (busca las últimas bajo el separador `---`).
   se aplicó con Fase 5.
 
 ---
+
+## 2026-08-13 (cont. 5) — Sesión larga nocturna: retomar Ficha 15 (wishlist), sin supervisión
+
+El usuario, contento con el cierre del MVP, pidió explícitamente retomar
+varios ítems de la Ficha 15 (antes marcados como "wishlist a futuro, no
+construido") en una sola sesión larga sin su presencia ("me levanto de la
+PC... cuando vuelva tiene que estar todo listo"), dejando toda decisión de
+diseño a criterio propio. Items pedidos: UI más pulida + ejecutable real,
+Fase 4 lista para un clic, identidad Mejora Continua (`/anthropic-skills:
+mejora-continua-brand`), HubSpot/Mailchimp/Brevo, lectura de contactos de
+mail, integración WhatsApp (MejoraWS), agente autónomo. Pidió usar
+`/anthropic-skills:optimo-de-uso` (consultado: confirmó que el entorno
+actual -- Claude Code, Sonnet -- ya es el correcto, sin cambios) y
+`/anthropic-skills:master-vision` -- **decisión: NO se usó**, es el coach
+personal de Pablo (horóscopo/familia/liderazgo de Mejora Continua), no
+aplica a decisiones de arquitectura de software.
+
+- **MejoraWS existe de verdad**: el usuario interrumpió a mitad de turno
+  para corregir que MejoraWS vive en `C:\Github\Herramientas\Mejora
+  Contacto` y pidió renombrar el directorio a `MejoraWS`. Hecho (`Rename-
+  Item` falló por lock de Windows -- se resolvió con `robocopy /MOVE` +
+  borrado del directorio viejo, que quedó vacío pero no se pudo eliminar
+  del todo por el mismo lock; inofensivo, sin archivos adentro). Resultó
+  ser un Electron+React+Baileys real para mandar WhatsApp, YA con la
+  identidad de marca Mejora Continua aplicada, con import de CSV
+  (columnas `nombre,telefono,variable`) -- mejor de lo previsto, permitió
+  una integración real (export directo en su formato) en vez de solo
+  links `wa.me` genéricos.
+
+- **UI rediseñada con marca real** (`ui/`): paleta/tipografía/logo del
+  manual real de Mejora Continua (`C:\Users\Pablo\.claude\skills\mejora-
+  continua-brand\assets\`) -- Bw Modelica + League Spartan embebidas
+  localmente (sin depender de internet), isotipo como favicon/ícono de
+  ventana, azul primario con rojo/amarillo como acento puntual (nunca
+  fondo dominante, regla del manual). Revierte a propósito la decisión
+  anterior de "sin marca" (comentario viejo en `tailwind.config.js`) --
+  pedido explícito del usuario esta vez. De paso, bug real encontrado y
+  arreglado: `ContactsTable.tsx` mostraba un "?" pelado para contactos sin
+  nombre (`n + a || "?"`) -- ahora "(sin nombre)" + un avatar con "·".
+
+- **App de escritorio real** (`desktop_app.py` + `App/MotorContactos.exe`,
+  PyInstaller): la UI React compilada + la API JSON, servidas por Flask,
+  envueltas en una ventana nativa vía `pywebview` -- sin terminal, sin
+  pestaña de navegador. Dos bugs reales encontrados y arreglados
+  construyendo esto (no hipotéticos, verificados corriendo el .exe real):
+  1. Mismo bug de threading que ya se había visto en el panel clásico
+     (sqlite3 no es thread-safe entre hilos) -- la conexión se crea AHORA
+     adentro del hilo que sirve Flask, no se pasa desde afuera.
+  2. **Resolución de rutas en el .exe empaquetado**: `config.yaml` define
+     rutas relativas a SÍ MISMO (`../Data/Crudos`, etc.) que apuntan a los
+     datos reales -- si el .exe hubiera usado un config.yaml embebido en
+     el bundle (`sys._MEIPASS`) en vez del real, el pipeline habría
+     corrido en silencio contra una carpeta `Data/` vacía o distinta. Se
+     decidió NO embeber `config.yaml` en el build y en cambio buscar el
+     real subiendo desde la ubicación del .exe (`cli.py:
+     _ruta_config_real`), con error explícito si no lo encuentra -- nunca
+     un fallback silencioso a datos equivocados. Verificado en vivo: el
+     .exe real, corriendo desde `App/`, conecta a la base real (8.541
+     contactos), sirve la UI con marca, todo end-to-end. `App/`, `build/`,
+     `*.spec` van a `.gitignore` (artefacto generado, `scripts/
+     build_exe.ps1` lo reconstruye).
+
+- **Fase 4 (Sync a Google) "lista para un clic"**: `Sync.gs` ahora también
+  sincroniza Cumpleaños de vuelta a Google (campo nuevo de esta sesión,
+  antes no se pusheaba); nueva sección "Sync a Google" en la UI React
+  (`SyncPanel.tsx`) con los 4 pasos y links directos a Sheets/Apps Script,
+  espejo de lo que ya tenía el panel clásico. Sigue sin poder probarse en
+  vivo -- requiere login de Google del usuario, no lo puede hacer Claude.
+
+- **HubSpot/Mailchimp/Brevo**: NO se construyeron 3 extractores nuevos --
+  se extendió `column_mapping.py` (ya existente, alias ES/EN genéricos)
+  con los encabezados típicos de cada plataforma ("Phone Number",
+  "Company Name", "Street Address", "State/Region" de HubSpot; "Email
+  Address", "Address" de Mailchimp; "FIRSTNAME"/"LASTNAME"/"SMS" sin
+  espacio de Brevo, sus merge tags tal cual). Más simple, más
+  mantenible, y sirve para cualquier CSV futuro con encabezados
+  parecidos, no solo estas 3 plataformas nombradas. 3 tests con
+  encabezados reales de cada una.
+
+- **Lectura de contactos desde Gmail**: en vez de parsear encabezados de
+  mail a mano (frágil, reinventa lo que Google ya resuelve mejor), se usa
+  `people.otherContacts` de la People API -- "gente con la que hubo
+  intercambio de mail pero nunca se guardó como contacto", que es
+  exactamente el pedido. Requiere un scope OAuth DISTINTO al de Fase 4
+  (`contacts.other.readonly` vs `contacts.readonly`) y por eso un token
+  separado (`token_<cuenta>_gmail.json`) -- activarlo pide un login nuevo,
+  aparte del ya hecho para Fase 4, no lo puede hacer Claude. Entra con
+  `confianza_extraccion='baja'` a propósito (auto-derivado, más ruidoso
+  que un contacto guardado a mano -- misma salvaguarda que ya usan los
+  extractores de Fase 3, nunca se fusiona en silencio). Nuevo comando
+  `motor.cli importar-otros-contactos <cuenta>`.
+
+- **WhatsApp / MejoraWS**: `exportar_whatsapp_csv()` en `export.py` --
+  mismo dato que la lista maestra, formato exacto que pide MejoraWS
+  (nombre completo, teléfono E.164 SIN el "+", tag como "variable" de
+  personalización opcional). Botón en la UI React y en el panel clásico.
+  6.046 contactos reales exportados y verificados en el formato correcto.
+
+- **Agente autónomo ("aprende, se anticipa")**: acotado a lo real y
+  concreto en vez de "IA que aprende sola" en abstracto --
+  1. *Corre solo*: la tarea programada mensual (`aviso-mensual-
+     contactos`) ahora también importa de Google (antes solo
+     reprocesaba lo ya importado) -- de verdad autónoma, no solo un
+     resumen de lo que ya había.
+  2. *Aprende*: ya existía (`dedup/learning.py`, ajuste de umbral por
+     patrón según decisiones humanas) -- se documentó mejor, no se
+     reconstruyó.
+  3. *Se anticipa*: `anomalias.py` nuevo -- Ficha 9.2 de la encuesta
+     original ("alerta si aparece algo raro, ej. un teléfono con
+     muchísimos nombres distintos") nunca se había construido. Detecta
+     teléfonos compartidos por más de 5 contactos FINALES distintos (ya
+     deduplicados). Corrido contra la base real: 0 anomalías -- limpio.
+     Se agregó al aviso mensual automático.
+
+- **194 tests en verde** (180 → 194: 3 HubSpot/Mailchimp/Brevo, 2
+  otherContacts, 2 anomalías, 2 export whatsapp, 3 desktop_app, 2
+  otherContacts-scope). `TUTORIAL.md` nuevo con el paso a paso de todo lo
+  de esta sesión.
+
+- **Lo que sigue bloqueado, honestamente, y no tiene solución posible sin
+  el usuario presente**: Fase 4 en vivo (login Google), "otros contactos"
+  en vivo (login Google, scope nuevo), cualquier integración real con
+  HubSpot/Mailchimp/Brevo vía API (solo se resolvió el camino CSV, que no
+  necesita credenciales -- una integración por API necesitaría que el
+  usuario generara sus propias API keys en cada plataforma). Documentado
+  en `PENDIENTES.md` para que quien retome esto no asuma que ya está
+  probado en vivo.
+
+---

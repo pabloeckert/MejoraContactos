@@ -168,6 +168,42 @@ def listar_contactos(conn: sqlite3.Connection, pagina: int = 1, tamano: int = 10
     return clusters[inicio : inicio + tamano], total
 
 
+def exportar_whatsapp_csv(config: Config, conn: sqlite3.Connection) -> Path:
+    """CSV en el formato exacto que espera MejoraWS
+    (C:\\Github\\Herramientas\\MejoraWS, "Importar CSV/Excel"): columnas
+    nombre,telefono,variable -- teléfono en E.164 SIN el "+" ("código de
+    país, sin espacios ni signos", así lo pide su propio README). Un
+    contacto con más de un WhatsApp genera una fila por número, mismo
+    criterio que la lista maestra. La columna "variable" lleva el tag
+    (familiar/laboral/cliente/proveedor/personal) -- útil como variable de
+    personalización del mensaje ({variable}) si el usuario quiere, no es
+    obligatorio usarla."""
+    import csv
+
+    clusters = _materializar_clusters(conn)
+    _aplicar_ediciones_manuales(conn, clusters)
+
+    destino = config.rutas.carpeta_salida / "contactos-whatsapp.csv"
+    destino.parent.mkdir(parents=True, exist_ok=True)
+
+    filas: list[tuple[str, str, str]] = []
+    for cluster in clusters:
+        nombre_completo = f"{cluster['nombre']} {cluster['apellido']}".strip()
+        if not nombre_completo:
+            continue
+        for whatsapp in sorted(cluster["whatsapp"]):
+            filas.append((nombre_completo, whatsapp.lstrip("+"), cluster["tag"] or ""))
+
+    filas.sort(key=lambda f: f[0].lower())
+
+    with destino.open("w", newline="", encoding="utf-8") as f:
+        escritor = csv.writer(f)
+        escritor.writerow(["nombre", "telefono", "variable"])
+        escritor.writerows(filas)
+
+    return destino
+
+
 def obtener_contacto(conn: sqlite3.Connection, cluster_id: str) -> dict | None:
     """Un cluster materializado (con ediciones manuales ya aplicadas),
     para precargar el formulario de /editar en el revisor web."""

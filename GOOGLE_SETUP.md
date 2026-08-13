@@ -78,3 +78,29 @@ PYTHONPATH=src .venv/Scripts/python.exe -m motor.cli exportar
 O desde el panel web (`motor.cli panel`), los botones de siempre siguen
 funcionando igual — solo que ahora el punto de partida es
 `importar-google` en vez de copiar CSV a `Data/Crudos/`.
+
+## Opcional — "Otros contactos" (gente con la que hubo mail, nunca guardada)
+
+Google guarda aparte a la gente con la que tuviste intercambio de mail en
+Gmail pero nunca agregaste como contacto explícito ("otros contactos").
+Es un pedido de permiso DISTINTO al del Paso 2 (otro scope: `contacts.
+other.readonly`) — no lo pide `importar-google`, hace falta correr esto
+aparte, una vez por cuenta:
+
+```bash
+PYTHONPATH=src .venv/Scripts/python.exe -m motor.cli importar-otros-contactos pablo
+PYTHONPATH=src .venv/Scripts/python.exe -m motor.cli importar-otros-contactos sindy
+```
+
+Mismo mecanismo (navegador, login, "app no verificada" → Avanzado). Si tu
+pantalla de consentimiento OAuth (Paso 1) está en modo "Prueba" con solo
+People API habilitada, este scope nuevo debería pedirse solo sin nada
+adicional — si Google tira un error de "acceso bloqueado" al probarlo,
+volvé a Pantalla de consentimiento OAuth → Agregar o quitar ámbitos → buscá
+"otherContacts" → agregalo.
+
+Esta gente entra con confianza baja a propósito (nunca la guardaste vos,
+puede ser ruido — una lista de mail, un proveedor de una sola compra) — el
+motor de dedup no la fusiona en silencio contra un contacto ya verificado,
+sin importar qué tan parecido dé el puntaje; siempre pasa por la cola de
+revisión primero.

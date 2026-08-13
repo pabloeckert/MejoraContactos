@@ -8,6 +8,12 @@ Todo corre en esta PC. Nada se sube a ningún lado salvo las llamadas
 directas a Google (People API, con permiso ya otorgado por cada cuenta) y
 a los proveedores de IA usados para los casos dudosos de deduplicación.
 
+**¿Primera vez acá después de la sesión del 2026-08-13? Empezá por
+[`TUTORIAL.md`](TUTORIAL.md)** — paso a paso de la app de escritorio
+(`App/MotorContactos.exe`, identidad Mejora Continua), importadores
+(HubSpot/Mailchimp/Brevo, Gmail), export a WhatsApp (MejoraWS), Fase 4 y
+el aviso mensual automático con detección de anomalías.
+
 **Este README no es la fuente de verdad del estado del proyecto — se
 actualiza cuando hay tiempo, no en cada sesión.** Los documentos que SÍ se
 mantienen al día en cada sesión de trabajo son:

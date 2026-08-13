@@ -3,12 +3,13 @@ import type { ReactNode } from "react";
 
 import { correrAccion, obtenerStats } from "./api";
 import ContactsTable from "./components/ContactsTable";
-import { IconAlert, IconCheck, IconClock, IconContact, IconDatabase, IconPlay, IconUsers } from "./components/icons";
+import { IconAlert, IconCheck, IconClock, IconDatabase, IconPlay, IconSync, IconUsers } from "./components/icons";
 import ReviewQueue from "./components/ReviewQueue";
 import StatCard from "./components/StatCard";
+import SyncPanel from "./components/SyncPanel";
 import type { Stats } from "./types";
 
-type Vista = "contactos" | "revisar";
+type Vista = "contactos" | "revisar" | "sync";
 
 export default function App() {
   const [vista, setVista] = useState<Vista>("contactos");
@@ -38,14 +39,22 @@ export default function App() {
     }
   }
 
+  async function exportarWhatsapp() {
+    setMensaje(null);
+    try {
+      const r = await correrAccion("exportar-whatsapp");
+      setMensaje(r.mensaje ?? r.error ?? null);
+    } catch (e) {
+      setMensaje(String(e));
+    }
+  }
+
   return (
     <div className="flex h-screen bg-neutral-50">
       <aside className="flex w-60 shrink-0 flex-col border-r border-neutral-200 bg-white">
         <div className="flex items-center gap-2 px-5 py-5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-white">
-            <IconContact className="h-4 w-4" />
-          </div>
-          <span className="text-sm font-semibold tracking-tight text-neutral-900">motor-contactos</span>
+          <img src="/marca/isotipo-color.png" alt="" className="h-8 w-8" />
+          <span className="font-marca text-sm font-medium tracking-tight text-marca-azul">motor-contactos</span>
         </div>
 
         <nav className="flex flex-col gap-1 px-3">
@@ -64,6 +73,9 @@ export default function App() {
           >
             Revisión pendiente
           </NavItem>
+          <NavItem activo={vista === "sync"} onClick={() => setVista("sync")} icono={<IconSync className="h-4 w-4" />}>
+            Sync a Google
+          </NavItem>
         </nav>
 
         <div className="mt-auto space-y-2 border-t border-neutral-100 p-3">
@@ -74,6 +86,12 @@ export default function App() {
           >
             <IconPlay className="h-4 w-4" />
             {corriendo ? "Corriendo..." : "Correr pipeline"}
+          </button>
+          <button
+            onClick={exportarWhatsapp}
+            className="flex w-full items-center justify-center gap-2 rounded-lg border border-neutral-200 px-3 py-2 text-xs font-medium text-neutral-600 transition hover:bg-neutral-50"
+          >
+            Exportar para WhatsApp
           </button>
           {mensaje && <p className="text-center text-xs leading-snug text-neutral-500">{mensaje}</p>}
         </div>
@@ -106,7 +124,9 @@ export default function App() {
         </div>
 
         <div className="min-h-0 flex-1 overflow-hidden">
-          {vista === "contactos" ? <ContactsTable /> : <ReviewQueue onCambio={recargarStats} />}
+          {vista === "contactos" && <ContactsTable />}
+          {vista === "revisar" && <ReviewQueue onCambio={recargarStats} />}
+          {vista === "sync" && <SyncPanel />}
         </div>
       </main>
     </div>
@@ -136,7 +156,7 @@ function NavItem({
       {icono}
       <span className="flex-1 text-left">{children}</span>
       {!!contador && (
-        <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-700">
+        <span className="rounded-full bg-marca-amarillo px-1.5 py-0.5 text-xs font-semibold text-marca-tinta">
           {contador}
         </span>
       )}

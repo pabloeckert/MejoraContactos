@@ -12,7 +12,12 @@ const ALTO_FILA = 52;
 function iniciales(c: Contacto): string {
   const n = (c.nombre?.[0] ?? "").toUpperCase();
   const a = (c.apellido?.[0] ?? "").toUpperCase();
-  return n + a || "?";
+  return n + a || "·";
+}
+
+function nombreCompleto(c: Contacto): string {
+  const n = `${c.nombre ?? ""} ${c.apellido ?? ""}`.trim();
+  return n || "(sin nombre)";
 }
 
 const COLORES_AVATAR = [
@@ -129,9 +134,7 @@ export default function ContactsTable() {
                       >
                         {iniciales(c)}
                       </span>
-                      <span className="truncate font-medium text-neutral-800">
-                        {c.nombre} {c.apellido}
-                      </span>
+                      <span className="truncate font-medium text-neutral-800">{nombreCompleto(c)}</span>
                     </span>
                     <span className="truncate text-neutral-500">
                       {[c.organizacion, c.cargo].filter(Boolean).join(" — ") || "—"}

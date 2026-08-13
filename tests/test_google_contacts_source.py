@@ -4,7 +4,7 @@ login -- todo se mockea (google-api-python-client y las credenciales)."""
 from unittest.mock import MagicMock, patch
 
 from motor.config import Config, DedupConfig, EmailConfig, GoogleConfig, LlmConfig, RevisorConfig, RutasConfig, TelefonoConfig
-from motor.google_contacts_source import _persona_a_campos, importar_google_contactos
+from motor.google_contacts_source import _persona_a_campos, importar_google_contactos, importar_otros_contactos
 from motor.staging_db import conectar
 
 
@@ -174,3 +174,55 @@ def test_importar_google_contactos_pagina_correctamente(tmp_path):
         insertados = importar_google_contactos(config, conn, "pablo")
 
     assert insertados == 2
+
+
+def _servicio_falso_otros_contactos(paginas: list[dict]) -> MagicMock:
+    servicio = MagicMock()
+    ejecuciones = iter(paginas)
+    servicio.people.return_value.otherContacts.return_value.list.return_value.execute.side_effect = lambda: next(ejecuciones)
+    return servicio
+
+
+def test_importar_otros_contactos_inserta_con_confianza_baja(tmp_path):
+    # "Otros contactos" son auto-derivados de Gmail (gente con la que hubo
+    # mail pero nunca se guardó como contacto) -- más ruidosos que un
+    # contacto guardado a mano, por eso van con confianza_extraccion="baja"
+    # (misma salvaguarda que ya usan los extractores de Fase 3: nunca se
+    # auto-fusionan en silencio contra un contacto ya verificado).
+    config = _config_prueba(tmp_path)
+    conn = conectar(config.rutas.base_sqlite)
+    pagina = {
+        "otherContacts": [
+            {
+                "resourceName": "otherContacts/o1",
+                "etag": "etag-o1",
+                "names": [{"givenName": "Roberto"}],
+                "emailAddresses": [{"value": "roberto@proveedor.com"}],
+            }
+        ]
+    }
+
+    with patch("motor.google_contacts_source.obtener_credenciales", return_value=MagicMock()), patch(
+        "googleapiclient.discovery.build", return_value=_servicio_falso_otros_contactos([pagina])
+    ):
+        insertados = importar_otros_contactos(config, conn, "pablo")
+
+    assert insertados == 1
+    fila = conn.execute("SELECT source_file, confianza_extraccion, raw_json FROM raw_records").fetchone()
+    assert fila["source_file"] == "google-otros-contactos:pablo:otherContacts/o1"
+    assert fila["confianza_extraccion"] == "baja"
+    assert "roberto@proveedor.com" in fila["raw_json"]
+
+
+def test_importar_otros_contactos_pide_credenciales_con_scope_distinto_a_fase4(tmp_path):
+    config = _config_prueba(tmp_path)
+    conn = conectar(config.rutas.base_sqlite)
+
+    with patch("motor.google_contacts_source.obtener_credenciales", return_value=MagicMock()) as mock_creds, patch(
+        "googleapiclient.discovery.build", return_value=_servicio_falso_otros_contactos([{"otherContacts": []}])
+    ):
+        importar_otros_contactos(config, conn, "pablo")
+
+    _, kwargs = mock_creds.call_args
+    assert kwargs["scopes"] == ["https://www.googleapis.com/auth/contacts.other.readonly"]
+    assert kwargs["sufijo_token"] == "_gmail"

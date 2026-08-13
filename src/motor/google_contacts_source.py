@@ -39,28 +39,44 @@ _SCOPES = ["https://www.googleapis.com/auth/contacts.readonly"]
 _CAMPOS_PERSONA = "names,phoneNumbers,emailAddresses,organizations,addresses,biographies,birthdays,photos"
 _RUTA_CREDENCIALES = Path("credentials.json")
 
+# "Otros contactos" (people/otherContacts): la gente con la que tuviste
+# intercambio de mail en Gmail pero nunca guardaste como contacto -- Google
+# ya hace la extracción de "¿quién me escribió?" mejor de lo que haríamos
+# nosotros parseando encabezados de mail a mano. Requiere un scope
+# DISTINTO al de Fase 4 (contacts.other.readonly, no contacts.readonly) --
+# por eso token y función de credenciales separados: no queremos que
+# activar esto rompa/pida re-login al import de Google Contacts normal que
+# ya venía funcionando.
+_SCOPES_OTROS_CONTACTOS = ["https://www.googleapis.com/auth/contacts.other.readonly"]
+_CAMPOS_OTROS_CONTACTOS = "names,emailAddresses,phoneNumbers"
+
 
 class CredencialesFaltantesError(RuntimeError):
     pass
 
 
-def _ruta_token(cuenta: str) -> Path:
-    return Path(f"token_{cuenta}.json")
+def _ruta_token(cuenta: str, sufijo: str = "") -> Path:
+    return Path(f"token_{cuenta}{sufijo}.json")
 
 
-def obtener_credenciales(cuenta: str):
+def obtener_credenciales(cuenta: str, scopes: list[str] = _SCOPES, sufijo_token: str = ""):
     """Devuelve credenciales OAuth válidas para `cuenta`, refrescando o
     pidiendo login interactivo (run_local_server abre el navegador) según
     haga falta. Import local de las librerías de Google -- son pesadas y
-    solo hacen falta acá, no en el resto del pipeline."""
+    solo hacen falta acá, no en el resto del pipeline.
+
+    `scopes`/`sufijo_token` separados para "otros contactos" (scope
+    distinto al de Fase 4, ver _SCOPES_OTROS_CONTACTOS) -- así cada
+    capacidad pide su propio login la primera vez sin pisar el token de
+    la otra."""
     from google.auth.transport.requests import Request
     from google.oauth2.credentials import Credentials
     from google_auth_oauthlib.flow import InstalledAppFlow
 
-    ruta_token = _ruta_token(cuenta)
+    ruta_token = _ruta_token(cuenta, sufijo_token)
     creds = None
     if ruta_token.exists():
-        creds = Credentials.from_authorized_user_file(str(ruta_token), _SCOPES)
+        creds = Credentials.from_authorized_user_file(str(ruta_token), scopes)
 
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
@@ -72,7 +88,7 @@ def obtener_credenciales(cuenta: str):
                     "Console). Ver GOOGLE_SETUP.md -- ese paso lo tenés que hacer vos, "
                     "requiere tu login en Google Cloud Console."
                 )
-            flow = InstalledAppFlow.from_client_secrets_file(str(_RUTA_CREDENCIALES), _SCOPES)
+            flow = InstalledAppFlow.from_client_secrets_file(str(_RUTA_CREDENCIALES), scopes)
             creds = flow.run_local_server(port=0)
         ruta_token.write_text(creds.to_json(), encoding="utf-8")
     return creds
@@ -114,6 +130,56 @@ def importar_google_contactos(config: Config, conn: sqlite3.Connection, cuenta: 
             conn.execute(
                 "INSERT INTO raw_records (source_file, source_row, raw_json, confianza_extraccion, creado_en) "
                 "VALUES (?, 1, ?, 'alta', ?)",
+                (ruta_virtual, json.dumps(campos, ensure_ascii=False), _ahora()),
+            )
+            _marcar_procesado(conn, ruta_virtual, etag)
+            total_insertados += 1
+
+        token_pagina = respuesta.get("nextPageToken")
+        if not token_pagina:
+            break
+
+    conn.commit()
+    return total_insertados
+
+
+def importar_otros_contactos(config: Config, conn: sqlite3.Connection, cuenta: str) -> int:
+    """"Otros contactos" de `cuenta`: gente con la que hubo intercambio de
+    mail en Gmail pero nunca se guardó como contacto explícito -- el
+    equivalente a "leer contactos desde la cuenta de mail" pedido, pero
+    usando la extracción que ya hace Google en vez de parsear encabezados
+    de mail a mano (más preciso: ya resuelve hilos, respuestas, alias).
+    Primera vez pide un login/consentimiento APARTE del de Fase 4 (scope
+    distinto). Mismo patrón incremental que importar_google_contactos:
+    etag de Google, source_file con prefijo propio para no chocar con
+    fuentes_procesadas de los contactos "de verdad"."""
+    from googleapiclient.discovery import build
+
+    creds = obtener_credenciales(cuenta, scopes=_SCOPES_OTROS_CONTACTOS, sufijo_token="_gmail")
+    servicio = build("people", "v1", credentials=creds)
+
+    total_insertados = 0
+    token_pagina = None
+    while True:
+        respuesta = (
+            servicio.people()
+            .otherContacts()
+            .list(pageSize=1000, readMask=_CAMPOS_OTROS_CONTACTOS, pageToken=token_pagina)
+            .execute()
+        )
+
+        for persona in respuesta.get("otherContacts", []):
+            resource_name = persona.get("resourceName", "")
+            etag = persona.get("etag", "")
+            ruta_virtual = f"google-otros-contactos:{cuenta}:{resource_name}"
+            if _ya_procesado(conn, ruta_virtual, etag):
+                continue
+            campos = _persona_a_campos(persona)
+            if not campos:
+                continue
+            conn.execute(
+                "INSERT INTO raw_records (source_file, source_row, raw_json, confianza_extraccion, creado_en) "
+                "VALUES (?, 1, ?, 'baja', ?)",
                 (ruta_virtual, json.dumps(campos, ensure_ascii=False), _ahora()),
             )
             _marcar_procesado(conn, ruta_virtual, etag)

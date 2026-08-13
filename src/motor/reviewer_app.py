@@ -17,7 +17,7 @@ from flask import Flask, jsonify, redirect, render_template_string, request, url
 from motor.config import Config
 from motor.dedup import learning
 from motor.dedup.merge_engine import aplicar_decision_lote, deduplicar_todo, deshacer, deshacer_ultima_corrida
-from motor.export import buscar_contactos, exportar_lista_maestra, guardar_edicion_manual, obtener_contacto
+from motor.export import buscar_contactos, exportar_lista_maestra, exportar_whatsapp_csv, guardar_edicion_manual, obtener_contacto
 from motor.ingest import extraer_todo
 from motor.normalize_pipeline import normalizar_todo
 from motor.tagging import _TAGS_VALIDOS
@@ -67,6 +67,12 @@ _PLANTILLA_DASHBOARD = _ESTILO + """
   <form method="post" action="/accion/deduplicar"><button class="secundario" type="submit">3. Deduplicar</button></form>
   <form method="post" action="/accion/exportar"><button class="secundario" type="submit">4. Exportar a Excel</button></form>
 </div>
+
+<h3>Enviar por WhatsApp</h3>
+<div class="acciones">
+  <form method="post" action="/accion/exportar-whatsapp"><button class="secundario" type="submit">Exportar CSV para MejoraWS</button></form>
+</div>
+<p style="color:#6B7280; font-size:0.85rem;">Genera <code>Data/Salida/contactos-whatsapp.csv</code> en el formato exacto que espera <a href="file:///C:/Github/Herramientas/MejoraWS" target="_blank">MejoraWS</a> (nombre, teléfono, variable) — importalo ahí con "Importar CSV/Excel".</p>
 
 <h3>Deshacer</h3>
 <div class="acciones">
@@ -281,6 +287,9 @@ def _ejecutar_accion(config: Config, conn: sqlite3.Connection, nombre: str) -> s
     if nombre == "exportar":
         destino = exportar_lista_maestra(config, conn)
         return f"Exportado: {destino}"
+    if nombre == "exportar-whatsapp":
+        destino = exportar_whatsapp_csv(config, conn)
+        return f"Exportado para MejoraWS: {destino} — importalo ahí con \"Importar CSV/Excel\""
     if nombre == "run":
         extraer_todo(config, conn)
         normalizar_todo(config, conn)

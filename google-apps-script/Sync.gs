@@ -61,12 +61,18 @@ var COLUMNAS = {
   ciudad: "Ciudad",
   provincia: "Provincia",
   pais: "País",
+  cumpleanos: "Cumpleaños",
   notaReferencia: "Nota de referencia",
   idGoogle: "Google Contact ID",
   ultimaSync: "Última sincronización",
 };
+// "Foto" y "Tag" de la lista maestra NO se sincronizan de vuelta a Google
+// a propósito: Foto ya sale de ahí (no tiene sentido pushear una URL como
+// si fuera una foto nueva, la People API pide bytes de imagen, no URL) y
+// Tag no tiene un campo 1:1 en People API sin meterse con Labels/grupos
+// (fuera de alcance de este script).
 
-var CAMPOS_PERSONA = "names,phoneNumbers,emailAddresses,organizations,addresses,biographies";
+var CAMPOS_PERSONA = "names,phoneNumbers,emailAddresses,organizations,addresses,biographies,birthdays";
 
 function sincronizarContactos() {
   var hoja = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(NOMBRE_HOJA);
@@ -164,10 +170,20 @@ function construirPersona_(valores, idx) {
     .filter(String)
     .join(", ");
   var nota = valores[idx[COLUMNAS.notaReferencia]];
+  var cumpleanos = valores[idx[COLUMNAS.cumpleanos]]; // "DD/MM/AAAA" o "DD/MM" (ver motor/google_contacts_source.py)
 
   var persona = {
     names: [{ givenName: nombre, familyName: apellido }],
   };
+
+  if (cumpleanos) {
+    var partes = String(cumpleanos).split("/");
+    if (partes.length >= 2) {
+      var fecha = { day: parseInt(partes[0], 10), month: parseInt(partes[1], 10) };
+      if (partes.length === 3) fecha.year = parseInt(partes[2], 10);
+      persona.birthdays = [{ date: fecha }];
+    }
+  }
 
   var telefonos = [];
   if (whatsapp) telefonos.push({ value: String(whatsapp), type: "mobile" });

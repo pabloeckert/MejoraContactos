@@ -1,12 +1,18 @@
 """Mapeo de encabezados de columna a claves canónicas, compartido por los
 extractores tabulares (CSV/TSV, Excel, JSON de objetos planos).
 
-Reconoce dos casos:
+Reconoce tres casos:
 1. El esquema de Google Contacts export ("Phone 1 - Value"/"Phone 1 -
    Label", "E-mail 1 - Value", etc. — confirmado contra pablo.csv/Sindy.csv
    reales, 78 columnas).
 2. Alias genéricos en español/inglés para CSVs de otro origen (otro CRM,
    planillas armadas a mano).
+3. Encabezados típicos de exports de HubSpot ("Phone Number", "Company
+   Name", "Street Address", "State/Region", "Country/Region"), Mailchimp
+   ("Email Address", "Address") y Brevo ("FIRSTNAME"/"LASTNAME"/"SMS", sin
+   espacio — así salen sus merge tags) — no hace falta un extractor
+   aparte por plataforma, son CSVs comunes que ya entra el extractor
+   genérico si el encabezado está en estas listas.
 
 Si un encabezado no matchea nada, se descarta (mejor perder una columna
 rara que inventar una clave canónica equivocada).
@@ -16,18 +22,23 @@ from __future__ import annotations
 
 import re
 
-_ALIAS_NOMBRE = {"first name", "nombre", "name", "nombres"}
-_ALIAS_APELLIDO = {"last name", "apellido", "surname", "apellidos"}
+_ALIAS_NOMBRE = {"first name", "firstname", "nombre", "name", "nombres"}
+_ALIAS_APELLIDO = {"last name", "lastname", "apellido", "surname", "apellidos"}
 _ALIAS_NOMBRE_COMPLETO = {"full name", "nombre completo", "display name", "fn"}
-_ALIAS_ORGANIZACION = {"organization name", "organization", "organizacion", "organización", "empresa", "company"}
+_ALIAS_ORGANIZACION = {
+    "organization name", "organization", "organizacion", "organización", "empresa", "company", "company name",
+}
 _ALIAS_CARGO = {"organization title", "cargo", "puesto", "job title", "title", "posicion", "posición"}
 _ALIAS_NOTAS = {"notes", "notas", "note", "nota"}
-_ALIAS_TELEFONO_UNICO = {"phone", "telefono", "teléfono", "celular", "whatsapp", "cel", "movil", "móvil"}
-_ALIAS_EMAIL_UNICO = {"email", "e-mail", "correo", "mail"}
-_ALIAS_DOMICILIO = {"address 1 - street", "domicilio", "direccion", "dirección", "street", "calle"}
+_ALIAS_TELEFONO_UNICO = {
+    "phone", "telefono", "teléfono", "celular", "whatsapp", "cel", "movil", "móvil",
+    "phone number", "mobile phone number", "primary phone number", "sms",
+}
+_ALIAS_EMAIL_UNICO = {"email", "e-mail", "correo", "mail", "email address"}
+_ALIAS_DOMICILIO = {"address 1 - street", "domicilio", "direccion", "dirección", "street", "calle", "address", "street address"}
 _ALIAS_CIUDAD = {"address 1 - city", "ciudad", "city", "localidad"}
-_ALIAS_PROVINCIA = {"address 1 - region", "provincia", "region", "región", "state"}
-_ALIAS_PAIS = {"address 1 - country", "pais", "país", "country"}
+_ALIAS_PROVINCIA = {"address 1 - region", "provincia", "region", "región", "state", "state/region"}
+_ALIAS_PAIS = {"address 1 - country", "pais", "país", "country", "country/region"}
 
 _NUMERO_RE = re.compile(r"\d+")
 

@@ -12,6 +12,12 @@ __pycache__/
 node_modules/
 dist/
 
+# App de escritorio empaquetada (PyInstaller) -- artefacto generado,
+# reconstruir con scripts/build_exe.ps1, no versionar el binario.
+App/
+build/
+*.spec
+
 # OAuth de Google Contacts -- secretos, nunca a git (ni siquiera al repo local)
 credentials.json
 token_*.json

@@ -79,7 +79,7 @@ export default function ReviewQueue({ onCambio }: Props) {
         >
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-sm font-medium text-neutral-800">
-              <IconClock className="h-4 w-4 text-amber-500" />
+              <IconClock className="h-4 w-4 text-marca-amarillo" />
               {grupo.patron}
             </div>
             <span className="shrink-0 rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-semibold text-neutral-600">

@@ -9,7 +9,7 @@ from openpyxl import load_workbook
 
 from motor.config import Config, DedupConfig, EmailConfig, LlmConfig, RevisorConfig, RutasConfig, TelefonoConfig
 from motor.dedup.merge_engine import aplicar_decision_lote, deduplicar_todo, deshacer, deshacer_ultima_corrida
-from motor.export import exportar_lista_maestra, guardar_edicion_manual
+from motor.export import exportar_lista_maestra, exportar_whatsapp_csv, guardar_edicion_manual
 from motor.ingest import extraer_todo
 from motor.normalize_pipeline import normalizar_todo
 from motor.staging_db import conectar
@@ -422,3 +422,29 @@ def test_deduplicar_continuar_false_ignora_corrida_incompleta(tmp_path):
 
     assert resultado["regla"] == 1  # recalculó fresco, mismo teléfono fusiona por regla
     assert resultado.get("revision_pendiente", 0) == 0
+
+
+def test_exportar_whatsapp_csv_formato_mejorows(tmp_path):
+    # MejoraWS (C:\Github\Herramientas\MejoraWS) espera exactamente estas
+    # 3 columnas, teléfono en E.164 SIN el "+" -- así lo pide su propio
+    # README ("código de país, sin espacios ni signos").
+    config = _config_prueba(tmp_path)
+    (config.rutas.carpeta_raiz / "dos.csv").write_text(
+        "Nombre,Apellido,Telefono\nJuan,Perez,3743504517;3743111222\n",
+        encoding="utf-8",
+    )
+    conn = conectar(config.rutas.base_sqlite)
+    extraer_todo(config, conn)
+    normalizar_todo(config, conn)
+    deduplicar_todo(config, conn)
+
+    destino = exportar_whatsapp_csv(config, conn)
+    assert destino.name == "contactos-whatsapp.csv"
+
+    contenido = destino.read_text(encoding="utf-8")
+    lineas = [l for l in contenido.splitlines() if l]
+    assert lineas[0] == "nombre,telefono,variable"
+    assert len(lineas) == 3  # un contacto, dos whatsapp -> dos filas
+    for linea in lineas[1:]:
+        assert "+" not in linea.split(",")[1]  # sin el "+", formato MejoraWS
+        assert linea.startswith("Juan Perez,549")

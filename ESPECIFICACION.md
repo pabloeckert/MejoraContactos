@@ -123,9 +123,14 @@ keys.
   (Vite, dev server local del usuario — **no** el que administra un Browser
   pane de Claude Code, que corre en un sandbox de red aislado sin acceso
   real a la máquina).
-- **Fase 5 — escaneo de directorios completos de la PC**: pospuesta a
-  propósito, no arrancar sin conversación aparte (volumen/privacidad
-  desconocidos).
+- **Fase 5 — escaneo de directorios completos de la PC**: **descartada**
+  (decisión explícita del usuario, 2026-08-13, cierre del MVP). No forma
+  parte del alcance del proyecto. El motor sigue funcionando sobre su
+  fuente real (Google Contacts vía People API); si en el futuro hiciera
+  falta ingestar archivos sueltos (PDF, capturas, texto libre), los
+  extractores de `extractors/` ya soportan eso apuntándolos a una carpeta
+  puntual — lo que se descarta es el escaneo automático/recursivo de toda
+  la PC, no la capacidad de extracción de archivos en sí.
 - **Multi-usuario / producto**: diseñado (no construido) — ver
   `PROMPT_CONTINUACION.md` § "Decisiones ya tomadas" para el resumen; el
   detalle completo vive en el historial de `MejoraContactos.md` de la

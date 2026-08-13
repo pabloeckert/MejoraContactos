@@ -17,7 +17,7 @@ from flask import Flask, jsonify, request
 
 from motor.config import Config
 from motor.dedup import learning
-from motor.dedup.merge_engine import deshacer, deshacer_ultima_corrida
+from motor.dedup.merge_engine import aplicar_decision_lote, deshacer, deshacer_ultima_corrida
 from motor.export import buscar_contactos, guardar_edicion_manual, listar_contactos, obtener_contacto
 
 
@@ -85,19 +85,9 @@ def registrar_rutas_api(app: Flask, config: Config, conn: sqlite3.Connection) ->
     def api_decidir():
         datos = request.get_json(force=True)
         patron, aceptar = datos["patron"], bool(datos["aceptar"])
-        pendientes = conn.execute(
-            "SELECT id FROM decisiones_log WHERE accion = 'revision_pendiente' AND detalle = ?",
-            (patron,),
-        ).fetchall()
-        nueva_accion = "fusionar" if aceptar else "separar"
-        for fila in pendientes:
-            conn.execute(
-                "UPDATE decisiones_log SET accion = ?, decidido_por = 'humano' WHERE id = ?",
-                (nueva_accion, fila["id"]),
-            )
-        conn.commit()
+        actualizados = aplicar_decision_lote(conn, patron, aceptar)
         learning.registrar_decision(conn, patron, aceptar)
-        return jsonify({"ok": True, "actualizados": len(pendientes)})
+        return jsonify({"ok": True, "actualizados": actualizados})
 
     @app.post("/api/deshacer/<cluster_id>")
     def api_deshacer(cluster_id: str):

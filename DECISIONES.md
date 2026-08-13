@@ -332,3 +332,80 @@ su reporte automáticamente (busca las últimas bajo el separador `---`).
   conversación está completo, sobre todo después de una compactación.
 
 ---
+
+## 2026-08-13 (cont. 3) — Cierre explícito del MVP: lote aprobado, Fase 5 descartada, bug real de fondo corregido
+
+- El usuario pidió explícitamente cerrar el proyecto de punta a punta,
+  asumiendo él mismo las decisiones estándar: (1) aprobar el lote de 649
+  pendientes tratándolos como la misma persona, (2) dejar el lanzador/UI
+  con la opción por defecto más simple, (3) descartar Fase 5
+  definitivamente (no "posponer").
+- **Al ejecutar (1) se encontró un bug real, no cosmético**: el botón
+  "Aprobar fusión de todo el lote" (`/decidir` en `reviewer_app.py`, y su
+  duplicado en `api.py`) solo actualizaba `decisiones_log.accion` — nunca
+  tocaba la tabla `clusters`. Efecto: el contador de "pendientes" bajaba a
+  0 (porque ese contador solo lee `decisiones_log`), pero la lista maestra
+  exportada seguía mostrando los contactos como personas separadas, porque
+  `clusters` es la tabla que realmente se materializa en el export y solo
+  se recalcula dentro de `deduplicar_todo()` — que a su vez solo reusa
+  decisiones humanas si está retomando una corrida INCOMPLETA (mismo
+  corrida_id), nunca si la corrida ya terminó (que es el caso normal
+  cuando alguien revisa la cola después de que terminó de correr). Un
+  usuario que hubiera usado el botón de "aprobar lote" del panel tal como
+  estaba habría visto "0 pendientes" pero, al abrir el Excel, seguía
+  viendo los contactos sin fusionar — una inconsistencia silenciosa real,
+  no hipotética.
+- **Fix de fondo, no un parche puntual**: nueva función
+  `aplicar_decision_lote()` + `_fusionar_pares_de_clusters()` en
+  `merge_engine.py`. Traduce cada par pendiente a sus clusters ACTUALES
+  (no a normalized_record ids sueltos, porque cada lado del par puede ya
+  ser un cluster de varios raw_records por fusiones de regla previas),
+  corre union-find sobre esos clusters, y persiste la fusión real en
+  `clusters` con `decidido_por='humano'`. Reemplaza el código duplicado
+  que tenían tanto `reviewer_app.py` (`/decidir`) como `api.py`
+  (`/api/decidir`) — ambas rutas ahora llaman a la misma función
+  compartida, así que este fix vale para siempre, no solo para esta
+  corrida. Test de regresión en `test_pipeline_integration.py`
+  (`test_aplicar_decision_lote_fusiona_clusters_de_verdad_no_solo_el_log`)
+  que reproduce el patrón real (mismo teléfono, nombres que la salvaguarda
+  de `scoring.py` lee como claramente distintos) y confirma que después de
+  aprobar el lote el export muestra 1 fila, no 2. **180 tests en verde.**
+- **Ejecutado contra la base real**: `aplicar_decision_lote(conn,
+  'tel=si|mail=no|nombre=baja|nombres_distintos', True)` — devolvió 3.219
+  actualizados (más que los 649 "de la corrida más reciente" porque la
+  función no filtra por corrida_id, a propósito: corrige TODO el historial
+  de ese patrón repetido en corridas previas (658, 596, 649...), no solo
+  el último). Resultado verificado en base: **649→0 pendientes, 8.590→8.541
+  contactos finales**. La caída de 49 (no de ~649) confirma que muchos de
+  esos pares comparten teléfono transitivamente entre sí (una misma línea
+  de oficina/familia vinculando a varias personas a la vez, no solo
+  pares sueltos) — colapsan en pocos clusters grandes en vez de muchos
+  clusters de a 2. `lista-maestra.xlsx` reexportado: 10.267 filas.
+- **Fase 5 (escaneo de PC)**: descartada explícitamente por el usuario,
+  no pospuesta. Documentado en `ESPECIFICACION.md`/`PENDIENTES.md`. No se
+  retoma sin pedido nuevo y explícito.
+- **Lanzador/UI por defecto**: se mantiene el panel HTML clásico
+  (`Iniciar Panel.bat`) como el punto de entrada único y por defecto — es
+  un solo proceso (Flask sirviendo todo, sin depender de Node/npm
+  corriendo en paralelo), ya tiene búsqueda/edición y la cola de revisión,
+  y no depende de nada que no esté ya instalado en el `.venv`. La UI nueva
+  en React (`ui/`, puerto 5174) sigue existiendo y funciona (confirmada en
+  la sesión anterior), pero requiere correr DOS servidores en paralelo
+  (backend Flask + `npm run dev`) — más frágil para "doble clic y listo",
+  así que no se la promovió a default. Se agregaron links directos a
+  Google Sheets/Apps Script en la sección "Fase 4" del panel para
+  minimizar fricción del único paso que queda (login de Google).
+- **Sobre "commit y push"**: se commiteó todo al repo git LOCAL de
+  `motor-contactos/` (como en cada handoff). Repetido a propósito porque
+  es una regla explícita y ya acordada: `motor-contactos/` y `Data/` NO
+  tienen remoto a GitHub y no se les agrega uno — contienen datos
+  personales reales de terceros (los contactos de Pablo y Sindy), y esa
+  separación es la que permite que el repo principal (la SPA, que sí va a
+  GitHub) nunca los exponga. "Push" en el pedido del usuario se interpretó
+  como aplicable al repo principal si había algo pendiente ahí, no como
+  autorización para exponer `motor-contactos/`/`Data/` a un remoto —  si
+  el usuario de verdad quiere un backup remoto de este código (sin los
+  datos), la opción seria sería un repo PRIVADO nuevo y separado, nunca el
+  mismo remoto que la SPA pública/semi-pública.
+
+---

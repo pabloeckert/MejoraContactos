@@ -15,7 +15,7 @@ from flask import Flask, jsonify, redirect, render_template_string, request, url
 
 from motor.config import Config
 from motor.dedup import learning
-from motor.dedup.merge_engine import deduplicar_todo, deshacer, deshacer_ultima_corrida
+from motor.dedup.merge_engine import aplicar_decision_lote, deduplicar_todo, deshacer, deshacer_ultima_corrida
 from motor.export import buscar_contactos, exportar_lista_maestra, guardar_edicion_manual, obtener_contacto
 from motor.ingest import extraer_todo
 from motor.normalize_pipeline import normalizar_todo
@@ -83,11 +83,11 @@ _PLANTILLA_DASHBOARD = _ESTILO + """
   <div class="mensaje error">Todavía no exportaste nada — apretá "Exportar a Excel" arriba antes de seguir con esto.</div>
 {% endif %}
 <ol style="font-size:0.9rem; color:#2B2B2B;">
-  <li>Subí <code>lista-maestra.xlsx</code> a un Google Sheet compartido con Sindy (Archivo → Importar → Reemplazar hoja actual).</li>
-  <li>En cada cuenta (Pablo y Sindy), Extensiones → Apps Script → pegar el código de <code>google-apps-script/Sync.gs</code> y correr <code>sincronizarContactos</code> una vez para autorizar.</li>
+  <li>Abrí <a href="https://sheets.google.com/create" target="_blank" rel="noopener">un Google Sheet nuevo</a> y subí <code>lista-maestra.xlsx</code> (Archivo → Importar → Subir → Reemplazar hoja actual). Compartilo con Sindy.</li>
+  <li>En cada cuenta (Pablo y Sindy), desde ese mismo Sheet: Extensiones → <a href="https://script.google.com" target="_blank" rel="noopener">Apps Script</a> → pegar el código de <code>google-apps-script/Sync.gs</code> → correr <code>sincronizarContactos</code> una vez para autorizar (acá es donde hacés login de Google — el único paso que no puede hacer Claude).</li>
   <li>(Opcional) Activar un disparador diario en cada cuenta para que se sincronice sola.</li>
 </ol>
-<p style="color:#6B7280; font-size:0.85rem;">Instrucciones completas y el código en <code>motor-contactos/google-apps-script/README.md</code>. Esta parte no la puede hacer Claude por vos — necesita tu login de Google.</p>
+<p style="color:#6B7280; font-size:0.85rem;">Instrucciones completas y el código en <code>motor-contactos/google-apps-script/README.md</code>. Una vez hecho esto una vez por cuenta, no hace falta repetirlo — el script actualiza en vez de duplicar.</p>
 """
 
 _PLANTILLA_REVISOR = _ESTILO + """
@@ -219,19 +219,9 @@ def crear_app(config: Config, conn: sqlite3.Connection) -> Flask:
     def decidir():
         datos = request.get_json(force=True)
         patron, aceptar = datos["patron"], bool(datos["aceptar"])
-        pendientes = conn.execute(
-            "SELECT id FROM decisiones_log WHERE accion = 'revision_pendiente' AND detalle = ?",
-            (patron,),
-        ).fetchall()
-        nueva_accion = "fusionar" if aceptar else "separar"
-        for fila in pendientes:
-            conn.execute(
-                "UPDATE decisiones_log SET accion = ?, decidido_por = 'humano' WHERE id = ?",
-                (nueva_accion, fila["id"]),
-            )
-        conn.commit()
+        actualizados = aplicar_decision_lote(conn, patron, aceptar)
         learning.registrar_decision(conn, patron, aceptar)
-        return jsonify({"ok": True, "actualizados": len(pendientes)})
+        return jsonify({"ok": True, "actualizados": actualizados})
 
     @app.post("/deshacer/<cluster_id>")
     def deshacer_ruta(cluster_id: str):

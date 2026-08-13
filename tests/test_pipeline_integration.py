@@ -8,7 +8,7 @@ cubre acá."""
 from openpyxl import load_workbook
 
 from motor.config import Config, DedupConfig, EmailConfig, LlmConfig, RevisorConfig, RutasConfig, TelefonoConfig
-from motor.dedup.merge_engine import deduplicar_todo, deshacer, deshacer_ultima_corrida
+from motor.dedup.merge_engine import aplicar_decision_lote, deduplicar_todo, deshacer, deshacer_ultima_corrida
 from motor.export import exportar_lista_maestra, guardar_edicion_manual
 from motor.ingest import extraer_todo
 from motor.normalize_pipeline import normalizar_todo
@@ -198,6 +198,55 @@ def test_contacto_con_dos_whatsapp_genera_dos_filas_no_una_celda_junta(tmp_path)
     for fila in filas:
         assert ";" not in fila["WhatsApp"]
         assert fila["Nombre"] == "Juan"  # el resto del contacto se repite igual en ambas filas
+
+
+def test_aplicar_decision_lote_fusiona_clusters_de_verdad_no_solo_el_log(tmp_path):
+    # Caso real recurrente: mismo teléfono, nombres que el sistema lee
+    # como claramente distintos (salvaguarda de scoring.py) -> cae en
+    # revision_pendiente aunque el teléfono matchee exacto. Aprobar el
+    # lote debe fusionar los CLUSTERS de verdad, no solo marcar el log
+    # (bug real: antes de aplicar_decision_lote, el contador de
+    # pendientes bajaba a 0 pero la lista maestra seguía separada).
+    config = _config_prueba(tmp_path)
+    (config.rutas.carpeta_raiz / "compartido.csv").write_text(
+        "Nombre,Apellido,Telefono\n"
+        "Lucia,Fernandez,3743504517\n"
+        "Gustavo,Lopez,3743504517\n",
+        encoding="utf-8",
+    )
+
+    conn = conectar(config.rutas.base_sqlite)
+    extraer_todo(config, conn)
+    normalizar_todo(config, conn)
+    deduplicar_todo(config, conn)
+
+    pendiente = conn.execute(
+        "SELECT detalle FROM decisiones_log WHERE accion = 'revision_pendiente' LIMIT 1"
+    ).fetchone()
+    assert pendiente is not None  # confirma que el caso realmente cayó en revisión
+    patron = pendiente["detalle"]
+
+    clusters_antes = {
+        fila["cluster_id"] for fila in conn.execute("SELECT cluster_id FROM clusters").fetchall()
+    }
+    assert len(clusters_antes) == 2  # todavía separados
+
+    actualizados = aplicar_decision_lote(conn, patron, True)
+    assert actualizados >= 1
+
+    clusters_despues = {
+        fila["cluster_id"] for fila in conn.execute("SELECT cluster_id FROM clusters").fetchall()
+    }
+    assert len(clusters_despues) == 1  # ahora fusionados de verdad
+
+    pendientes_restantes = conn.execute(
+        "SELECT COUNT(*) c FROM decisiones_log WHERE accion = 'revision_pendiente'"
+    ).fetchone()["c"]
+    assert pendientes_restantes == 0
+
+    destino = exportar_lista_maestra(config, conn)
+    filas = _leer_xlsx(destino)
+    assert len(filas) == 1  # el export refleja la fusión, no dos filas separadas
 
 
 def test_edicion_manual_pisa_el_valor_calculado_al_exportar(tmp_path):

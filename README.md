@@ -29,12 +29,17 @@ People API** (`google_contacts_source.py` — ver `GOOGLE_SETUP.md`). Las
 cifras y ejemplos de más abajo que mencionan "34.811 registros" o
 `Data/Crudos/*.csv` corresponden a esa etapa anterior del proyecto y ya NO
 reflejan el dataset real actual — quedan como documentación histórica de
-cómo se construyó y probó cada pieza, no como estado vigente. Estado real
-más reciente confirmado en base (2026-08-13): **36.103 raw_records**
-(18.135 de Pablo + 17.968 de Sindy, importados directo de sus cuentas de
-Google), **36.102 normalizados**, **8.590 contactos finales** tras
-deduplicar, **649 casos en cola de revisión** pendientes de aprobar a mano
-en `/revisar`.
+cómo se construyó y probó cada pieza, no como estado vigente.
+
+**MVP cerrado (2026-08-13)**: el usuario aprobó explícitamente el último
+lote de casos dudosos (mismo teléfono → misma persona) y descartó Fase 5.
+Estado final confirmado en base: **36.103 raw_records** (18.135 de Pablo +
+17.968 de Sindy, importados directo de sus cuentas de Google),
+**36.102 normalizados**, **8.541 contactos finales** tras deduplicar,
+**0 casos pendientes de revisión**. `Data/Salida/lista-maestra.xlsx`
+(10.267 filas) es la lista maestra vigente. Lo único que sigue abierto es
+Fase 4 (sync a Google Contacts) — requiere que Pablo/Sindy hagan el login
+de Google una vez, es el único paso que Claude no puede hacer.
 
 **Segunda interfaz en construcción**: además del panel HTML clásico
 (`reviewer_app.py`, descripto abajo), hay una **UI nueva en React**
@@ -150,13 +155,14 @@ la sección "Scheduled" de Claude Code, no vive en este repo porque no es
 código Python; `Iniciar Panel.bat` / `Instalar (primera vez).bat` en la
 raíz de `motor-contactos/` permiten usar todo esto sin abrir una terminal.
 
-Todavía NO construido: Fase 5 (escaneo de directorios de la PC, pospuesta
-a propósito — falta que Pablo defina qué carpetas incluir/excluir antes de
-tocar el filesystem fuera de `Data/Crudos`) y modo híbrido de revisión
-(lote + individual, hoy solo hay lote en `/revisar` e individual en
-`/editar`, no un tercer modo combinado) — ver
+**Fase 5 (escaneo de directorios de la PC): descartada explícitamente
+(2026-08-13), no forma parte del alcance del proyecto.** Modo híbrido de
+revisión (lote + individual combinados en un tercer modo) sigue sin
+construir — hoy hay lote (`/revisar`) e individual (`/editar`) por
+separado, cubre el caso de uso real sin necesidad de un tercer modo. Ver
 `C:\Users\Pablo\.claude\plans\lee-claude-md-y-dame-immutable-pony.md`
-secciones "Spec cerrada v2" y "ACTUALIZACIÓN 2/3/4/5" para el detalle completo.
+secciones "Spec cerrada v2" y "ACTUALIZACIÓN 2/3/4/5" para el detalle
+histórico completo.
 
 **Para que Fase 3 extraiga algo de imágenes/capturas**: instalar
 Tesseract-OCR (el binario, no alcanza con `pip install`) desde

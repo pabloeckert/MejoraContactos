@@ -164,6 +164,109 @@ def _resolver_con_llm(
     return decidido_por
 
 
+def aplicar_decision_lote(conn: sqlite3.Connection, patron: str, aceptar: bool) -> int:
+    """Aplica una decisión humana en lote (botón "Aprobar/Rechazar fusión
+    de todo el lote" del revisor, patrón de scoring.py) a TODOS los pares
+    `revision_pendiente` de ese patrón en la corrida más reciente.
+
+    A diferencia de solo actualizar decisiones_log (lo que hacía esta
+    función antes de que existiera), si `aceptar=True` esto también
+    fusiona de verdad los clusters correspondientes -- sin este paso, la
+    cola de pendientes bajaba a 0 pero la lista maestra exportada seguía
+    mostrando los contactos como separados, porque _materializar_clusters
+    solo corre dentro de deduplicar_todo() y una corrida nueva no reusa
+    decisiones manuales de una corrida ya completada (solo reanuda una
+    corrida incompleta, ver deduplicar_todo()).
+
+    Fusionar acá es union-find sobre clusters YA EXISTENTES (no sobre
+    normalized_record ids sueltos): cada par pendiente puede involucrar
+    contactos que ya son cluster de varios raw_records (por fusiones de
+    regla previas), así que se fusionan los clusters completos de ambos
+    lados, no solo el par puntual."""
+    filas = conn.execute(
+        "SELECT id, raw_record_id_a, raw_record_id_b FROM decisiones_log "
+        "WHERE accion = 'revision_pendiente' AND detalle = ?",
+        (patron,),
+    ).fetchall()
+    if not filas:
+        return 0
+
+    nueva_accion = "fusionar" if aceptar else "separar"
+    for fila in filas:
+        conn.execute(
+            "UPDATE decisiones_log SET accion = ?, decidido_por = 'humano' WHERE id = ?",
+            (nueva_accion, fila["id"]),
+        )
+
+    if aceptar:
+        _fusionar_pares_de_clusters(
+            conn, [(f["raw_record_id_a"], f["raw_record_id_b"]) for f in filas]
+        )
+
+    conn.commit()
+    return len(filas)
+
+
+def _fusionar_pares_de_clusters(conn: sqlite3.Connection, pares_normalized_ids: list[tuple[int, int]]) -> None:
+    """pares_normalized_ids son pares de normalized_record.id (el nombre de
+    columna decisiones_log.raw_record_id_a/b es heredado pero en realidad
+    guarda normalized_record ids -- ver deduplicar_todo()). Traduce cada
+    uno a su cluster_id ACTUAL y fusiona esos clusters completos entre sí."""
+    mapa_raw = {
+        fila["id"]: fila["raw_record_id"]
+        for fila in conn.execute("SELECT id, raw_record_id FROM normalized_records").fetchall()
+    }
+    cluster_de_raw = {
+        fila["raw_record_id"]: fila["cluster_id"]
+        for fila in conn.execute("SELECT raw_record_id, cluster_id FROM clusters").fetchall()
+    }
+
+    padres: dict[str, str] = {}
+
+    def raiz(x: str) -> str:
+        while padres.get(x, x) != x:
+            padres[x] = padres.get(padres[x], padres[x])
+            x = padres[x]
+        return x
+
+    def unir(a: str, b: str) -> None:
+        ra, rb = raiz(a), raiz(b)
+        if ra != rb:
+            padres[ra] = rb
+
+    cluster_ids_afectados: set[str] = set()
+    for id_a, id_b in pares_normalized_ids:
+        raw_a, raw_b = mapa_raw.get(id_a), mapa_raw.get(id_b)
+        if raw_a is None or raw_b is None:
+            continue
+        ca, cb = cluster_de_raw.get(raw_a), cluster_de_raw.get(raw_b)
+        if ca is None or cb is None or ca == cb:
+            continue
+        padres.setdefault(ca, ca)
+        padres.setdefault(cb, cb)
+        unir(ca, cb)
+        cluster_ids_afectados.add(ca)
+        cluster_ids_afectados.add(cb)
+
+    grupos: dict[str, list[str]] = {}
+    for cluster_id in cluster_ids_afectados:
+        grupos.setdefault(raiz(cluster_id), []).append(cluster_id)
+
+    for miembros in grupos.values():
+        if len(miembros) < 2:
+            continue
+        raw_ids_del_grupo = sorted(
+            raw_id for raw_id, cid in cluster_de_raw.items() if cid in miembros
+        )
+        nuevo_cluster_id = f"c-{uuid.uuid5(uuid.NAMESPACE_OID, str(raw_ids_del_grupo))}"
+        marcadores = ",".join("?" * len(raw_ids_del_grupo))
+        conn.execute(
+            f"UPDATE clusters SET cluster_id = ?, decidido_por = 'humano', actualizado_en = ? "
+            f"WHERE raw_record_id IN ({marcadores})",
+            (nuevo_cluster_id, _ahora(), *raw_ids_del_grupo),
+        )
+
+
 def deshacer(conn: sqlite3.Connection, cluster_id: str) -> int:
     """Separa todos los raw_records de un cluster en clusters propios de
     nuevo. No borra decisiones_log — queda como auditoría de que hubo una

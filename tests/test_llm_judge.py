@@ -116,6 +116,27 @@ def test_content_null_no_rompe_la_corrida_prueba_el_siguiente():
     assert veredicto.misma_persona is False
 
 
+def test_tope_de_intentos_gratis_no_prueba_toda_la_rotacion():
+    """Regresión: sin tope, un caso con muchos candidatos fallando prueba
+    TODOS (14 en producción) antes de escalar -- eso fue lo que hizo tardar
+    más de 2hs una corrida de 596 casos. Con maximo_intentos_gratis=2, solo
+    debe llamar a 2 (groq + el primero de la rotación), nunca al segundo."""
+    import requests
+
+    config = _config(rotacion=("modelo-a:free", "modelo-b:free", "modelo-c:free"))
+    config = LlmConfig(
+        activar_para_dudosos=True,
+        primario=config.primario,
+        rotacion_gratis_openrouter=config.rotacion_gratis_openrouter,
+        maximo_intentos_gratis=2,
+        escalado=config.escalado,
+    )
+    judge = LlmJudge(config)
+    with patch("requests.post", side_effect=requests.ConnectionError("fallo")) as post:
+        judge.decidir({}, {})
+    assert post.call_count == 2 + 1  # 2 gratis + escalado a anthropic
+
+
 def test_si_nadie_responde_devuelve_none():
     import requests
 

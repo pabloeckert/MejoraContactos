@@ -87,6 +87,12 @@ class LlmConfig:
     # varios proveedores gratis en vez de agotar la cuota de uno solo.
     # Ver llm_judge.py y ESPECIFICACION.md § LLM-judge.
     rotacion_gratis_openrouter: tuple[str, ...] = ()
+    # Tope de candidatos gratis probados POR CASO antes de escalar a
+    # Anthropic (incluye a `primario`) — sin este tope, un caso puede
+    # terminar probando los 14 candidatos gratis en secuencia si todos
+    # fallan/tardan, multiplicando el tiempo total por nada (encontrado en
+    # la práctica: 596 casos con esto sin limitar tardaron más de 2hs).
+    maximo_intentos_gratis: int = 3
     escalado: LlmEscaladoConfig = field(default_factory=LlmEscaladoConfig)
 
 
@@ -211,5 +217,6 @@ def _cargar_llm(raw: dict) -> LlmConfig:
         activar_para_dudosos=bool(raw.get("activar_para_dudosos", False)),
         primario=primario,
         rotacion_gratis_openrouter=rotacion,
+        maximo_intentos_gratis=int(raw.get("maximo_intentos_gratis", 3)),
         escalado=escalado,
     )

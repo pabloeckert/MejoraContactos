@@ -41,6 +41,7 @@ def deduplicar_todo(config: Config, conn: sqlite3.Connection) -> dict[str, int]:
     judge = LlmJudge(config.llm) if config.llm.activar_para_dudosos else None
 
     contadores: dict[str, int] = {"regla": 0, "revision_pendiente": 0, "separados": 0}
+    llamadas_llm = 0
 
     for id_a, id_b in sorted(candidatos):
         reg_a = scoring.cargar_registro(conn, id_a)
@@ -61,6 +62,13 @@ def deduplicar_todo(config: Config, conn: sqlite3.Connection) -> dict[str, int]:
             if not resuelto:
                 _loguear(conn, id_a, id_b, "revision_pendiente", "pendiente", score, corrida_id, patron)
             contadores[clave] = contadores.get(clave, 0) + 1
+            # La banda media (LLM) es la única lenta -- red por caso, hasta
+            # varios segundos. Progreso visible cada 10 para no quedar a
+            # ciegas en una corrida larga (encontrado en la práctica: sin
+            # esto, 2hs sin ninguna señal de si seguía viva o colgada).
+            llamadas_llm += 1
+            if llamadas_llm % 10 == 0:
+                print(f"  ...LLM-judge: {llamadas_llm} casos ambiguos procesados", flush=True)
 
     _materializar_clusters(conn, uf, corrida_id)
     conn.commit()

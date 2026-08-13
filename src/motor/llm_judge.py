@@ -77,10 +77,16 @@ class LlmJudge:
             return None
 
         candidatos = self._candidatos_gratis()
+        # Tope de intentos gratis por caso -- sin esto, un caso donde el
+        # candidato de turno tarda/falla puede terminar probando los 14
+        # candidatos en secuencia (hasta 14 x 15s de timeout = 3.5 min por
+        # UN caso). Con 3 alcanza para repartir carga sin que un caso lento
+        # se coma minutos enteros.
+        intentos = min(len(candidatos), self._config.maximo_intentos_gratis)
         umbral = self._config.escalado.umbral_confianza_groq
         mejor: VeredictoLlm | None = None
 
-        for i in range(len(candidatos)):
+        for i in range(intentos):
             candidato = candidatos[(self._siguiente_indice + i) % len(candidatos)]
             veredicto = self._consultar(candidato.proveedor, candidato.modelo, contacto_a, contacto_b)
             if veredicto is None:
@@ -90,7 +96,7 @@ class LlmJudge:
                 self._siguiente_indice = (self._siguiente_indice + i + 1) % len(candidatos)
                 return veredicto
 
-        self._siguiente_indice = (self._siguiente_indice + 1) % len(candidatos)
+        self._siguiente_indice = (self._siguiente_indice + intentos) % len(candidatos)
 
         escalado = self._config.escalado
         veredicto_escalado = self._consultar(escalado.proveedor, escalado.modelo, contacto_a, contacto_b)
@@ -136,7 +142,7 @@ def _llamar_openai_compatible(proveedor: str, api_key: str, modelo: str, prompt_
             ],
             "temperature": 0,
         },
-        timeout=20,
+        timeout=12,  # bajado de 20s -- con hasta 3 intentos gratis por caso, 20s cada uno se sentía en la práctica
     )
     respuesta.raise_for_status()
     return respuesta.json()["choices"][0]["message"]["content"]
@@ -156,7 +162,7 @@ def _llamar_anthropic(api_key: str, modelo: str, prompt_usuario: str) -> str:
             "system": _PROMPT_SISTEMA,
             "messages": [{"role": "user", "content": prompt_usuario}],
         },
-        timeout=20,
+        timeout=12,  # bajado de 20s -- con hasta 3 intentos gratis por caso, 20s cada uno se sentía en la práctica
     )
     respuesta.raise_for_status()
     return respuesta.json()["content"][0]["text"]

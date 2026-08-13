@@ -93,6 +93,13 @@ llm:
     - "cohere/north-mini-code:free"
     - "poolside/laguna-s-2.1:free"
     - "poolside/laguna-xs-2.1:free"
+  # Tope de candidatos gratis probados POR CASO antes de escalar a
+  # Anthropic (incluye a `primario`) -- sin este tope, un caso puede
+  # terminar probando los 14 candidatos gratis en secuencia si todos
+  # fallan/tardan (encontrado en la práctica: 596 casos así tardaron más
+  # de 2hs). Con 3 alcanza para repartir carga sin que un caso lento se
+  # coma minutos enteros.
+  maximo_intentos_gratis: 3
   escalado:
     proveedor: "anthropic"
     modelo: "claude-sonnet-4-5"

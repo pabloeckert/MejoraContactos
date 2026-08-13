@@ -1,15 +1,48 @@
 # Motor de consolidación de contactos
 
-Sistema local (Python) para escanear, limpiar, deduplicar y consolidar los
-contactos desparramados en `Data/Crudos` (Excel, CSV, TXT, VCF, JSON, HTML,
-Google Contacts exports, etc.) en una lista maestra única, lista para
-importar a Google Contacts / WhatsApp.
+Sistema local (Python) para limpiar, deduplicar y consolidar los contactos
+reales de Pablo y Sindy en una lista maestra única, sincronizable con
+Google Contacts.
 
-Todo corre en esta PC, sobre tus archivos reales. Nada se sube a ningún
-lado. Ver `Data/decisiones-arquitectura.txt` para las decisiones de fondo
-que dieron origen a este diseño.
+Todo corre en esta PC. Nada se sube a ningún lado salvo las llamadas
+directas a Google (People API, con permiso ya otorgado por cada cuenta) y
+a los proveedores de IA usados para los casos dudosos de deduplicación.
 
-## Estado actual
+**Este README no es la fuente de verdad del estado del proyecto — se
+actualiza cuando hay tiempo, no en cada sesión.** Los documentos que SÍ se
+mantienen al día en cada sesión de trabajo son:
+- [`ESPECIFICACION.md`](ESPECIFICACION.md) — arquitectura completa y reglas
+  que no se negocian.
+- [`PENDIENTES.md`](PENDIENTES.md) — qué falta, qué está bloqueado, qué
+  está pospuesto a propósito. Es lo primero a leer para saber "qué falta".
+- [`DECISIONES.md`](DECISIONES.md) — log append-only de decisiones y
+  hallazgos, con fecha y motivo.
+- `handoffs/` — un reporte de traspaso por sesión (tests, commits, estado),
+  el más reciente por orden de fecha es el más confiable.
+- [`PROMPT_CONTINUACION.md`](PROMPT_CONTINUACION.md) — cómo retomar el
+  proyecto en una cuenta de Claude nueva.
+
+**Pivote importante (2026-08-11)**: el sistema dejó de depender de los
+exports manuales `Data/Crudos/pablo.csv`/`Sindy.csv` (se borraron sin
+querer recuperarlos) y ahora se conecta **directo a Google Contacts vía
+People API** (`google_contacts_source.py` — ver `GOOGLE_SETUP.md`). Las
+cifras y ejemplos de más abajo que mencionan "34.811 registros" o
+`Data/Crudos/*.csv` corresponden a esa etapa anterior del proyecto y ya NO
+reflejan el dataset real actual — quedan como documentación histórica de
+cómo se construyó y probó cada pieza, no como estado vigente. Estado real
+más reciente confirmado en base (2026-08-13): **36.103 raw_records**
+(18.135 de Pablo + 17.968 de Sindy, importados directo de sus cuentas de
+Google), **36.102 normalizados**, **8.590 contactos finales** tras
+deduplicar, **649 casos en cola de revisión** pendientes de aprobar a mano
+en `/revisar`.
+
+**Segunda interfaz en construcción**: además del panel HTML clásico
+(`reviewer_app.py`, descripto abajo), hay una **UI nueva en React**
+(`ui/`, Vite+React+TS+Tailwind) que habla con `src/motor/api.py` — una API
+JSON montada sobre el mismo Flask app, sin reemplazar el panel clásico.
+Ver `ESPECIFICACION.md` para el detalle de qué tiene cada una.
+
+## Estado actual (histórico — ver aviso arriba)
 
 **Fase 1 (MVP) construida y validada de punta a punta contra datos reales**
 (`Data/Crudos/pablo.csv` + `Data/Crudos/Sindy.csv`, 34.811 registros):
@@ -91,6 +124,14 @@ limpieza. Verificado a mano: 0 caracteres especiales (comillas/apóstrofes),
 juntos, 1 caso residual de nombre sospechoso (de 572 originales) que quedó
 sin resolver por ser un patrón demasiado ambiguo para un regex.
 
+Distribución del auto-etiquetado sobre esas 10.197 filas: 7.008 "personal"
+(default, sin cargo/empresa/palabra clave detectada), 3.126 "laboral", 41
+"familiar", 18 "proveedor", 4 "cliente" — la heurística por palabras clave
+solo tiene señal fuerte cuando el campo Nota de referencia trae algo
+explícito; para la mayoría de los 34.811 contactos reales ese campo viene
+vacío, así que la mayoría cae en "personal" hasta que se corrija a mano
+desde `/editar`.
+
 **Fases 1, 2, 3 y 4 construidas.** Fase 4 (`google-apps-script/Sync.gs` +
 `google-apps-script/README.md`): sincroniza la lista maestra con Google
 Contacts vía Apps Script (`ContactsApp`, sin configuración extra en Google
@@ -99,12 +140,23 @@ el Sheet compartido, pegar el script en cada cuenta, autorizar — son pasos
 que solo Pablo/Sindy pueden hacer con su propio login de Google; el panel
 web (sección "Fase 4") tiene los pasos resumidos.
 
+**Auto-etiquetado, edición en línea, aviso mensual y lanzador de doble
+clic — construidos.** Auto-etiquetado (`tagging.py`) completa el campo Tag
+solo al normalizar; edición en línea vive en `/buscar` → `/editar/<id>`
+del panel web (tabla `ediciones_manuales`, override no destructivo sobre
+el export); el aviso mensual es una tarea programada real (día 30 de cada
+mes, 9:00) que corre el pipeline y avisa el resumen — administrable desde
+la sección "Scheduled" de Claude Code, no vive en este repo porque no es
+código Python; `Iniciar Panel.bat` / `Instalar (primera vez).bat` en la
+raíz de `motor-contactos/` permiten usar todo esto sin abrir una terminal.
+
 Todavía NO construido: Fase 5 (escaneo de directorios de la PC, pospuesta
-a propósito). Auto-etiquetado del campo `tag`, edición en línea en el
-revisor web, modo híbrido de revisión (lote + individual), y el aviso
-mensual del día 30 quedan para una fase posterior — ver
+a propósito — falta que Pablo defina qué carpetas incluir/excluir antes de
+tocar el filesystem fuera de `Data/Crudos`) y modo híbrido de revisión
+(lote + individual, hoy solo hay lote en `/revisar` e individual en
+`/editar`, no un tercer modo combinado) — ver
 `C:\Users\Pablo\.claude\plans\lee-claude-md-y-dame-immutable-pony.md`
-secciones "Spec cerrada v2" y "ACTUALIZACIÓN 2/3/4" para el detalle completo.
+secciones "Spec cerrada v2" y "ACTUALIZACIÓN 2/3/4/5" para el detalle completo.
 
 **Para que Fase 3 extraiga algo de imágenes/capturas**: instalar
 Tesseract-OCR (el binario, no alcanza con `pip install`) desde
@@ -113,6 +165,12 @@ en el PATH de Windows, indicar la ruta en `config.yaml` (`ocr.tesseract_cmd`,
 ejemplo comentado ahí mismo).
 
 ## Primera vez
+
+**Sin terminal**: doble clic en `Instalar (primera vez).bat` (una sola vez) y
+después `Iniciar Panel.bat` (cada vez que se quiera usar) — ambos en la raíz
+de `motor-contactos/`.
+
+**Por línea de comandos**, si se prefiere:
 
 ```bash
 cd motor-contactos
@@ -197,10 +255,19 @@ Las API keys (`GROQ_API_KEY`, `ANTHROPIC_API_KEY`) van en `motor-contactos/.env`
 
 **Con panel web (recomendado)** — abre el navegador solo, sin memorizar comandos:
 
+Doble clic en `Iniciar Panel.bat`, o por línea de comandos:
+
 ```bash
 cd motor-contactos
 PYTHONPATH=src .venv/Scripts/python.exe -m motor.cli panel
 ```
+
+Dentro del panel: "Panel" corre el pipeline paso a paso o de una vez,
+"Revisión pendiente" es la cola de aprobación en lote para los casos
+dudosos, y "Buscar / editar contacto" permite buscar a alguien por
+nombre/teléfono/email y corregir a mano Nombre/Apellido/Cargo/Empresa/Tag/
+dirección/nota — esa corrección siempre pisa lo que calculó la limpieza
+automática para ese contacto puntual.
 
 **Por línea de comandos:**
 

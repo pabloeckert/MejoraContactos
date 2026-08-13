@@ -223,3 +223,112 @@ su reporte automáticamente (busca las últimas bajo el separador `---`).
   muchísimo.
 
 ---
+
+## 2026-08-13 (cont.) — Inconsistencia histórica encontrada: clusters vs decisiones_log desincronizados
+
+- Al relanzar `deduplicar` (ya con reanudación), retomó la corrida
+  `2026-08-12T16:44:13` (139.957 pares ya decididos, todos) en vez de la
+  más reciente `2026-08-12T22:10:58`. Investigando se encontró que
+  `clusters` (la tabla que define "contactos finales") tenía SOLO la
+  corrida `16:44:13` materializada — es decir, **los "8.593 contactos" y
+  "596 pendientes" que se venían mostrando desde que se cargaron las API
+  keys eran de DOS corridas distintas y desincronizadas entre sí**: los
+  contactos finales seguían siendo de ANTES de cargar las keys (658
+  pendientes, cero resueltos por IA), mientras que el conteo de
+  "pendientes" sí reflejaba la corrida con keys (596, la que restó los 62
+  resueltos). No se pudo reconstruir con certeza total el porqué exacto
+  (la corrida `22:10:58` logueó sus 139.957 decisiones pero aparentemente
+  nunca llegó a completar `_materializar_clusters()` + commit final, bajo
+  el código VIEJO de un solo commit al final — no se investigó más a
+  fondo, prioridad baja ahora que existe la reanudación con commits
+  periódicos, que hace este escenario mucho menos probable de repetirse).
+- No hubo pérdida de datos ni corrupción — la inconsistencia era entre dos
+  ESTADOS VÁLIDOS, no un dato corrupto. Se resolvió con una corrida 100%
+  fresca (`continuar=False`) que deja `decisiones_log` y `clusters`
+  consistentes bajo un único `corrida_id` nuevo.
+- Nota de tooling: `Start-Process ... -ArgumentList "-c", "código con
+  punto y coma"` en PowerShell rompe el código Python (lo corta mal,
+  `SyntaxError: invalid syntax` en la palabra `from`). Para correr Python
+  ad hoc desde un proceso desprendido, escribir un archivo `.py` real y
+  pasarlo como argumento -- nunca `-c` con código multi-statement.
+  `scripts/_correr_dedup_fresco.py` (temporal, no versionado como parte
+  del pipeline normal) es el ejemplo que se usó acá.
+
+---
+
+## 2026-08-13 (cont. 2) — Continuación con resumen de contexto incompleto: trabajo redundante detectado y descartado sin daño
+
+- Esta sesión se retomó desde un resumen de contexto (compactación) que
+  describía el proyecto en un estado MUCHO más viejo que el real (CSV
+  manuales en `Data/Crudos`, sin pivote a Google Contacts, sin `api.py`,
+  sin UI React, ~34.811 registros). El resumen no mencionaba nada de lo
+  documentado arriba (pivote a Google, corridas de dedup reales,
+  reanudación, etc.) — quedó fuera del corte de compactación.
+- Consecuencia: se reconstruyeron desde cero, redundantemente, features
+  que YA estaban hechas y commiteadas (`tagging.py`/auto-etiquetado,
+  edición en línea en `/buscar`→`/editar` con `ediciones_manuales`,
+  `Iniciar Panel.bat`/`Instalar (primera vez).bat`). `git status`/`git log`
+  confirmaron que esos archivos ya estaban trackeados con el commit
+  inicial (`56b6260`) y que la versión ya existente era MÁS completa que
+  la recién escrita (la ya existente permite editar también
+  WhatsApp/teléfono fijo/email con normalización real vía `config`, algo
+  que esta sesión no había llegado a escribir todavía). No se detectó
+  ningún conflicto de contenido real (los `Write`/`Edit` de esta sesión no
+  rompieron nada, `pytest` siguió en 179 verde antes y después).
+- Se corrió `python -m motor.cli run` sin saber que había una corrida de
+  dedup resumible en curso sobre el dataset REAL (36.103 contactos de
+  Google) — con `continuar=True` (default), esto retomó/completó esa
+  misma corrida en vez de crear una corrida nueva descartable. Verificado
+  contra la base: un solo `corrida_id` materializado en `clusters`
+  (`2026-08-13T10:16:23`, 36.102 filas, 8.590 contactos finales, 649
+  pendientes) — coincide con el resumen que ya había en
+  `handoffs/dedup-corrida.log`. **No se hizo ninguna llamada nueva a
+  Groq/Anthropic/OpenRouter** (el diccionario de resultado de esta sesión
+  no trae claves `llm_groq`/`llm_anthropic`, a diferencia de la corrida
+  del log que sí las tiene) — sin costo adicional. **No se perdió ningún
+  dato** (`raw_records`/`normalized_records`/`decisiones_log` intactos,
+  apéndice-only). Conclusión: la operación fue inocua, pero fue casualidad
+  favorable, no una decisión informada — el sistema de resumido está
+  diseñado justamente para tolerar esto, pero no hay que asumirlo dos
+  veces sin volver a leer `PENDIENTES.md`/el handoff más reciente primero.
+- Se corrió el backfill de `tag` (auto-etiquetado) sobre los 36.102
+  `normalized_records` reales vía script directo — quedó 0 filas sin tag.
+  Distribución real: 7.861 "personal", 2.388 "laboral", 43 "familiar", 10
+  "proveedor", 3 "cliente" (sobre 10.305 filas exportadas — más de una fila
+  por contacto cuando hay más de un WhatsApp/fijo/email). La mayoría cae
+  en "personal" por default porque el campo Nota de referencia casi nunca
+  trae texto explícito en los datos reales — se corrige a mano por
+  contacto puntual desde `/editar`, no hay forma de mejorar mucho más la
+  heurística sin ese texto.
+- Se creó una tarea programada real (`mcp__scheduled-tasks`, NO
+  `CronCreate` — ese vive solo dentro de la sesión y expira a los 7 días,
+  no sirve para "todos los meses" indefinidamente) para el aviso mensual
+  del día 30 pedido en la encuesta original: `aviso-mensual-contactos`,
+  cron `0 9 30 * *` (9:00, día 30 de cada mes — no dispara en febrero, que
+  no tiene día 30; limitación aceptada, no es un bug). Corre
+  `motor.cli run` y avisa el resumen. **Limitación real, no ocultada**:
+  esta tarea corre "mientras esta app esté abierta"; si está cerrada el
+  día 30, corre en el próximo inicio — no es un disparador a nivel de
+  Windows independiente de que la app esté abierta. Si en algún momento
+  hace falta garantía más dura (que corra SÍ o SÍ el día exacto sin
+  depender de que la app de Claude esté abierta), la alternativa es un
+  Windows Task Scheduler apuntando a un script `.bat`/`.ps1` — no
+  construido todavía, evaluar si hace falta.
+- Se corrigió un bug real encontrado al probar en vivo (`preview_start` +
+  Browser pane) la ruta `/buscar`→`/editar` recién agregada: el panel
+  Flask tira `sqlite3.ProgrammingError: SQLite objects created in a thread
+  can only be used in that same thread` en cualquier request real (no en
+  los tests, que usan `test_client()` síncrono) porque el server de
+  desarrollo de Werkzeug corre cada request en un hilo nuevo por default,
+  y la conexión sqlite se crea una sola vez al arrancar. Fix en `cli.py`:
+  `crear_app(config, conn).run(port=..., threaded=False)` — un solo
+  usuario en localhost no necesita concurrencia real. Verificado en vivo
+  contra el panel real: búsqueda y guardado de una edición confirmados
+  funcionando end-to-end (se hizo y se deshizo sobre un contacto real de
+  prueba, sin dejar el tag de prueba puesto).
+- **Lección para la próxima sesión/cuenta**: antes de tocar la base real o
+  correr el pipeline "para verificar algo", leer primero `PENDIENTES.md` y
+  el handoff más reciente — no asumir que el resumen de contexto de la
+  conversación está completo, sobre todo después de una compactación.
+
+---

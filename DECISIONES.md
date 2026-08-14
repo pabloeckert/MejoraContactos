@@ -839,3 +839,52 @@ del reporte).
 - **201 tests en verde** (200 → 201: 1 de `test_image_ocr_extractor.py`).
 
 ---
+
+## 2026-08-14 (cont. 2) — Nueva instrucción permanente: autonomía total, y por qué Fase 4 sigue sin poder probarse en vivo
+
+- **El usuario pidió explícitamente, de acá en adelante, no esperar
+  respuesta suya para actuar** — "es más fácil corregir lo que veo que
+  sentarme y esperar cada vez que preguntes". Esto refuerza (no reemplaza)
+  la dogma ya existente de "Continuous work mode"/"PM autonomy" en
+  CLAUDE.md — el único límite que sigue vigente, y que el propio CLAUDE.md
+  ya nombraba como ejemplo explícito, es cuando el siguiente paso requiere
+  físicamente las manos/ojos/login del usuario (login de Google es el
+  ejemplo textual). Cualquier cuenta de Claude que retome este proyecto
+  debe operar bajo este criterio: decidir y avanzar sin encuestas, y
+  reservar las preguntas solo para bloqueos genuinos de ese tipo.
+- **Se intentó probar Fase 4 (`Sync.gs`) contra una cuenta de prueba,
+  pedido explícito de esta sesión.** Sigue bloqueado por la misma razón ya
+  documentada varias veces en este archivo y en `PENDIENTES.md`: el primer
+  `sincronizarContactos()` de un proyecto de Apps Script nuevo exige que el
+  dueño de la cuenta de Google click-through un consentimiento OAuth real
+  en el navegador ("Google no verificó esta app" → Avanzado → Ir a
+  [proyecto]) — no hay forma de completar eso sin la presencia física del
+  usuario, ni con el nuevo pedido de autonomía total ni con ninguna otra
+  instrucción posible (entrar credenciales/otorgar permisos OAuth en
+  nombre de otra persona está fuera de lo que Claude puede hacer, es una
+  regla de seguridad, no una preferencia de flujo de trabajo).
+- **Lo que sí se hizo de forma autónoma para dejar el paso bloqueante lo
+  más corto posible cuando el usuario tenga 5 minutos**: se releyó
+  `Sync.gs` completo de punta a punta buscando bugs antes de su primera
+  corrida real contra datos reales (sin hallazgos — DRY_RUN, reintento con
+  backoff en 429, manejo de contacto borrado en Google con fallback a
+  crear de nuevo, todo se ve correcto) y se generó
+  `lista-maestra-PRUEBA-fase4.xlsx` (enviado directo al usuario, no
+  versionado en el repo — 3 contactos 100% ficticios, ninguno real, con la
+  MISMA estructura exacta que produce `export.py`: mismo nombre de
+  pestaña "Lista maestra", mismas 15 columnas/encabezados en el mismo
+  orden, mismo estilo de encabezado azul de marca) para que el usuario
+  solo tenga que: Sheet en blanco → Archivo → Importar → Subir ese archivo
+  → Extensiones → Apps Script → pegar `Sync.gs` → Servicios → agregar
+  People API → correr `sincronizarContactos()` (dry-run) → revisar el log
+  → pasar `DRY_RUN` a `false` → correr de nuevo → confirmar en
+  contacts.google.com → borrar los 3 contactos de prueba. Este archivo de
+  prueba usa teléfonos con el prefijo `555` (convención reservada para
+  datos ficticios) y emails `@ejemplo-motor-contactos.test` — nunca puede
+  confundirse con un contacto real si queda pegado sin querer.
+- **No queda nada más por preparar de este lado** — el siguiente paso es
+  100% del usuario. Cuando confirme el resultado (o pegue el log de la
+  corrida), actualizar `PENDIENTES.md` § Fase 4 y este log con el
+  resultado real.
+
+---

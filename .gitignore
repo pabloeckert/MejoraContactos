@@ -18,6 +18,10 @@ App/
 build/
 *.spec
 
+# Documento de auditoría generado (scripts/generar_auditoria.py) --
+# artefacto regenerable, no versionar el binario.
+motor-contactos-auditoria.docx
+
 # OAuth de Google Contacts -- secretos, nunca a git (ni siquiera al repo local)
 credentials.json
 token_*.json

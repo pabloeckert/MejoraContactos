@@ -780,3 +780,62 @@ personal de Pablo, no una herramienta de decisiones de UI.
   reconstruido y verificado en vivo tras el rediseño de UI.
 
 ---
+
+## 2026-08-14 (cont.) — Los 2 hallazgos restantes de la revisión: ausencia de auto-build y fallo silencioso de Tesseract
+
+El usuario pidió cerrar los dos hallazgos que habían quedado sin encarar de
+la revisión pegada en la ronda anterior (ambos MEDIO/BAJO en el risk matrix
+del reporte).
+
+- **Ausencia de auto-build del ejecutable**: el reporte proponía CI clásico
+  (ej. GitHub Actions). Se descartó esa forma concreta a propósito — este
+  repo no tiene remoto ni lo va a tener (decisión ya tomada y documentada
+  arriba, 2026-08-13 cont. 3: contiene datos personales reales de terceros),
+  así que no hay dónde correr un runner de CI. El problema de fondo sí es
+  real: `App/MotorContactos.exe` es un artefacto generado
+  (`.gitignore`) que solo se actualiza si alguien se acuerda de correr
+  `build_exe.ps1` a mano después de tocar `ui/src` o el backend — puede
+  quedar viejo en silencio indefinidamente. Se ató la solución al
+  checkpoint que YA existe y YA se corre al cerrar cada ronda:
+  `scripts/handoff.ps1` ahora compara el `LastWriteTime` más reciente de
+  `ui/src`, `src/motor` y `assets` contra el del `.exe` actual, y si hay
+  código más nuevo, llama a `build_exe.ps1` solo, antes de correr los
+  tests — sin tocar nada si no hace falta (no reconstruye en cada handoff,
+  solo cuando hay cambios reales). El resultado (reconstruido / al día /
+  falló) queda en la sección "Ejecutable" del reporte de handoff.
+  **Probado en vivo de punta a punta en esta misma sesión**: primer intento
+  se cortó a mitad del build de PyInstaller por un error de tooling propio
+  (un `Select-Object -First N` sobre la salida de `handoff.ps1` cerró el
+  pipeline antes de tiempo y mató el proceso — PowerShell corta upstream
+  cuando `-First` ya juntó lo que necesitaba; quedó un `build/` a medio
+  escribir, sin daño real porque `git status` seguía limpio y no se había
+  tageado el handoff). Se limpió el residuo y se corrió de nuevo en
+  background sin truncar la salida — terminó bien: detectó el `.exe`
+  desactualizado, lo reconstruyó, y el binario nuevo se lanzó a mano
+  (`App\MotorContactos.exe escritorio`) confirmando título de ventana
+  correcto y `/api/stats` respondiendo con los datos reales (8.541
+  contactos).
+- **Fallo silencioso de Tesseract-OCR**: `image_ocr_extractor.py` atrapaba
+  CUALQUIER excepción de `pytesseract.image_to_string` (Tesseract no
+  instalado, imagen corrupta, lo que sea) en el mismo `except Exception`
+  genérico y devolvía `[]` sin loguear nada — el docstring del módulo
+  afirmaba que esto "queda logueado (ver ingest.py)", pero eso era falso: al
+  atraparse adentro del propio extractor, la excepción nunca llegaba al
+  `try/except` de `ingest.py` que sí imprime un aviso por archivo. Efecto
+  real: si a alguien se le pasa por alto instalar el binario de Tesseract,
+  procesar una carpeta entera de capturas de pantalla no da NINGUNA señal
+  de que el problema es "falta un programa", se ve idéntico a "ninguna de
+  estas imágenes tenía un contacto". Fix: se separó
+  `pytesseract.TesseractNotFoundError` del resto de excepciones — ese caso
+  específico imprime un aviso claro (con el link de instalación) UNA sola
+  vez por corrida (flag de módulo, no por archivo, para no inundar la
+  consola si hay cientos de capturas), el resto de errores (imagen
+  corrupta, formato no soportado) se mantiene en silencio como antes,
+  porque ESO sí es ruido esperado por archivo, no un problema de entorno.
+  Test de regresión nuevo mockeando `pytesseract.image_to_string` para
+  forzar el caso específico (no se puede depender de si la máquina que
+  corre los tests tiene o no Tesseract instalado) y confirmando que el
+  aviso sale exactamente una vez con dos imágenes procesadas.
+- **201 tests en verde** (200 → 201: 1 de `test_image_ocr_extractor.py`).
+
+---

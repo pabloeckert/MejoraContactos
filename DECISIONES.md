@@ -631,3 +631,54 @@ aplica a decisiones de arquitectura de software.
   probado en vivo.
 
 ---
+
+## 2026-08-13 (cont. 6) — Feedback en vivo sobre la tabla de contactos: bug real + rediseño UX
+
+El usuario abrió la app de escritorio y pidió en vivo: ver todos los
+campos sin doble clic, columnas angostables/ensanchables, y un filtro
+combinado "mejor que Excel". Pidió `/optimo-de-uso` (confirmó Sonnet +
+Code, sin cambios), `/design:ux-copy` (patrones de copy aplicados: "X de Y
+contactos" para el contador, estructura qué-es/por-qué-vacío/cómo-seguir
+para el empty state de filtros vacíos con acción "Limpiar filtros") y
+`/anthropic-skills:mejora-continua-brand` (ya aplicado). **NO se usó
+`/anthropic-skills:master-vision`** otra vez — sigue siendo el coach
+personal de Pablo, no una herramienta de decisiones de UI.
+
+- **Bug real encontrado antes de tocar el diseño**: `/api/contactos`
+  clavaba `tamano` en un tope de 500 server-side — con 8.541 contactos
+  reales, la tabla NUNCA había mostrado más de los primeros 500 desde que
+  se construyó (silencioso, sin error, simplemente el resto no estaba
+  disponible para filtrar/ver). Tope subido a 20.000; la UI ahora carga
+  toda la lista una sola vez al entrar y filtra/busca 100% client-side
+  (instantáneo, sin ida y vuelta al server por cada tecla — apropiado
+  para este volumen de datos, no lo sería para millones de filas). Test
+  de regresión (`test_api_contactos_tamano_puede_superar_500`).
+- **`ContactsTable.tsx` reescrito**: 12 columnas configurables (antes 5
+  fijas, con Cargo/Empresa combinados en un string) + Nombre fijo a la
+  izquierda. Por columna: mostrar/ocultar (menú "Columnas"), ancho
+  redimensionable a mano (drag del borde), filtro de texto-contiene (Tag
+  usa multiselect en vez de texto libre, mismo enum que
+  `motor/tagging.py`). Anchos y visibilidad persisten en `localStorage`
+  entre sesiones. Búsqueda global instantánea sobre todos los campos a la
+  vez (con normalización de acentos, "Posadas"/"posadas"/"pósadas"
+  matchean igual). Contador "X de Y contactos" y botón "Limpiar N
+  filtros" cuando hay algo activo.
+- **Bug de UX encontrado probando en vivo, no hipotético**: el menú
+  "Columnas" y el filtro de una columna podían quedar abiertos los dos a
+  la vez (verificado con `javascript_tool`, `document.querySelectorAll`
+  mostraba las opciones de ambos popovers superpuestas). Arreglado: abrir
+  uno cierra el otro.
+- **`types.ts` tenía un gap real**: `Contacto` no incluía `cumpleanos` ni
+  `foto_url` (campos agregados a `api.py` en una sesión anterior, nunca
+  reflejados en el tipo de TypeScript) — corregido, ahora la columna
+  Cumpleaños tiene tipo real en vez de depender de acceso no tipado.
+- Verificado en vivo con `javascript_tool` (los clicks del `computer` tool
+  no registraban de forma confiable contra esta ventana -- se usó
+  disparo de eventos DOM nativo como alternativa, más confiable):
+  búsqueda global (8.541 → 1.285 con "posadas"), toggle de columnas,
+  filtro de tag (8.541 → 3 con "cliente", los 3 con el tag correcto),
+  resize (160px → 240px, persistido en localStorage).
+- **195 tests en verde** (194 → 195: 1 nuevo en `test_api.py`). `.exe`
+  reconstruido y `TUTORIAL.md` actualizado con la sección de la tabla.
+
+---

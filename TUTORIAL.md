@@ -62,6 +62,23 @@ Botones abajo a la izquierda:
   reconocen (necesitan Tesseract-OCR instalado aparte para capturas, ver
   `README.md`).
 
+## 3.5. La tabla de contactos, a fondo
+
+- **Todos los campos**: 12 columnas configurables (Cargo, Empresa,
+  WhatsApp, Teléfono fijo, Email, Ciudad, Provincia, País, Domicilio,
+  Cumpleaños, Tag, Nota) más Nombre fijo a la izquierda. Botón
+  **"Columnas"** para tildar/destildar cuáles ver — se acuerda entre
+  sesiones.
+- **Angostar/ensanchar**: arrastrá el borde derecho de cualquier
+  encabezado de columna. También se acuerda.
+- **Filtro por columna**: el ícono de lupa en cada encabezado abre un
+  filtro de "contiene" (texto) o, en Tag, una lista para tildar una o
+  varias categorías a la vez.
+- **Búsqueda global**: la caja de arriba busca en TODOS los campos a la
+  vez, instantánea (no hace falta esperar, ya está todo cargado).
+- **"Limpiar N filtros"**: aparece cuando hay algo filtrado, saca todo de
+  una.
+
 ## 4. Editar un contacto a mano
 
 Sección "Contactos" → buscar → click en la fila → se abre el editor:

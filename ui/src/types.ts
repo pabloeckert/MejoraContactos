@@ -12,6 +12,8 @@ export interface Contacto {
   ciudad: string;
   provincia: string;
   pais: string;
+  cumpleanos: string;
+  foto_url: string;
   nota_referencia: string;
 }
 

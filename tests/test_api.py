@@ -71,6 +71,24 @@ def test_api_contactos_lista_y_pagina(tmp_path):
     assert cuerpo["contactos"][0]["nombre"]  # viene serializado, no un dataclass/set
 
 
+def test_api_contactos_tamano_puede_superar_500(tmp_path):
+    # La UI carga toda la lista de una y filtra client-side -- si el tope
+    # server-side siguiera clavado en 500, con más de 500 contactos reales
+    # (hoy son 8.541) la tabla nunca mostraría el resto.
+    config = _config_prueba(tmp_path)
+    filas = "\n".join(f"Persona{i},Apellido{i},{3743500000 + i}" for i in range(3))
+    (config.rutas.carpeta_raiz / "a.csv").write_text(f"Nombre,Apellido,Telefono\n{filas}\n", encoding="utf-8")
+    conn = conectar(config.rutas.base_sqlite)
+    cliente = crear_app(config, conn).test_client()
+    cliente.post("/api/accion/run")
+
+    respuesta = cliente.get("/api/contactos?tamano=5000&pagina=1")
+    cuerpo = respuesta.get_json()
+
+    assert cuerpo["tamano"] == 5000  # no se lo pisó a 500
+    assert len(cuerpo["contactos"]) == 3
+
+
 def test_api_contacto_inexistente_da_404(tmp_path):
     config = _config_prueba(tmp_path)
     conn = conectar(config.rutas.base_sqlite)

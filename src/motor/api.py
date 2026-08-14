@@ -45,7 +45,12 @@ def registrar_rutas_api(app: Flask, config: Config, conn: sqlite3.Connection) ->
     def api_contactos():
         consulta = request.args.get("q", "").strip()
         pagina = max(_a_entero(request.args.get("pagina"), 1), 1)
-        tamano = min(max(_a_entero(request.args.get("tamano"), 100), 1), 500)
+        # Tope alto (no 500): la UI carga TODA la lista una sola vez y
+        # filtra/busca client-side (instantáneo, sin ida y vuelta al
+        # server por cada tecla) -- 8.500 contactos hoy es liviano para
+        # una sola respuesta JSON local. Sigue habiendo tope para no
+        # aceptar un valor arbitrariamente grande de un query param.
+        tamano = min(max(_a_entero(request.args.get("tamano"), 100), 1), 20000)
 
         if consulta:
             contactos = buscar_contactos(conn, consulta, limite=tamano)

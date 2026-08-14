@@ -4,10 +4,13 @@
     desde cero: compila la UI React y corre PyInstaller.
 
 .NOTES
-    Correr esto de nuevo cada vez que cambie el código de la UI (ui/src/)
-    o del backend Python que usa el modo "escritorio" (desktop_app.py,
-    api.py, export.py, etc.) -- App/ es un artefacto generado, no se
-    versiona en git (ver .gitignore), así que no se actualiza solo.
+    scripts/handoff.ps1 ya llama a este script automáticamente cuando
+    detecta código más nuevo en ui/src, src/motor o assets que el último
+    build de App/MotorContactos.exe -- no hace falta acordarse de correrlo
+    a mano después de cada cambio. Sigue sirviendo para correrlo manual
+    durante desarrollo iterativo (probar el .exe sin esperar al cierre de
+    la ronda). App/ es un artefacto generado, no se versiona en git (ver
+    .gitignore), así que sin este mecanismo no se actualiza solo.
 
     config.yaml, .env, Data/ NO se empaquetan a propósito -- el .exe los
     busca en tiempo de ejecución subiendo desde su propia carpeta (ver

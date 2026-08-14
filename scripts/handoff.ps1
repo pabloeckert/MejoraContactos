@@ -8,15 +8,19 @@
 
 .DESCRIPTION
     1. Commitea cualquier cambio sin commitear en motor-contactos/.git.
-    2. Corre pytest y captura el resultado.
-    3. Junta los commits nuevos desde el ultimo tag "handoff-*".
-    4. Lee las ultimas entradas de DECISIONES.md y el estado de
+    2. Detecta si App\MotorContactos.exe quedo desactualizado (hay codigo
+       en ui/src, src/motor o assets mas nuevo que el ultimo build) y lo
+       reconstruye solo si hace falta -- build_exe.ps1 existia pero nada
+       recordaba correrlo, asi que el .exe podia quedar viejo en silencio.
+    3. Corre pytest y captura el resultado.
+    4. Junta los commits nuevos desde el ultimo tag "handoff-*".
+    5. Lee las ultimas entradas de DECISIONES.md y el estado de
        PENDIENTES.md.
-    5. Arma motor-contactos/handoffs/handoff-<timestamp>.md con todo, y lo
+    6. Arma motor-contactos/handoffs/handoff-<timestamp>.md con todo, y lo
        imprime en pantalla.
-    6. Tagea el commit actual como handoff-<timestamp> (marca el punto de
+    7. Tagea el commit actual como handoff-<timestamp> (marca el punto de
        corte para la proxima corrida).
-    7. De paso, respalda Data/ (mismo mecanismo que setup_project.ps1).
+    8. De paso, respalda Data/ (mismo mecanismo que setup_project.ps1).
 
 .NOTES
     Correr esto ANTES de que se corte la sesion por limite de cuota, no
@@ -58,14 +62,56 @@ try {
         $seCommiteo = $false
     }
 
-    # 2. Tests
+    # 2. Auto-build del .exe si quedo desactualizado -- antes dependia de
+    # que alguien se acordara de correr build_exe.ps1 a mano despues de
+    # tocar ui/src o el backend; si se olvidaba, el .exe quedaba viejo sin
+    # que nada lo avisara.
+    $ExePath = Join-Path $MotorDir "App\MotorContactos.exe"
+    $CarpetasFuenteExe = @(
+        (Join-Path $MotorDir "ui\src"),
+        (Join-Path $MotorDir "src\motor"),
+        (Join-Path $MotorDir "assets")
+    ) | Where-Object { Test-Path $_ }
+
+    $ultimaModificacionFuente = $CarpetasFuenteExe |
+        ForEach-Object { Get-ChildItem -Path $_ -Recurse -File -ErrorAction SilentlyContinue } |
+        Measure-Object -Property LastWriteTime -Maximum |
+        Select-Object -ExpandProperty Maximum
+
+    if (-not (Test-Path $ExePath)) {
+        $exeDesactualizado = $true
+        $motivoExe = "App\MotorContactos.exe todavia no existe"
+    } elseif ($ultimaModificacionFuente -and $ultimaModificacionFuente -gt (Get-Item $ExePath).LastWriteTime) {
+        $exeDesactualizado = $true
+        $motivoExe = "hay codigo mas nuevo ($ultimaModificacionFuente) que el ultimo build ($((Get-Item $ExePath).LastWriteTime))"
+    } else {
+        $exeDesactualizado = $false
+        $motivoExe = "sin cambios en ui/src, src/motor o assets desde el ultimo build"
+    }
+
+    if ($exeDesactualizado) {
+        Write-Host "==> App\MotorContactos.exe desactualizado ($motivoExe) -- reconstruyendo..." -ForegroundColor Yellow
+        try {
+            & (Join-Path $ScriptDir "build_exe.ps1")
+            $resultadoExe = "Reconstruido automaticamente ($motivoExe)."
+            Write-Host "==> $resultadoExe" -ForegroundColor Green
+        } catch {
+            $resultadoExe = "FALLO la reconstruccion automatica ($motivoExe): $($_.Exception.Message)"
+            Write-Host "==> $resultadoExe" -ForegroundColor Red
+        }
+    } else {
+        $resultadoExe = "Al dia -- $motivoExe."
+        Write-Host "==> App\MotorContactos.exe $resultadoExe" -ForegroundColor Cyan
+    }
+
+    # 3. Tests
     $venvPython = Join-Path $MotorDir ".venv\Scripts\python.exe"
     $env:PYTHONPATH = Join-Path $MotorDir "src"
     $salidaTests = & $venvPython -m pytest -q 2>&1 | Out-String
     $testsOk = $LASTEXITCODE -eq 0
     $resumenTests = ($salidaTests -split "`n" | Select-Object -Last 5) -join "`n"
 
-    # 3. Commits desde el ultimo handoff
+    # 4. Commits desde el ultimo handoff
     $ultimoTag = git tag --list "handoff-*" --sort=-creatordate | Select-Object -First 1
     if ($ultimoTag) {
         $rangoLog = "$ultimoTag..HEAD"
@@ -76,7 +122,7 @@ try {
         $diffStat = "(primer handoff -- no hay punto de comparacion previo)"
     }
 
-    # 4. DECISIONES.md (ultimas entradas) y PENDIENTES.md completo
+    # 5. DECISIONES.md (ultimas entradas) y PENDIENTES.md completo
     $decisionesPath = Join-Path $MotorDir "DECISIONES.md"
     $pendientesPath = Join-Path $MotorDir "PENDIENTES.md"
     $ultimasDecisiones = ""
@@ -87,9 +133,13 @@ try {
     }
     $pendientes = if (Test-Path $pendientesPath) { Get-Content $pendientesPath -Raw -Encoding UTF8 } else { "(no existe PENDIENTES.md)" }
 
-    # 5. Armar el reporte
+    # 6. Armar el reporte
     $reporte = @"
 # Handoff -- $timestamp
+
+## Ejecutable (App\MotorContactos.exe)
+
+$resultadoExe
 
 ## Tests
 
@@ -123,7 +173,7 @@ $pendientes
     $archivoReporte = Join-Path $HandoffsDir "handoff-$timestamp.md"
     Set-Content -Path $archivoReporte -Value $reporte -Encoding UTF8
 
-    # 6. Tag del punto de corte
+    # 7. Tag del punto de corte
     git tag $tagNuevo | Out-Null
 
     Write-Host ""
@@ -134,7 +184,7 @@ $pendientes
     Pop-Location
 }
 
-# 7. Backup de Data/ tambien, mismo criterio que setup_project.ps1
+# 8. Backup de Data/ tambien, mismo criterio que setup_project.ps1
 if (Test-Path (Join-Path $DataDir ".git")) {
     Push-Location $DataDir
     try {

@@ -11,9 +11,13 @@ Windows: descargar el instalador desde
 https://github.com/UB-Mannheim/tesseract/wiki e indicar la ruta con
 `pytesseract.pytesseract.tesseract_cmd` si el binario no queda en el PATH.
 Sin el binario instalado, este extractor no rompe el pipeline — devuelve
-[] y queda logueado (ver ingest.py, que envuelve cada extractor en
-try/except desde que se sumaron los extractores experimentales de Fase 3),
-simplemente no aporta esos contactos hasta que se instale."""
+[] para cada imagen, pero avisa UNA vez por corrida (no una vez por
+archivo, que sería puro ruido si hay cientos de capturas) de que Tesseract
+falta y por eso no se está extrayendo nada de ninguna imagen — antes de
+este aviso, la falta del binario y "esta imagen en particular no tenía
+ningún contacto" se veían exactamente igual desde afuera (ambas devuelven
+[] en silencio), así que no había forma de notar el problema real sin leer
+el código."""
 
 from __future__ import annotations
 
@@ -25,14 +29,28 @@ from PIL import Image
 from motor.extractors.base import RawContactRecord, registrar
 from motor.extractors.freetext_extractor import extraer_contactos_de_texto
 
+_avisado_tesseract_faltante = False
+
 
 @registrar("png", "jpg", "jpeg")
 def extraer_imagen(path: Path) -> list[RawContactRecord]:
+    global _avisado_tesseract_faltante
     try:
         texto = pytesseract.image_to_string(Image.open(path), lang="spa+eng")
+    except pytesseract.TesseractNotFoundError:
+        if not _avisado_tesseract_faltante:
+            print(
+                "aviso: Tesseract-OCR no está instalado en este sistema — las "
+                "imágenes (.png/.jpg/.jpeg) se van a saltear sin extraer "
+                "contactos hasta que se instale. Ver "
+                "https://github.com/UB-Mannheim/tesseract/wiki"
+            )
+            _avisado_tesseract_faltante = True
+        return []
     except Exception:
-        # Tesseract no instalado, formato de imagen no soportado, etc. —
-        # no inventar datos ni romper el resto de la extracción.
+        # Imagen corrupta, formato no soportado, etc. -- esto sí es ruido
+        # esperado por archivo (no un problema de entorno), se mantiene en
+        # silencio a nivel de este extractor tal como antes.
         return []
 
     return [

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { listarContactos } from "../api";
 import type { Contacto } from "../types";
 import EditDialog from "./EditDialog";
-import { IconAlert, IconSearch, IconUsers, IconX } from "./icons";
+import { IconAlert, IconSearch, IconSliders, IconUsers, IconX } from "./icons";
 
 // Carga toda la base en memoria y filtra/ordena client-side -- 8.500
 // contactos es liviano, y así la búsqueda y los filtros por columna son
@@ -64,18 +64,27 @@ function iniciales(c: Contacto): string {
   return n + a || "·";
 }
 
-function nombreCompleto(c: Contacto): string {
-  const n = `${c.nombre ?? ""} ${c.apellido ?? ""}`.trim();
-  return n || "(sin nombre)";
+// Sin nombre no significa sin identidad: mostramos el mejor identificador
+// secundario disponible (whatsapp > email > empresa) en vez del genérico
+// "(sin nombre)" pelado -- pedido explícito tras revisión UX (2026-08-14).
+function identidad(c: Contacto): { texto: string; esFallback: boolean } {
+  const nombre = `${c.nombre ?? ""} ${c.apellido ?? ""}`.trim();
+  if (nombre) return { texto: nombre, esFallback: false };
+  const alterno = c.whatsapp[0] || c.telefono_fijo[0] || c.emails[0] || c.organizacion;
+  return { texto: alterno || "Sin datos de identidad", esFallback: true };
 }
 
+// Paleta de avatar derivada de los 3 colores de marca (azul/rojo/amarillo)
+// más 3 tonos neutros de apoyo -- antes era la paleta genérica de Tailwind
+// (azul/verde/violeta/ámbar/rosa/cian) sin relación con la identidad
+// visual del resto de la app.
 const COLORES_AVATAR = [
-  "bg-blue-100 text-blue-700",
-  "bg-emerald-100 text-emerald-700",
-  "bg-violet-100 text-violet-700",
-  "bg-amber-100 text-amber-700",
-  "bg-rose-100 text-rose-700",
-  "bg-cyan-100 text-cyan-700",
+  "bg-marca-azul/10 text-marca-azul",
+  "bg-marca-rojo/10 text-marca-rojo",
+  "bg-marca-amarillo/25 text-[#8a6c0a]", // texto oscurecido sobre amarillo por contraste (WCAG)
+  "bg-neutral-200 text-neutral-700",
+  "bg-marca-azul/20 text-marca-azul",
+  "bg-neutral-800/10 text-neutral-800",
 ];
 
 function colorAvatar(seed: string): string {
@@ -100,8 +109,7 @@ export default function ContactsTable() {
   const [busquedaGlobal, setBusquedaGlobal] = useState("");
   const [filtrosColumna, setFiltrosColumna] = useState<Partial<Record<ColumnKey, string>>>({});
   const [tagsFiltro, setTagsFiltro] = useState<Set<string>>(new Set());
-  const [columnaConFiltroAbierto, setColumnaConFiltroAbierto] = useState<ColumnKey | null>(null);
-  const [menuColumnasAbierto, setMenuColumnasAbierto] = useState(false);
+  const [panelAbierto, setPanelAbierto] = useState(false);
 
   const [anchos, setAnchos] = useState<Record<string, number>>(() =>
     cargarJSON(
@@ -115,11 +123,6 @@ export default function ContactsTable() {
       Object.fromEntries(COLUMNAS.map((c) => [c.key, c.visibleDefault])),
     ),
   );
-
-  function alternarFiltroColumna(key: ColumnKey) {
-    setColumnaConFiltroAbierto((v) => (v === key ? null : key));
-    setMenuColumnasAbierto(false);
-  }
 
   const contenedorRef = useRef<HTMLDivElement>(null);
   const resizeRef = useRef<{ key: ColumnKey; startX: number; startAncho: number } | null>(null);
@@ -159,7 +162,7 @@ export default function ContactsTable() {
       }
       if (global) {
         const bolsa = normalizarTexto(
-          [nombreCompleto(c), ...COLUMNAS.map((col) => col.texto(c))].join(" "),
+          [identidad(c).texto, ...COLUMNAS.map((col) => col.texto(c))].join(" "),
         );
         if (!bolsa.includes(global)) return false;
       }
@@ -220,38 +223,20 @@ export default function ContactsTable() {
           />
         </div>
 
-        <div className="relative">
-          <button
-            onClick={() => {
-              setMenuColumnasAbierto((v) => !v);
-              setColumnaConFiltroAbierto(null);
-            }}
-            className="rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
-          >
-            Columnas
-          </button>
-          {menuColumnasAbierto && (
-            <>
-              <div className="fixed inset-0 z-10" onClick={() => setMenuColumnasAbierto(false)} />
-              <div className="absolute left-0 top-full z-20 mt-1 w-56 rounded-lg border border-neutral-200 bg-white p-2 shadow-lg">
-                <p className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-wide text-neutral-400">
-                  Columnas visibles
-                </p>
-                {COLUMNAS.map((col) => (
-                  <label key={col.key} className="flex items-center gap-2 rounded px-2 py-1.5 text-sm text-neutral-700 hover:bg-neutral-50">
-                    <input
-                      type="checkbox"
-                      checked={visibles[col.key] !== false}
-                      onChange={(e) => setVisibles((prev) => ({ ...prev, [col.key]: e.target.checked }))}
-                      className="accent-accent"
-                    />
-                    {col.label}
-                  </label>
-                ))}
-              </div>
-            </>
+        <button
+          onClick={() => setPanelAbierto(true)}
+          className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition ${
+            filtrosActivos > 0
+              ? "border-accent/40 bg-accent/5 text-accent"
+              : "border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-50"
+          }`}
+        >
+          <IconSliders className="h-3.5 w-3.5" />
+          Columnas y filtros
+          {filtrosActivos > 0 && (
+            <span className="rounded-full bg-accent px-1.5 py-0.5 text-[10px] font-semibold text-white">{filtrosActivos}</span>
           )}
-        </div>
+        </button>
 
         {filtrosActivos > 0 && (
           <button
@@ -299,41 +284,35 @@ export default function ContactsTable() {
                 <div className="sticky left-0 z-10 flex shrink-0 items-center border-r border-neutral-200 bg-neutral-50 px-4" style={{ width: anchoNombre }}>
                   Nombre
                 </div>
-                {columnasActivas.map((col) => (
-                  <div
-                    key={col.key}
-                    className="relative flex shrink-0 items-center gap-1 border-r border-neutral-100 px-3"
-                    style={{ width: anchos[col.key] ?? col.anchoDefault }}
-                  >
-                    <span className="truncate">{col.label}</span>
-                    {col.key === "tag" ? (
-                      <TagFiltroBoton
-                        abierto={columnaConFiltroAbierto === "tag"}
-                        onToggle={() => alternarFiltroColumna("tag")}
-                        seleccionados={tagsFiltro}
-                        onCambiar={setTagsFiltro}
-                      />
-                    ) : (
-                      <ColumnaFiltroBoton
-                        activo={!!filtrosColumna[col.key]}
-                        abierto={columnaConFiltroAbierto === col.key}
-                        onToggle={() => alternarFiltroColumna(col.key)}
-                        valor={filtrosColumna[col.key] ?? ""}
-                        onCambiar={(v) => setFiltrosColumna((prev) => ({ ...prev, [col.key]: v }))}
-                        label={col.label}
-                      />
-                    )}
+                {columnasActivas.map((col) => {
+                  const filtroActivo = col.key === "tag" ? tagsFiltro.size > 0 : !!filtrosColumna[col.key];
+                  return (
                     <div
-                      onMouseDown={(e) => iniciarResize(col.key, e)}
-                      className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-accent/30"
-                    />
-                  </div>
-                ))}
+                      key={col.key}
+                      className="relative flex shrink-0 items-center gap-1 border-r border-neutral-100 px-3"
+                      style={{ width: anchos[col.key] ?? col.anchoDefault }}
+                    >
+                      <span className="truncate">{col.label}</span>
+                      {/* Sin popover por columna a propósito -- se sacaron porque en
+                          las columnas del extremo derecho (Tag, Nota) se abrían
+                          fuera del viewport visible. Un punto simple avisa que hay
+                          un filtro activo; ajustarlo se hace desde el panel lateral
+                          (botón "Columnas y filtros"), que siempre es visible
+                          completo sin importar qué tan angosta o ancha esté la tabla. */}
+                      {filtroActivo && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" title="Filtro activo" />}
+                      <div
+                        onMouseDown={(e) => iniciarResize(col.key, e)}
+                        className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-accent/30"
+                      />
+                    </div>
+                  );
+                })}
               </div>
 
               <div style={{ height: virtualizador.getTotalSize(), position: "relative" }}>
                 {virtualizador.getVirtualItems().map((fila) => {
                   const c = filtrados[fila.index];
+                  const id = identidad(c);
                   return (
                     <button
                       key={c.cluster_id}
@@ -357,7 +336,12 @@ export default function ContactsTable() {
                         >
                           {iniciales(c)}
                         </span>
-                        <span className="truncate font-medium text-neutral-800">{nombreCompleto(c)}</span>
+                        <span className="min-w-0">
+                          <span className={`block truncate font-medium ${id.esFallback ? "text-neutral-500" : "text-neutral-800"}`}>
+                            {id.texto}
+                          </span>
+                          {id.esFallback && <span className="block text-[10px] uppercase tracking-wide text-neutral-400">Sin nombre</span>}
+                        </span>
                       </span>
                       {columnasActivas.map((col) => (
                         <span
@@ -387,99 +371,126 @@ export default function ContactsTable() {
         )}
       </div>
 
+      {panelAbierto && (
+        <PanelColumnasFiltros
+          visibles={visibles}
+          onCambiarVisible={(key, val) => setVisibles((prev) => ({ ...prev, [key]: val }))}
+          filtrosColumna={filtrosColumna}
+          onCambiarFiltro={(key, val) => setFiltrosColumna((prev) => ({ ...prev, [key]: val }))}
+          tagsFiltro={tagsFiltro}
+          onCambiarTags={setTagsFiltro}
+          onLimpiarTodo={limpiarFiltros}
+          onCerrar={() => setPanelAbierto(false)}
+        />
+      )}
+
       {editando && <EditDialog contacto={editando} onClose={() => setEditando(null)} onGuardado={alGuardar} />}
     </div>
   );
 }
 
-function ColumnaFiltroBoton({
-  activo,
-  abierto,
-  onToggle,
-  valor,
-  onCambiar,
-  label,
+// Panel lateral único para columnas visibles + filtro por campo. Reemplaza
+// el dropdown de "Columnas" (que se abría sobre el propio contenido de la
+// tabla, tapando las primeras filas) y los popovers de filtro por
+// encabezado (que en las columnas del extremo derecho se abrían fuera del
+// viewport visible en tablas anchas) -- un solo lugar fijo, siempre
+// completamente visible sin importar el ancho/scroll de la tabla.
+function PanelColumnasFiltros({
+  visibles,
+  onCambiarVisible,
+  filtrosColumna,
+  onCambiarFiltro,
+  tagsFiltro,
+  onCambiarTags,
+  onLimpiarTodo,
+  onCerrar,
 }: {
-  activo: boolean;
-  abierto: boolean;
-  onToggle: () => void;
-  valor: string;
-  onCambiar: (v: string) => void;
-  label: string;
+  visibles: Record<string, boolean>;
+  onCambiarVisible: (key: ColumnKey, val: boolean) => void;
+  filtrosColumna: Partial<Record<ColumnKey, string>>;
+  onCambiarFiltro: (key: ColumnKey, val: string) => void;
+  tagsFiltro: Set<string>;
+  onCambiarTags: (s: Set<string>) => void;
+  onLimpiarTodo: () => void;
+  onCerrar: () => void;
 }) {
-  return (
-    <div className="relative">
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onToggle();
-        }}
-        className={`rounded p-0.5 ${activo ? "text-accent" : "text-neutral-300 hover:text-neutral-500"}`}
-        title={`Filtrar por ${label.toLowerCase()}`}
-      >
-        <IconSearch className="h-3 w-3" />
-      </button>
-      {abierto && (
-        <>
-          <div className="fixed inset-0 z-10" onClick={onToggle} />
-          <div className="absolute left-0 top-full z-20 mt-1 w-48 rounded-lg border border-neutral-200 bg-white p-2 normal-case shadow-lg">
-            <input
-              autoFocus
-              value={valor}
-              onChange={(e) => onCambiar(e.target.value)}
-              placeholder={`${label} contiene...`}
-              className="w-full rounded border border-neutral-300 px-2 py-1 text-xs font-normal outline-none focus:border-accent"
-            />
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-function TagFiltroBoton({
-  abierto,
-  onToggle,
-  seleccionados,
-  onCambiar,
-}: {
-  abierto: boolean;
-  onToggle: () => void;
-  seleccionados: Set<string>;
-  onCambiar: (s: Set<string>) => void;
-}) {
-  function alternar(tag: string) {
-    const nuevo = new Set(seleccionados);
+  function alternarTag(tag: string) {
+    const nuevo = new Set(tagsFiltro);
     if (nuevo.has(tag)) nuevo.delete(tag);
     else nuevo.add(tag);
-    onCambiar(nuevo);
+    onCambiarTags(nuevo);
   }
 
   return (
-    <div className="relative">
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onToggle();
-        }}
-        className={`rounded p-0.5 ${seleccionados.size > 0 ? "text-accent" : "text-neutral-300 hover:text-neutral-500"}`}
-        title="Filtrar por tag"
-      >
-        <IconSearch className="h-3 w-3" />
-      </button>
-      {abierto && (
-        <>
-          <div className="fixed inset-0 z-10" onClick={onToggle} />
-          <div className="absolute left-0 top-full z-20 mt-1 w-44 rounded-lg border border-neutral-200 bg-white p-2 normal-case shadow-lg">
-            {[...TAGS_CONOCIDOS, "(sin tag)"].map((tag) => (
-              <label key={tag} className="flex items-center gap-2 rounded px-2 py-1 text-sm font-normal text-neutral-700 hover:bg-neutral-50">
-                <input type="checkbox" checked={seleccionados.has(tag)} onChange={() => alternar(tag)} className="accent-accent" />
-                {tag}
+    <>
+      <div className="fixed inset-0 z-30 bg-black/20" onClick={onCerrar} />
+      <div className="fixed right-0 top-0 z-40 flex h-full w-[22rem] flex-col bg-white shadow-2xl">
+        <div className="flex items-center justify-between border-b border-neutral-200 px-5 py-4">
+          <h2 className="font-marca text-sm font-medium text-marca-azul">Columnas y filtros</h2>
+          <button onClick={onCerrar} className="rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600">
+            <IconX className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto scroll-fino px-5 py-4">
+          <section className="mb-6">
+            <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-400">Columnas visibles</h3>
+            <div className="grid grid-cols-2 gap-1">
+              {COLUMNAS.map((col) => (
+                <label key={col.key} className="flex items-center gap-2 rounded px-1.5 py-1 text-sm text-neutral-700 hover:bg-neutral-50">
+                  <input
+                    type="checkbox"
+                    checked={visibles[col.key] !== false}
+                    onChange={(e) => onCambiarVisible(col.key, e.target.checked)}
+                    className="accent-accent"
+                  />
+                  {col.label}
+                </label>
+              ))}
+            </div>
+          </section>
+
+          <section>
+            <div className="mb-2 flex items-center justify-between">
+              <h3 className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">Filtros por campo</h3>
+              <button onClick={onLimpiarTodo} className="text-xs font-medium text-marca-rojo hover:underline">
+                Limpiar todo
+              </button>
+            </div>
+
+            <div className="mb-3">
+              <label className="mb-1 block text-xs font-medium text-neutral-600">Tag</label>
+              <div className="flex flex-wrap gap-1.5">
+                {[...TAGS_CONOCIDOS, "(sin tag)"].map((tag) => (
+                  <button
+                    key={tag}
+                    onClick={() => alternarTag(tag)}
+                    className={`rounded-full border px-2.5 py-1 text-xs font-medium transition ${
+                      tagsFiltro.has(tag)
+                        ? "border-accent bg-accent text-white"
+                        : "border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300"
+                    }`}
+                  >
+                    {tag}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {COLUMNAS.filter((c) => c.key !== "tag").map((col) => (
+              <label key={col.key} className="mb-3 block text-xs font-medium text-neutral-600">
+                {col.label}
+                <input
+                  value={filtrosColumna[col.key] ?? ""}
+                  onChange={(e) => onCambiarFiltro(col.key, e.target.value)}
+                  placeholder="Contiene..."
+                  className="mt-1 w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm font-normal text-neutral-800 outline-none focus:border-accent focus:ring-1 focus:ring-accent/30"
+                />
               </label>
             ))}
-          </div>
-        </>
-      )}
-    </div>
+          </section>
+        </div>
+      </div>
+    </>
   );
 }

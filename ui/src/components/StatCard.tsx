@@ -8,23 +8,22 @@ interface Props {
 }
 
 const TONOS: Record<NonNullable<Props["tono"]>, string> = {
-  neutral: "bg-neutral-100 text-neutral-600",
-  accent: "bg-accent/10 text-accent",
-  warn: "bg-marca-rojo/10 text-marca-rojo",
+  neutral: "text-neutral-500",
+  accent: "text-accent",
+  warn: "text-marca-rojo",
 };
 
+// Barra compacta en vez de tarjeta grande (2026-08-14, revisión UX): antes
+// 4 tarjetas de ~90px de alto se comían espacio vertical que la tabla
+// densa necesita más. Todo en una fila, ícono+número+etiqueta inline.
 export default function StatCard({ etiqueta, valor, icono, tono = "neutral" }: Props) {
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
-      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${TONOS[tono]}`}>
-        {icono}
-      </div>
-      <div className="min-w-0">
-        <div className="text-2xl font-semibold leading-tight text-neutral-900">
-          {typeof valor === "number" ? valor.toLocaleString("es-AR") : valor}
-        </div>
-        <div className="truncate text-xs font-medium uppercase tracking-wide text-neutral-500">{etiqueta}</div>
-      </div>
+    <div className="flex items-center gap-2">
+      <span className={TONOS[tono]}>{icono}</span>
+      <span className="text-lg font-semibold leading-none text-neutral-900">
+        {typeof valor === "number" ? valor.toLocaleString("es-AR") : valor}
+      </span>
+      <span className="text-[11px] font-medium uppercase leading-none tracking-wide text-neutral-500">{etiqueta}</span>
     </div>
   );
 }

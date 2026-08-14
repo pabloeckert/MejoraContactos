@@ -25,13 +25,19 @@ los únicos que te tocan a vos.
    en el editor de Apps Script, ícono "Servicios" (+) en el panel
    izquierdo → buscar "People API" → Agregar. Sin este paso el script no
    compila (el objeto `People` no existe todavía en tu proyecto).
-6. **Probar primero con datos de prueba**: antes de correrlo contra la
-   lista real, probá con un Sheet aparte con 2-3 filas ficticias, para
-   confirmar que la migración a People API (ver abajo) funciona bien en tu
-   cuenta antes de tocar tus contactos reales.
-7. Correr `sincronizarContactos` una vez a mano (▶) para autorizar los
-   permisos. Si Google avisa "app no verificada", es tu propio script:
-   Avanzado → Ir a [nombre del proyecto] (no seguro).
+6. **Primera corrida — modo simulación (obligatoria, no opcional)**:
+   `CONFIG.DRY_RUN` empieza en `true` en el código tal cual lo pegaste.
+   Corré `sincronizarContactos` una vez a mano (▶) — esto NO escribe nada
+   real en Google Contacts, solo pide el permiso (si Google avisa "app no
+   verificada", es tu propio script: Avanzado → Ir a [nombre del
+   proyecto]) y deja en el log (Ejecuciones, panel izquierdo) qué
+   operación haría fila por fila. Revisalo.
+7. **Recién si el log del paso 6 se ve bien**: cambiá `DRY_RUN: true` a
+   `DRY_RUN: false` arriba del todo de `Sync.gs`, guardá, y corré
+   `sincronizarContactos` de nuevo — ahí sí escribe de verdad. Se
+   recomienda que esta primera corrida real sea contra un Sheet de
+   prueba con 2-3 contactos ficticios, no contra la lista completa,
+   hasta confirmar que la migración a People API anda bien en tu cuenta.
 8. **(Opcional, recomendado)** Activar un disparador automático: ícono de
    reloj a la izquierda → Añadir disparador → función
    `sincronizarContactos` → Basado en tiempo → cada día.

@@ -34,9 +34,17 @@
  * 6. Corré sincronizarContactos() una vez a mano (▶) para autorizar los
  *    permisos que pide Google. Si aparece "Google no verificó esta app",
  *    es tu propio script — Avanzado > Ir a [nombre del proyecto].
- *    IMPORTANTE: probá esto primero contra un Sheet de prueba con 2-3
- *    contactos ficticios, no contra la lista real, hasta confirmar que
- *    la migración a People API anda bien en tu cuenta.
+ *    CONFIG.DRY_RUN empieza en `true` -- esta primera corrida NO escribe
+ *    nada real, solo pide el permiso y loguea qué haría. Mirá el log
+ *    (Ejecuciones, a la izquierda) y confirmá que las operaciones
+ *    proyectadas tienen sentido antes de seguir al paso 6.5.
+ * 6.5. Recién cuando el log del paso 6 se vea bien: cambiá `DRY_RUN: true`
+ *    a `DRY_RUN: false` arriba del todo del script, guardá, y corré
+ *    sincronizarContactos() de nuevo -- ahí sí escribe en Google Contacts
+ *    de verdad. Se recomienda hacer esta primera corrida real contra un
+ *    Sheet de prueba con 2-3 contactos ficticios, no contra la lista
+ *    completa, hasta confirmar que la migración a People API anda bien
+ *    en tu cuenta.
  * 7. (Opcional, recomendado) Activá un disparador automático: ícono de
  *    reloj a la izquierda > Añadir disparador > función
  *    sincronizarContactos > Basado en tiempo > cada día, a la hora que
@@ -46,7 +54,22 @@
  * (columna "Google Contact ID") en vez de duplicarlos. Si Google devuelve
  * error de cuota (429), reintenta solo esa fila con espera creciente
  * (2s, 4s, 8s, 16s) antes de darse por vencido.
+ *
+ * MODO DRY_RUN (agregado 2026-08-14, tras revisión de riesgos): CONFIG.
+ * DRY_RUN empieza en `true` a propósito -- la primera vez que corras
+ * sincronizarContactos() NO va a escribir nada real en Google Contacts,
+ * solo va a loguear (Ver > Registros, o Ejecuciones a la izquierda) qué
+ * habría hecho fila por fila. Revisá ese log, confirmá que las
+ * operaciones proyectadas tienen sentido, y recién ahí cambiá
+ * CONFIG.DRY_RUN a `false` para que la corrida sea real. En modo DRY_RUN
+ * tampoco se escriben las columnas "Google Contact ID"/"Última
+ * sincronización" -- la hoja queda intacta hasta que de verdad se
+ * sincroniza.
  */
+
+var CONFIG = {
+  DRY_RUN: true, // <- cambiar a false SOLO después de revisar el log de una corrida en dry-run
+};
 
 var NOMBRE_HOJA = "Lista maestra";
 var COLUMNAS = {
@@ -80,6 +103,10 @@ function sincronizarContactos() {
     throw new Error('No se encontró la hoja "' + NOMBRE_HOJA + '". Revisá el nombre de la pestaña.');
   }
 
+  if (CONFIG.DRY_RUN) {
+    Logger.log("=== MODO DRY_RUN — no se escribe nada real en Google Contacts ni en la hoja ===");
+  }
+
   var datos = hoja.getDataRange().getValues();
   var encabezados = datos[0];
   var idx = {};
@@ -87,7 +114,9 @@ function sincronizarContactos() {
     idx[h] = i;
   });
 
-  idx = asegurarColumnas_(hoja, encabezados, idx);
+  if (!CONFIG.DRY_RUN) {
+    idx = asegurarColumnas_(hoja, encabezados, idx);
+  }
 
   var creados = 0;
   var actualizados = 0;
@@ -106,7 +135,7 @@ function sincronizarContactos() {
     }
 
     try {
-      var idExistente = valores[idx[COLUMNAS.idGoogle]];
+      var idExistente = idx[COLUMNAS.idGoogle] !== undefined ? valores[idx[COLUMNAS.idGoogle]] : null;
       var idFinal;
       if (idExistente) {
         idFinal = actualizarContacto_(idExistente, valores, idx);
@@ -115,18 +144,30 @@ function sincronizarContactos() {
         idFinal = crearContacto_(valores, idx);
         creados++;
       }
-      hoja.getRange(fila + 1, idx[COLUMNAS.idGoogle] + 1).setValue(idFinal);
-      hoja.getRange(fila + 1, idx[COLUMNAS.ultimaSync] + 1).setValue(new Date());
+      if (!CONFIG.DRY_RUN) {
+        hoja.getRange(fila + 1, idx[COLUMNAS.idGoogle] + 1).setValue(idFinal);
+        hoja.getRange(fila + 1, idx[COLUMNAS.ultimaSync] + 1).setValue(new Date());
+      }
     } catch (err) {
       Logger.log("Fila " + (fila + 1) + " (" + nombre + " " + apellido + "): " + err);
     }
   }
 
-  Logger.log("Creados: " + creados + " | Actualizados: " + actualizados + " | Saltados (sin datos): " + saltados);
+  Logger.log(
+    (CONFIG.DRY_RUN ? "[DRY_RUN] Proyectado" : "Real") +
+      " — Creados: " + creados + " | Actualizados: " + actualizados + " | Saltados (sin datos): " + saltados
+  );
+  if (CONFIG.DRY_RUN) {
+    Logger.log("Nada de esto se escribió todavía. Revisá el detalle fila por fila arriba y, si está bien, cambiá CONFIG.DRY_RUN a false.");
+  }
 }
 
 function crearContacto_(valores, idx) {
   var persona = construirPersona_(valores, idx);
+  if (CONFIG.DRY_RUN) {
+    Logger.log("[DRY_RUN] Crearía contacto nuevo: " + JSON.stringify(persona));
+    return "DRY_RUN-nuevo";
+  }
   var creado = conReintento_(function () {
     return People.People.createContact(persona);
   });
@@ -134,6 +175,12 @@ function crearContacto_(valores, idx) {
 }
 
 function actualizarContacto_(resourceName, valores, idx) {
+  var persona = construirPersona_(valores, idx);
+  if (CONFIG.DRY_RUN) {
+    Logger.log("[DRY_RUN] Actualizaría " + resourceName + " con: " + JSON.stringify(persona));
+    return resourceName;
+  }
+
   var actual;
   try {
     actual = conReintento_(function () {
@@ -145,7 +192,6 @@ function actualizarContacto_(resourceName, valores, idx) {
     return crearContacto_(valores, idx);
   }
 
-  var persona = construirPersona_(valores, idx);
   persona.etag = actual.etag;
   var actualizado = conReintento_(function () {
     return People.People.updateContact(persona, resourceName, { updatePersonFields: CAMPOS_PERSONA });

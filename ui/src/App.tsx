@@ -97,28 +97,31 @@ export default function App() {
         </div>
       </aside>
 
-      <main className="flex min-w-0 flex-1 flex-col gap-6 overflow-hidden p-6">
-        <div className="grid grid-cols-4 gap-4">
+      <main className="flex min-w-0 flex-1 flex-col gap-4 overflow-hidden p-6">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl border border-neutral-200 bg-white px-5 py-3 shadow-sm">
           <StatCard
             etiqueta="Contactos"
             valor={stats?.contactos_finales ?? "—"}
-            icono={<IconUsers className="h-5 w-5" />}
+            icono={<IconUsers className="h-4 w-4" />}
             tono="accent"
           />
+          <span className="h-5 w-px bg-neutral-200" />
           <StatCard
-            etiqueta="Registros normalizados"
+            etiqueta="Normalizados"
             valor={stats?.normalized_records ?? "—"}
-            icono={<IconDatabase className="h-5 w-5" />}
+            icono={<IconDatabase className="h-4 w-4" />}
           />
+          <span className="h-5 w-px bg-neutral-200" />
           <StatCard
-            etiqueta="Registros crudos"
+            etiqueta="Crudos"
             valor={stats?.raw_records ?? "—"}
-            icono={<IconCheck className="h-5 w-5" />}
+            icono={<IconCheck className="h-4 w-4" />}
           />
+          <span className="h-5 w-px bg-neutral-200" />
           <StatCard
-            etiqueta="Pendientes de revisión"
+            etiqueta="Pendientes"
             valor={stats?.pendientes ?? "—"}
-            icono={<IconClock className="h-5 w-5" />}
+            icono={<IconClock className="h-4 w-4" />}
             tono={stats && stats.pendientes > 0 ? "warn" : "neutral"}
           />
         </div>

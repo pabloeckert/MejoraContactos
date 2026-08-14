@@ -68,15 +68,26 @@ def obtener_credenciales(cuenta: str, scopes: list[str] = _SCOPES, sufijo_token:
     `scopes`/`sufijo_token` separados para "otros contactos" (scope
     distinto al de Fase 4, ver _SCOPES_OTROS_CONTACTOS) -- así cada
     capacidad pide su propio login la primera vez sin pisar el token de
-    la otra."""
+    la otra.
+
+    El token en disco queda cifrado con DPAPI (ver token_crypto.py) --
+    solo se puede desproteger desde esta misma cuenta de Windows. Un
+    token_*.json de antes de este cambio (texto plano) se sigue leyendo
+    igual (migración transparente) y queda re-escrito cifrado la próxima
+    vez que se guarde acá abajo."""
+    import json
+
     from google.auth.transport.requests import Request
     from google.oauth2.credentials import Credentials
     from google_auth_oauthlib.flow import InstalledAppFlow
 
+    from motor.token_crypto import escribir_token_protegido, leer_token_protegido
+
     ruta_token = _ruta_token(cuenta, sufijo_token)
     creds = None
     if ruta_token.exists():
-        creds = Credentials.from_authorized_user_file(str(ruta_token), scopes)
+        info = json.loads(leer_token_protegido(ruta_token))
+        creds = Credentials.from_authorized_user_info(info, scopes)
 
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
@@ -90,7 +101,7 @@ def obtener_credenciales(cuenta: str, scopes: list[str] = _SCOPES, sufijo_token:
                 )
             flow = InstalledAppFlow.from_client_secrets_file(str(_RUTA_CREDENCIALES), scopes)
             creds = flow.run_local_server(port=0)
-        ruta_token.write_text(creds.to_json(), encoding="utf-8")
+        escribir_token_protegido(ruta_token, creds.to_json())
     return creds
 
 

@@ -92,6 +92,7 @@ _PLANTILLA_DASHBOARD = _ESTILO + """
 <ol style="font-size:0.9rem; color:#2B2B2B;">
   <li>Abrí <a href="https://sheets.google.com/create" target="_blank" rel="noopener">un Google Sheet nuevo</a> y subí <code>lista-maestra.xlsx</code> (Archivo → Importar → Subir → Reemplazar hoja actual). Compartilo con Sindy.</li>
   <li>En cada cuenta (Pablo y Sindy), desde ese mismo Sheet: Extensiones → <a href="https://script.google.com" target="_blank" rel="noopener">Apps Script</a> → pegar el código de <code>google-apps-script/Sync.gs</code> → correr <code>sincronizarContactos</code> una vez para autorizar (acá es donde hacés login de Google — el único paso que no puede hacer Claude).</li>
+  <li>El script arranca en modo simulación (<code>DRY_RUN: true</code>) — esa primera corrida no escribe nada real, solo loguea qué haría. Revisá el log (Ejecuciones) y recién ahí cambiá <code>DRY_RUN</code> a <code>false</code> para sincronizar de verdad.</li>
   <li>(Opcional) Activar un disparador diario en cada cuenta para que se sincronice sola.</li>
 </ol>
 <p style="color:#6B7280; font-size:0.85rem;">Instrucciones completas y el código en <code>motor-contactos/google-apps-script/README.md</code>. Una vez hecho esto una vez por cuenta, no hace falta repetirlo — el script actualiza en vez de duplicar.</p>
@@ -286,16 +287,16 @@ def _ejecutar_accion(config: Config, conn: sqlite3.Connection, nombre: str) -> s
         return f"Deduplicación completa — {deduplicar_todo(config, conn)}"
     if nombre == "exportar":
         destino = exportar_lista_maestra(config, conn)
-        return f"Exportado: {destino}"
+        return f"✓ Exportado: {destino.name}"
     if nombre == "exportar-whatsapp":
         destino = exportar_whatsapp_csv(config, conn)
-        return f"Exportado para MejoraWS: {destino} — importalo ahí con \"Importar CSV/Excel\""
+        return f"✓ Exportado para MejoraWS: {destino.name} — importalo ahí con \"Importar CSV/Excel\""
     if nombre == "run":
         extraer_todo(config, conn)
         normalizar_todo(config, conn)
         resultado = deduplicar_todo(config, conn)
         destino = exportar_lista_maestra(config, conn)
-        return f"Corrida completa — deduplicación {resultado} — exportado: {destino}"
+        return f"✓ Corrida completa — deduplicación {resultado} — exportado: {destino.name}"
     if nombre == "deshacer-ultima-corrida":
         resumen = deshacer_ultima_corrida(conn)
         return f"Última corrida revertida — {resumen}"

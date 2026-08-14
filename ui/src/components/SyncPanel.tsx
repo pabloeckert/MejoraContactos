@@ -43,14 +43,20 @@ export default function SyncPanel() {
           API". Corré <code className="rounded bg-neutral-100 px-1 py-0.5 text-xs">sincronizarContactos</code> una vez — ahí te pide login
           de Google, el único paso que es tuyo.
         </Paso>
-        <Paso n={4} titulo="(Opcional) Disparador automático">
+        <Paso n={4} titulo="Revisá el modo simulación antes de activarlo de verdad">
+          El script arranca con <code className="rounded bg-neutral-100 px-1 py-0.5 text-xs">DRY_RUN: true</code> — esa primera corrida no
+          escribe nada real, solo loguea qué haría (Ejecuciones, panel izquierdo de Apps Script). Cuando el log se vea bien, cambiá esa
+          línea a <code className="rounded bg-neutral-100 px-1 py-0.5 text-xs">false</code> y corré de nuevo para que sincronice de verdad.
+        </Paso>
+        <Paso n={5} titulo="(Opcional) Disparador automático">
           Ícono de reloj en Apps Script → Añadir disparador → diario. Se sincroniza solo desde ahí en adelante.
         </Paso>
       </ol>
 
       <p className="rounded-lg border border-marca-amarillo/40 bg-marca-amarillo/10 px-3 py-2 text-xs text-neutral-700">
-        Probá primero contra un Sheet de prueba con 2-3 contactos ficticios antes de correrlo contra la lista real —
-        instrucciones completas en <code className="rounded bg-white px-1 py-0.5">google-apps-script/README.md</code>.
+        Aun con el modo simulación, la primera corrida REAL conviene hacerla contra un Sheet de prueba con 2-3 contactos
+        ficticios antes de la lista completa — instrucciones completas en{" "}
+        <code className="rounded bg-white px-1 py-0.5">google-apps-script/README.md</code>.
       </p>
     </div>
   );

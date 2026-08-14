@@ -209,6 +209,40 @@ línea operativos. Lo único que sigue vivo en este archivo es Fase 4
 - [x] ~~Tutorial rápido de uso~~ — `TUTORIAL.md`.
 - **194 tests en verde** (180 → 194).
 
+## Auditoría .docx + segunda ronda de revisión UX/seguridad (2026-08-14)
+
+- [x] ~~Auditoría técnica real en `.docx` (identidad Mejora Continua)~~ —
+      `scripts/generar_auditoria.py`, contenido leído del código real en
+      el momento (no de memoria), fuentes verificadas con Word COM real
+      (cero "Calibri" de fallback, colores de marca confirmados).
+- [x] ~~Panel "Columnas"/popovers de filtro tapaban datos y se salían del
+      viewport~~ — unificados en un solo drawer lateral fijo
+      (`PanelColumnasFiltros`, `ContactsTable.tsx`) que resuelve oclusión
+      y desborde con el mismo cambio.
+- [x] ~~KPIs muy pesados visualmente~~ — `StatCard` pasó de tarjeta a
+      línea inline compacta, una sola barra en `App.tsx`.
+- [x] ~~"(sin nombre)" sin ningún dato útil~~ — `identidad()` en
+      `ContactsTable.tsx` usa WhatsApp > teléfono fijo > email > empresa
+      como texto principal antes de rendirse.
+- [x] ~~Avatares con colores genéricos de Tailwind~~ — paleta de marca
+      (azul/rojo/amarillo + 2 neutros), amarillo con texto oscurecido a
+      mano por contraste WCAG.
+- [x] ~~Rutas absolutas de Windows filtrando a mensajes de la UI~~ —
+      `_ejecutar_accion` en `reviewer_app.py` interpola `destino.name` en
+      vez del `Path` completo.
+- [x] ~~`Sync.gs` sin red de seguridad para su primera corrida en vivo~~ —
+      `CONFIG.DRY_RUN = true` por defecto, no escribe nada real hasta que
+      se cambia a mano tras revisar el log. Documentado en 4 lugares
+      consistentes (`Sync.gs`, README, `SyncPanel.tsx`, panel clásico).
+- [x] ~~`token_pablo.json`/`token_sindy.json` en texto plano~~ — cifrados
+      en reposo con DPAPI de Windows (`token_crypto.py`, sin dependencias
+      nuevas), migración transparente para tokens viejos, **los dos
+      archivos reales ya migrados y verificados end-to-end** en esta
+      sesión (no quedó pendiente para "la próxima vez que se usen"). 5
+      tests nuevos, todos con archivos sintéticos.
+- **200 tests en verde** (194 → 200). `.exe` reconstruido y verificado en
+  vivo.
+
 ## Fase 4 — Google Contacts
 
 - [ ] Probar `Sync.gs` (ya migrado a People API) contra una cuenta de

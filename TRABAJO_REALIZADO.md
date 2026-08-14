@@ -64,6 +64,104 @@ sin resolver.
 - **Panel clásico** (`Iniciar Panel.bat`): mismo motor, versión más
   simple en el navegador, como respaldo si la app de escritorio fallara.
 
+## 4.1 Desarrollo visual y UX/UI — detalle
+
+### Estructura de pantalla
+
+- **Sidebar fija a la izquierda** (240px, fondo blanco, borde derecho
+  fino): arriba el isotipo de marca (32px) + wordmark "motor-contactos"
+  en Bw Modelica; debajo, navegación de 3 ítems (Contactos / Revisión
+  pendiente / Sync a Google) — el activo se marca con fondo azul claro y
+  texto azul, el resto en gris con hover sutil; "Revisión pendiente"
+  lleva una píldora amarilla con el conteo cuando hay algo pendiente.
+  Abajo de todo, dos acciones fijas: "Correr pipeline" (botón azul
+  sólido, primario) y "Exportar para WhatsApp" (botón con borde,
+  secundario), con una línea de estado debajo tras cada acción.
+- **Panel principal**: arriba, 4 tarjetas de métricas en fila (Contactos
+  / Registros normalizados / Registros crudos / Pendientes), cada una
+  con ícono en cuadrado de color, número grande y etiqueta chica en
+  mayúsculas. Debajo, el contenido cambia según la sección elegida.
+
+### Vista "Contactos"
+
+- Barra de herramientas: buscador con ícono de lupa (placeholder
+  "Buscar en todos los campos..."), botón "Columnas" (abre un panel con
+  checkbox por campo), "Limpiar N filtros" en rojo (solo aparece si hay
+  algo filtrado), y a la derecha el contador "X de Y contactos".
+- Tabla: encabezado fijo arriba (fondo gris clarito, etiquetas en
+  mayúscula chica); columna Nombre fija a la izquierda con avatar
+  circular de iniciales (color asignado por hash del contacto, así cada
+  persona siempre tiene el mismo color) + nombre completo; 12 columnas a
+  la derecha, cada una con: label, ícono de filtro (lupa chica, se pone
+  azul si tiene un filtro activo), y una manija invisible en el borde
+  derecho para arrastrar y redimensionar. La columna Tag muestra el
+  valor como píldora gris en vez de texto plano.
+- Filas virtualizadas (solo se renderizan las visibles en pantalla, aunque
+  haya 8.541 — por eso el scroll es fluido incluso con toda la base
+  cargada), hover gris clarito, click abre el editor.
+- Dos estados vacíos distintos: "todavía no hay contactos" (primera vez)
+  vs. "sin resultados para estos filtros" (con botón "Limpiar filtros")
+  — mensajes distintos a propósito, porque la causa y la solución no son
+  la misma.
+
+### Vista "Revisión pendiente"
+
+Tarjetas agrupadas por patrón de coincidencia; cada par pendiente muestra
+lado a lado nombre, organización, teléfono, email, de qué fuente salió
+cada contacto y su foto si tiene — para decidir con contexto real, no un
+id numérico pelado. Botones "Aprobar"/"Rechazar" el lote completo.
+
+### Vista "Sync a Google"
+
+Lista numerada de 4 pasos con círculos azules numerados, links directos a
+Google Sheets y Apps Script embebidos en el texto, y una caja de aviso
+amarilla al final ("probá primero con un Sheet de prueba...").
+
+### Editor de contacto (modal)
+
+Overlay oscuro + tarjeta centrada: grilla de 2 columnas para campos
+cortos (nombre, apellido, cargo, empresa, tag, dirección), 3 columnas de
+textareas para los campos que pueden tener más de un valor (WhatsApp,
+teléfono fijo, email — uno por línea), textarea aparte para la nota.
+Botones "Cancelar"/"Guardar" abajo a la derecha.
+
+### Sistema de diseño aplicado
+
+- **Color**: Azul `#1A3D84` como primario (estructura, botones,
+  estados activos, avatares), Rojo `#E1061E` reservado para
+  error/limpiar, Amarillo `#F7CC13` para lo que necesita atención
+  (píldora de pendientes, tag, avisos) — blanco dominante en todo el
+  fondo, el color se usa como acento puntual, nunca como bloque grande
+  (regla del manual de marca).
+- **Tipografía**: Bw Modelica para el wordmark, League Spartan para el
+  resto — ambas embebidas como archivos locales (no dependen de
+  internet ni de que la fuente esté instalada en la PC).
+- **Logo**: isotipo como ícono de la ventana/pestaña y en el sidebar.
+
+### Interacciones construidas (más allá de mostrar datos)
+
+Filtro de texto "contiene" por columna, multiselect de categorías en Tag,
+búsqueda global instantánea con normalización de acentos (busco
+"posadas" y encuentra "Pósadas"), columnas mostrar/ocultar y
+redimensionables con la elección guardada entre sesiones (localStorage),
+encabezado y primera columna fijos al hacer scroll horizontal/vertical.
+
+### Honestidad sobre lo que falta pulir (autocrítica, no solo lo que pediste)
+
+- Los popovers de filtro en columnas muy a la derecha (Tag, Nota) pueden
+  abrirse fuera del viewport visible si la tabla está muy ancha — hay que
+  hacer scroll horizontal primero para verlos bien.
+- Los colores de los avatares son una paleta genérica (azul/verde/violeta/
+  ámbar/rosa/cian de Tailwind), no derivada de la paleta de marca.
+- Sin modo oscuro.
+- Sin paso de accesibilidad (navegación por teclado, lectores de
+  pantalla) todavía.
+- Sin transiciones/animaciones — los cambios de vista y los filtros son
+  instantáneos pero "secos", sin microinteracción.
+- Muchos contactos muestran "(sin nombre)" de forma prominente en la
+  columna principal — funciona, pero visualmente es ruidoso cuando hay
+  muchos seguidos (ver captura que mandaste).
+
 ## 5. Automatización
 
 - **Aviso mensual autónomo** (día 30, 9:00): importa contactos nuevos de

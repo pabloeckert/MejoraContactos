@@ -1050,3 +1050,82 @@ del reporte).
 - **221 tests en verde** (sin cambios netos de código en esta entrada).
 
 ---
+
+## 2026-08-15 (cont.) — Meta-auditoría + dos propuestas de rediseño de Lovable: qué se aplicó y qué se descartó
+
+- El usuario pidió una "meta-auditoría": criticar la auditoría .docx del
+  2026-08-14 (verificar qué estaba bien sustentado, qué no, y qué le
+  faltaba) más un prompt de mejoras enfocado en riesgos/seguridad para
+  pegar en otro agente — entregado en el chat, explícitamente sin cambios
+  de código en este proyecto. Hallazgo más serio de esa revisión, no
+  mencionado en la auditoría original: `llm_judge.py:112-114`
+  (`_consultar`) manda nombre/apellido/organización/TODOS los teléfonos/
+  TODOS los emails de ambos contactos, tal cual, a Groq y a cualquiera de
+  los 13 modelos gratis rotativos de OpenRouter además de Anthropic, en
+  cada caso de dedup "zona gris" — datos personales reales de terceros
+  saliendo a proveedores externos sin ningún control de minimización.
+  Verificado leyendo `merge_engine.py:373-380` (`_a_dict`, el payload
+  exacto). También: `Sync.gs:168/180` loguea `JSON.stringify(persona)`
+  completo en modo DRY_RUN (queda en el log de ejecuciones de Google Apps
+  Script). Ninguno de los dos hallazgos estaba en el informe original —
+  quedaron en el prompt de mejoras entregado, no implementados todavía
+  (el usuario no pidió ejecutar el prompt, solo tenerlo listo).
+- El usuario pegó DOS propuestas de rediseño de interfaz generadas por
+  "Lovable" (una acotada centrada en debilidades puntuales, otra un
+  "rediseño integral" completo: tema oscuro por default, command palette
+  Ctrl+K, layout maestro-detalle reemplazando la tabla+modal actual,
+  rail de iconos en vez de sidebar, cola de revisión rediseñada
+  par-por-par con atajos J/K/F/S/Z) con la instrucción explícita de que
+  la decisión final es de esta sesión, Lovable es solo una opinión.
+- **Se rechazó el rediseño integral completo**, con criterio explícito:
+  (1) es una reescritura de días, no algo para meter en una sesión sobre
+  una UI que ya funciona y está testeada con 221 tests en verde; (2) gran
+  parte de las "debilidades declaradas" que ambos documentos citan
+  (popovers fuera del viewport, paleta de avatar genérica) YA se habían
+  resuelto en la ronda del 2026-08-14 de esta misma sesión — los
+  documentos describían un estado ya superado, otra vez el problema de
+  que un análisis estático envejece mal si no se versiona; (3) la
+  propuesta de cola de revisión par-a-par con atajos J/K asume una
+  arquitectura distinta a la real (`ReviewQueue.tsx`/`reviewer_app.py`
+  aprueban/rechazan LOTES por patrón, no pares individuales uno por uno
+  — implementarlo tal cual habría exigido rediseñar el flujo de revisión
+  entero, no solo agregar atajos).
+- **Se extrajeron y aplicaron 3 mejoras acotadas, de valor real,
+  verificadas contra el código antes de tocar nada**:
+  1. *Badges de calidad del dato*: `phone_normalizer.py`/
+     `email_normalizer.py` ya calculaban flags (`movil-asumido`,
+     `incompleto`, `corregido`, `revisar`) guardados en
+     `normalized_records.flags` desde hace tiempo, pero `export.py`
+     nunca los propagaba a `_materializar_clusters()` — el dato existía
+     en la base, la interfaz nunca lo mostró. Se agregó la unión de
+     flags de todos los `normalized_records` que componen cada cluster,
+     más un `editado_manualmente` (si el cluster tiene fila en
+     `ediciones_manuales`). Se muestran como puntos de color con
+     tooltip junto al nombre en la tabla.
+  2. *Pantalla Anomalías*: `anomalias.py` (teléfono compartido por +5
+     contactos finales) existía y corría por CLI/aviso mensual desde una
+     sesión anterior, pero nunca tuvo pantalla propia — mismo patrón que
+     el punto anterior, dato calculado y nunca mostrado. Nuevo
+     `/api/anomalias` + pantalla dedicada.
+  3. *Tipografía monoespaciada* para teléfono/email en la tabla
+     (legibilidad de dígitos alineados) — cambio de estilo puntual, sin
+     tocar layout.
+- **Verificado en vivo antes de commitear**: backend de prueba (puerto
+  aparte) con datos sintéticos armados a propósito para disparar cada
+  flag (`movil-asumido` con un teléfono de 10 dígitos sin pista,
+  `incompleto`+`corregido` con uno de 7 dígitos) y una anomalía real (6
+  contactos con el mismo número) — Browser pane confirmó los 3 puntos de
+  color correctos con sus tooltips, el punto verde de "editado
+  manualmente", y la pantalla de Anomalías mostrando el teléfono y los 6
+  nombres. Sin errores de consola.
+- **No se tocó el panel HTML clásico** para esto — Anomalías es una
+  pantalla nueva que tampoco existía ahí, y agregarla hubiera requerido
+  construir de cero una vista de datos que ese panel no tiene (es
+  deliberadamente el "bote de salvamento", no una segunda app completa).
+  Documentado como decisión, no como olvido.
+- **224 tests en verde** (221 → 224: 2 en `test_pipeline_integration.py`
+  para flags/editado_manualmente, 1 en `test_api.py` para el endpoint de
+  anomalías — la lógica de detección de anomalías en sí ya estaba
+  cubierta en `test_anomalias.py` de una sesión anterior).
+
+---

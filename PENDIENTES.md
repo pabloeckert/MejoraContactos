@@ -340,6 +340,29 @@ línea operativos. Lo único que sigue vivo en este archivo es Fase 4
   importar desde Google (tokens ya autorizados, no requiere login) o
   esperar instrucción del usuario sobre cuándo hacerlo.
 
+## Meta-auditoría + evaluación de propuestas de rediseño de Lovable (2026-08-15, cont.)
+
+- [x] ~~Meta-auditoría de la auditoría .docx del 2026-08-14~~ — entregada
+      en el chat (crítica + prompt de mejoras enfocado en riesgos/
+      seguridad, sin cambios de código en este proyecto, tal como se
+      pidió). Hallazgo más serio, no estaba en la auditoría original:
+      `llm_judge.py` manda nombre/teléfonos/emails completos de ambos
+      contactos a proveedores de IA externos (Groq/OpenRouter/Anthropic)
+      en cada caso de dedup "zona gris" — ver DECISIONES.md para el
+      detalle y el prompt de mejoras completo (no ejecutado todavía, el
+      usuario no lo pidió).
+- [x] ~~Evaluar 2 propuestas de rediseño de interfaz de Lovable~~ — se
+      rechazó el "rediseño integral" (tema oscuro, command palette,
+      layout maestro-detalle, cola de revisión par-a-par con atajos)
+      por alcance/riesgo y porque parte describía debilidades ya
+      resueltas en la ronda anterior de esta misma sesión. Se aplicaron
+      3 mejoras acotadas de valor real: badges de calidad del dato
+      (`movil-asumido`/`incompleto`/`corregido`, ya calculados por el
+      pipeline, nunca mostrados), pantalla Anomalías (`anomalias.py` ya
+      existía, era CLI-only), tipografía monoespaciada para teléfono/
+      email. Detalle completo y razones en DECISIONES.md.
+- **224 tests en verde** (221 → 224).
+
 ## Fase 4 — Google Contacts
 
 - [ ] Probar `Sync.gs` (ya migrado a People API) contra una cuenta de

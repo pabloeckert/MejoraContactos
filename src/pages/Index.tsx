@@ -21,6 +21,7 @@ import { Upload, Zap, Users, Download, BarChart3, Settings, Moon, Sun, Activity,
 import { useI18n } from "@/lib/i18n";
 import { GoogleContactsPanel } from "@/components/GoogleContactsPanel";
 import { ApiKeysPanel } from "@/components/ApiKeysPanel";
+import { MejoraWsPanel } from "@/components/MejoraWsPanel";
 import { HealthCheckPanel } from "@/components/HealthCheckPanel";
 import { HistoryPanel } from "@/components/HistoryPanel";
 import { Button } from "@/components/ui/button";
@@ -421,6 +422,7 @@ const Index = () => {
                   )}
                 </div>
                 <ApiKeysPanel />
+                <MejoraWsPanel />
                 <div className="grid gap-4 lg:grid-cols-2">
                   <HealthCheckPanel />
                   <HistoryPanel onRestore={handleRestoreFromHistory} />

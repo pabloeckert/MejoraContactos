@@ -42,6 +42,21 @@ def test_api_stats_en_cero_sin_datos(tmp_path):
     }
 
 
+def test_api_anomalias_sin_datos_devuelve_lista_vacia(tmp_path):
+    # La lógica de detección real (telefono_compartido_por_muchos_contactos)
+    # ya está cubierta en tests/test_anomalias.py -- esto solo confirma que
+    # el endpoint /api/anomalias (nuevo, antes anomalias.py era CLI-only)
+    # queda bien enchufado.
+    config = _config_prueba(tmp_path)
+    conn = conectar(config.rutas.base_sqlite)
+    cliente = crear_app(config, conn).test_client()
+
+    respuesta = cliente.get("/api/anomalias")
+
+    assert respuesta.status_code == 200
+    assert respuesta.get_json() == {"anomalias": []}
+
+
 def test_api_cuentas_google_devuelve_las_configuradas(tmp_path):
     config = replace(_config_prueba(tmp_path), google=GoogleConfig(cuentas=("pablo", "sindy")))
     conn = conectar(config.rutas.base_sqlite)

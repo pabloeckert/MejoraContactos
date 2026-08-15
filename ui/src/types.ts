@@ -15,6 +15,14 @@ export interface Contacto {
   cumpleanos: string;
   foto_url: string;
   nota_referencia: string;
+  flags: string[];
+  editado_manualmente: boolean;
+}
+
+export interface Anomalia {
+  telefono: string;
+  cantidad: number;
+  nombres: string[];
 }
 
 export interface Stats {

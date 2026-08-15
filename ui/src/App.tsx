@@ -2,8 +2,10 @@ import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 
 import { correrAccion, obtenerStats } from "./api";
+import AnomaliasPanel from "./components/AnomaliasPanel";
 import ContactsTable from "./components/ContactsTable";
 import {
+  IconActivity,
   IconAlert,
   IconChat,
   IconCheck,
@@ -21,7 +23,7 @@ import SyncPanel from "./components/SyncPanel";
 import WhatsAppPanel from "./components/WhatsAppPanel";
 import type { Stats } from "./types";
 
-type Vista = "contactos" | "revisar" | "importar" | "whatsapp" | "sync";
+type Vista = "contactos" | "revisar" | "importar" | "whatsapp" | "anomalias" | "sync";
 
 export default function App() {
   const [vista, setVista] = useState<Vista>("contactos");
@@ -85,6 +87,13 @@ export default function App() {
           <NavItem activo={vista === "whatsapp"} onClick={() => setVista("whatsapp")} icono={<IconChat className="h-4 w-4" />}>
             WhatsApp
           </NavItem>
+          <NavItem
+            activo={vista === "anomalias"}
+            onClick={() => setVista("anomalias")}
+            icono={<IconActivity className="h-4 w-4" />}
+          >
+            Anomalías
+          </NavItem>
           <NavItem activo={vista === "sync"} onClick={() => setVista("sync")} icono={<IconSync className="h-4 w-4" />}>
             Sync a Google
           </NavItem>
@@ -137,6 +146,7 @@ export default function App() {
           {vista === "revisar" && <ReviewQueue onCambio={recargarStats} />}
           {vista === "importar" && <ImportPanel />}
           {vista === "whatsapp" && <WhatsAppPanel />}
+          {vista === "anomalias" && <AnomaliasPanel />}
           {vista === "sync" && <SyncPanel />}
         </div>
       </main>

@@ -274,6 +274,58 @@ def test_edicion_manual_pisa_el_valor_calculado_al_exportar(tmp_path):
     assert filas[0]["Tag"] == "familiar"  # la corrección manual gana sobre el auto-etiquetado
 
 
+def test_listar_contactos_expone_flags_de_calidad_del_telefono(tmp_path):
+    # Antes de esto, phone_normalizer.py YA calculaba flags como
+    # "movil-asumido"/"incompleto"/"corregido" (guardadas en
+    # normalized_records.flags) pero export.py nunca las propagaba al
+    # cluster materializado -- el dato existía, la interfaz nunca lo
+    # mostraba (hallazgo real de la revisión UX 2026-08-15).
+    from motor.export import listar_contactos
+
+    config = _config_prueba(tmp_path)
+    (config.rutas.carpeta_raiz / "uno.csv").write_text(
+        # 10 dígitos sin pista de móvil/fijo en el encabezado -> "movil-asumido".
+        "Nombre,Apellido,Telefono\nJuan,Perez,3764123456\n"
+        # 7 dígitos (6-8) -> se completa con el código de área default -> "incompleto"+"corregido".
+        "Ana,Gomez,1234567\n",
+        encoding="utf-8",
+    )
+
+    conn = conectar(config.rutas.base_sqlite)
+    extraer_todo(config, conn)
+    normalizar_todo(config, conn)
+    deduplicar_todo(config, conn)
+
+    contactos, _ = listar_contactos(conn, 1, 100)
+    por_nombre = {c["nombre"]: c for c in contactos}
+
+    assert "telefono:movil-asumido" in por_nombre["Juan"]["flags"]
+    assert "telefono:incompleto" in por_nombre["Ana"]["flags"]
+    assert "telefono:corregido" in por_nombre["Ana"]["flags"]
+    assert por_nombre["Juan"]["editado_manualmente"] is False
+
+
+def test_listar_contactos_marca_editado_manualmente(tmp_path):
+    from motor.export import listar_contactos
+
+    config = _config_prueba(tmp_path)
+    (config.rutas.carpeta_raiz / "uno.csv").write_text(
+        "Nombre,Apellido,Telefono\nJuan,Perez,3743504517\n", encoding="utf-8"
+    )
+
+    conn = conectar(config.rutas.base_sqlite)
+    extraer_todo(config, conn)
+    normalizar_todo(config, conn)
+    deduplicar_todo(config, conn)
+
+    cluster_id = conn.execute("SELECT cluster_id FROM clusters LIMIT 1").fetchone()["cluster_id"]
+    guardar_edicion_manual(conn, cluster_id, {"tag": "familiar"}, config)
+
+    contactos, _ = listar_contactos(conn, 1, 100)
+    contacto = next(c for c in contactos if c["cluster_id"] == cluster_id)
+    assert contacto["editado_manualmente"] is True
+
+
 def test_edicion_manual_normaliza_whatsapp_telefono_fijo_y_email(tmp_path):
     config = _config_prueba(tmp_path)
     (config.rutas.carpeta_raiz / "uno.csv").write_text(

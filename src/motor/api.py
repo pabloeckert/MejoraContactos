@@ -45,6 +45,12 @@ def registrar_rutas_api(app: Flask, config: Config, conn: sqlite3.Connection) ->
     def api_cuentas_google():
         return jsonify({"cuentas": list(config.google.cuentas)})
 
+    @app.get("/api/anomalias")
+    def api_anomalias():
+        from motor.anomalias import detectar_telefonos_sospechosos
+
+        return jsonify({"anomalias": detectar_telefonos_sospechosos(conn)})
+
     @app.get("/api/contactos")
     def api_contactos():
         consulta = request.args.get("q", "").strip()
@@ -141,4 +147,6 @@ def _serializar_contacto(c: dict) -> dict:
         "cumpleanos": c.get("cumpleanos", ""),
         "foto_url": c.get("foto_url", ""),
         "nota_referencia": c.get("nota_referencia", ""),
+        "flags": sorted(c.get("flags") or []),
+        "editado_manualmente": bool(c.get("editado_manualmente")),
     }

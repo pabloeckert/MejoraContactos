@@ -142,6 +142,7 @@ def _aplicar_ediciones_manuales(conn: sqlite3.Connection, clusters: list[dict]) 
         edicion = ediciones.get(cluster["cluster_id"])
         if not edicion:
             continue
+        cluster["editado_manualmente"] = True
         for campo in _CAMPOS:
             valor = edicion[campo]
             if valor is not None and valor != "":
@@ -371,7 +372,7 @@ def _materializar_clusters(conn: sqlite3.Connection) -> list[dict]:
     filas = conn.execute(
         "SELECT c.cluster_id, n.nombre, n.apellido, n.organizacion, n.cargo, "
         "n.telefonos_e164, n.telefonos_fijo_e164, n.emails, n.tag, "
-        "n.domicilio, n.ciudad, n.provincia, n.pais, n.cumpleanos, n.foto_url, n.notas "
+        "n.domicilio, n.ciudad, n.provincia, n.pais, n.cumpleanos, n.foto_url, n.notas, n.flags "
         "FROM clusters c "
         "JOIN raw_records r ON r.id = c.raw_record_id "
         "JOIN normalized_records n ON n.raw_record_id = r.id"
@@ -398,6 +399,15 @@ def _materializar_clusters(conn: sqlite3.Connection) -> list[dict]:
                 "cumpleanos": "",
                 "foto_url": "",
                 "notas": [],
+                # Unión de los flags de cada normalized_record que compone
+                # este cluster (ej. "telefono:movil-asumido",
+                # "telefono:incompleto") -- ya se calculaban en
+                # normalize_pipeline.py pero se perdían acá, nunca llegaban
+                # a la lista maestra ni a la UI (hallazgo real de la
+                # revisión UX del 2026-08-15: el sistema sabía que un dato
+                # era una suposición/corrección, pero no lo mostraba).
+                "flags": set(),
+                "editado_manualmente": False,
             },
         )
         cluster["nombre"] = cluster["nombre"] or fila["nombre"] or ""
@@ -414,6 +424,7 @@ def _materializar_clusters(conn: sqlite3.Connection) -> list[dict]:
         cluster["pais"] = cluster["pais"] or fila["pais"] or ""
         cluster["cumpleanos"] = cluster["cumpleanos"] or fila["cumpleanos"] or ""
         cluster["foto_url"] = cluster["foto_url"] or fila["foto_url"] or ""
+        cluster["flags"] |= set(json.loads(fila["flags"] or "[]"))
         if fila["notas"]:
             cluster["notas"].append(fila["notas"])
 

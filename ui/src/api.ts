@@ -1,4 +1,4 @@
-import type { Contacto, GrupoPendiente, Stats } from "./types";
+import type { Anomalia, Contacto, GrupoPendiente, Stats } from "./types";
 
 // El backend Python (motor/api.py) corre en :5000 por default
 // (config.yaml -> revisor.puerto). Se puede pisar en dev con
@@ -55,4 +55,8 @@ export function correrAccion(nombre: string): Promise<{ ok: boolean; mensaje?: s
 
 export function obtenerCuentasGoogle(): Promise<{ cuentas: string[] }> {
   return pedir("/api/cuentas-google");
+}
+
+export function obtenerAnomalias(): Promise<{ anomalias: Anomalia[] }> {
+  return pedir("/api/anomalias");
 }

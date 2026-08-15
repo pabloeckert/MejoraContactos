@@ -46,6 +46,11 @@ const COLUMNAS: ColumnaDef[] = [
   { key: "nota_referencia", label: "Nota de referencia", anchoDefault: 220, visibleDefault: true, texto: (c) => c.nota_referencia },
 ];
 
+// Teléfonos y emails con tipografía monoespaciada: mejora la lectura de
+// dígitos alineados (E.164) y evita que un email largo con caracteres
+// angostos "parezca" más corto que uno con caracteres anchos.
+const COLUMNAS_MONOESPACIADAS = new Set<ColumnKey>(["whatsapp", "telefono_fijo", "emails"]);
+
 const CLAVE_ANCHOS = "motor-contactos:anchos-columna";
 const CLAVE_VISIBLES = "motor-contactos:columnas-visibles";
 
@@ -99,6 +104,21 @@ function normalizarTexto(s: string): string {
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, ""); // saca acentos para que "Posadas"/"posadas" y "Perez"/"Pérez" matcheen igual
 }
+
+// Badges de calidad del dato: el pipeline ya calcula estos flags
+// (phone_normalizer.py/email_normalizer.py, guardados en normalized_
+// records.flags) pero hasta esta ronda se perdían al armar la lista
+// final -- el sistema "sabía" que un teléfono era una suposición o una
+// corrección y no lo mostraba en ningún lado. "fijo" se excluye a
+// propósito: ya es visible como columna separada, no es una señal de
+// calidad dudosa.
+const ETIQUETAS_FLAG: Record<string, { etiqueta: string; color: string }> = {
+  "telefono:movil-asumido": { etiqueta: "Móvil asumido (sin pista explícita)", color: "bg-marca-amarillo" },
+  "telefono:incompleto": { etiqueta: "Teléfono incompleto, completado con código de área default", color: "bg-marca-rojo" },
+  "telefono:corregido": { etiqueta: "Teléfono corregido automáticamente", color: "bg-marca-azul" },
+  "telefono:revisar": { etiqueta: "Teléfono dudoso, revisar a mano", color: "bg-marca-rojo" },
+  "email:corregido": { etiqueta: "Dominio de email corregido automáticamente", color: "bg-marca-azul" },
+};
 
 export default function ContactsTable() {
   const [contactos, setContactos] = useState<Contacto[]>([]);
@@ -337,8 +357,24 @@ export default function ContactsTable() {
                           {iniciales(c)}
                         </span>
                         <span className="min-w-0">
-                          <span className={`block truncate font-medium ${id.esFallback ? "text-neutral-500" : "text-neutral-800"}`}>
-                            {id.texto}
+                          <span className="flex items-center gap-1.5">
+                            <span className={`block truncate font-medium ${id.esFallback ? "text-neutral-500" : "text-neutral-800"}`}>
+                              {id.texto}
+                            </span>
+                            {(c.flags.length > 0 || c.editado_manualmente) && (
+                              <span className="flex shrink-0 items-center gap-0.5">
+                                {c.editado_manualmente && (
+                                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" title="Editado manualmente" />
+                                )}
+                                {c.flags.map((f) => (
+                                  <span
+                                    key={f}
+                                    className={`h-1.5 w-1.5 rounded-full ${ETIQUETAS_FLAG[f]?.color ?? "bg-neutral-300"}`}
+                                    title={ETIQUETAS_FLAG[f]?.etiqueta ?? f}
+                                  />
+                                ))}
+                              </span>
+                            )}
                           </span>
                           {id.esFallback && <span className="block text-[10px] uppercase tracking-wide text-neutral-400">Sin nombre</span>}
                         </span>
@@ -346,7 +382,9 @@ export default function ContactsTable() {
                       {columnasActivas.map((col) => (
                         <span
                           key={col.key}
-                          className="shrink-0 truncate border-r border-neutral-50 px-3 text-neutral-500"
+                          className={`shrink-0 truncate border-r border-neutral-50 px-3 text-neutral-500 ${
+                            COLUMNAS_MONOESPACIADAS.has(col.key) ? "font-mono tabular-nums" : ""
+                          }`}
                           style={{ width: anchos[col.key] ?? col.anchoDefault }}
                         >
                           {col.key === "tag" ? (

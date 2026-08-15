@@ -3,14 +3,25 @@ import type { ReactNode } from "react";
 
 import { correrAccion, obtenerStats } from "./api";
 import ContactsTable from "./components/ContactsTable";
-import { IconAlert, IconCheck, IconClock, IconDatabase, IconDownload, IconPlay, IconSync, IconUsers } from "./components/icons";
+import {
+  IconAlert,
+  IconChat,
+  IconCheck,
+  IconClock,
+  IconDatabase,
+  IconDownload,
+  IconPlay,
+  IconSync,
+  IconUsers,
+} from "./components/icons";
 import ImportPanel from "./components/ImportPanel";
 import ReviewQueue from "./components/ReviewQueue";
 import StatCard from "./components/StatCard";
 import SyncPanel from "./components/SyncPanel";
+import WhatsAppPanel from "./components/WhatsAppPanel";
 import type { Stats } from "./types";
 
-type Vista = "contactos" | "revisar" | "importar" | "sync";
+type Vista = "contactos" | "revisar" | "importar" | "whatsapp" | "sync";
 
 export default function App() {
   const [vista, setVista] = useState<Vista>("contactos");
@@ -37,16 +48,6 @@ export default function App() {
       setMensaje(String(e));
     } finally {
       setCorriendo(false);
-    }
-  }
-
-  async function exportarWhatsapp() {
-    setMensaje(null);
-    try {
-      const r = await correrAccion("exportar-whatsapp");
-      setMensaje(r.mensaje ?? r.error ?? null);
-    } catch (e) {
-      setMensaje(String(e));
     }
   }
 
@@ -81,6 +82,9 @@ export default function App() {
           >
             Importar
           </NavItem>
+          <NavItem activo={vista === "whatsapp"} onClick={() => setVista("whatsapp")} icono={<IconChat className="h-4 w-4" />}>
+            WhatsApp
+          </NavItem>
           <NavItem activo={vista === "sync"} onClick={() => setVista("sync")} icono={<IconSync className="h-4 w-4" />}>
             Sync a Google
           </NavItem>
@@ -94,12 +98,6 @@ export default function App() {
           >
             <IconPlay className="h-4 w-4" />
             {corriendo ? "Corriendo..." : "Correr pipeline"}
-          </button>
-          <button
-            onClick={exportarWhatsapp}
-            className="flex w-full items-center justify-center gap-2 rounded-lg border border-neutral-200 px-3 py-2 text-xs font-medium text-neutral-600 transition hover:bg-neutral-50"
-          >
-            Exportar para WhatsApp
           </button>
           {mensaje && <p className="text-center text-xs leading-snug text-neutral-500">{mensaje}</p>}
         </div>
@@ -138,6 +136,7 @@ export default function App() {
           {vista === "contactos" && <ContactsTable />}
           {vista === "revisar" && <ReviewQueue onCambio={recargarStats} />}
           {vista === "importar" && <ImportPanel />}
+          {vista === "whatsapp" && <WhatsAppPanel />}
           {vista === "sync" && <SyncPanel />}
         </div>
       </main>

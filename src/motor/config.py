@@ -119,6 +119,15 @@ class GoogleConfig:
 
 
 @dataclass(frozen=True)
+class MejoraWsConfig:
+    # MejoraWS (Electron+Baileys, envío de WhatsApp) es un proyecto hermano
+    # separado -- no se reimplementa acá, solo se lanza. Default apunta a
+    # dónde vive hoy en la máquina de Pablo; si algún día se mueve, es un
+    # cambio de una línea en config.yaml, no de código.
+    ruta: Path = Path("C:/Github/Herramientas/MejoraWS")
+
+
+@dataclass(frozen=True)
 class Config:
     rutas: RutasConfig
     extensiones_permitidas: frozenset[str]
@@ -129,6 +138,7 @@ class Config:
     revisor: RevisorConfig
     ocr: OcrConfig = field(default_factory=OcrConfig)
     google: GoogleConfig = field(default_factory=GoogleConfig)
+    mejoraws: MejoraWsConfig = field(default_factory=MejoraWsConfig)
 
 
 def cargar_config(path: str | Path = "config.yaml") -> Config:
@@ -170,6 +180,9 @@ def cargar_config(path: str | Path = "config.yaml") -> Config:
     google_raw = raw.get("google", {})
     google = GoogleConfig(cuentas=tuple(google_raw.get("cuentas", [])))
 
+    mejoraws_raw = raw.get("mejoraws", {})
+    mejoraws = MejoraWsConfig(ruta=Path(mejoraws_raw["ruta"]) if "ruta" in mejoraws_raw else MejoraWsConfig().ruta)
+
     return Config(
         rutas=rutas,
         extensiones_permitidas=frozenset(raw.get("extensiones_permitidas", [])),
@@ -180,6 +193,7 @@ def cargar_config(path: str | Path = "config.yaml") -> Config:
         revisor=revisor,
         ocr=ocr,
         google=google,
+        mejoraws=mejoraws,
     )
 
 

@@ -85,11 +85,12 @@ _PLANTILLA_DASHBOARD = _ESTILO + """
   <form method="post" action="/accion/exportar"><button class="secundario" type="submit">4. Exportar a Excel</button></form>
 </div>
 
-<h3>Enviar por WhatsApp</h3>
+<h3>Enviar por WhatsApp (MejoraWS)</h3>
 <div class="acciones">
-  <form method="post" action="/accion/exportar-whatsapp"><button class="secundario" type="submit">Exportar CSV para MejoraWS</button></form>
+  <form method="post" action="/accion/exportar-whatsapp"><button class="secundario" type="submit">1. Exportar CSV para MejoraWS</button></form>
+  <form method="post" action="/accion/abrir-mejoraws"><button type="submit">2. Abrir MejoraWS</button></form>
 </div>
-<p style="color:#6B7280; font-size:0.85rem;">Genera <code>Data/Salida/contactos-whatsapp.csv</code> en el formato exacto que espera <a href="file:///C:/Github/Herramientas/MejoraWS" target="_blank">MejoraWS</a> (nombre, teléfono, variable) — importalo ahí con "Importar CSV/Excel".</p>
+<p style="color:#6B7280; font-size:0.85rem;">El CSV queda en <code>Data/Salida/contactos-whatsapp.csv</code> (nombre, teléfono, variable). "Abrir MejoraWS" lanza esa app aparte (Electron+Baileys, envío real de WhatsApp) — desde ahí, "Importar CSV/Excel" con ese archivo. MejoraWS maneja su propia sesión de WhatsApp y sus propios límites de envío; este panel no reimplementa nada de eso, solo la abre.</p>
 
 <h3>Deshacer</h3>
 <div class="acciones">
@@ -353,6 +354,14 @@ def _ejecutar_accion(config: Config, conn: sqlite3.Connection, nombre: str) -> s
         except ValueError as exc:
             return str(exc)
         return f"✓ Importado '{archivo.name}' — raw_records nuevos: {nuevos}"
+    if nombre == "abrir-mejoraws":
+        from motor.mejoraws_launcher import MejoraWsNoEncontradoError, abrir_mejoraws
+
+        try:
+            abrir_mejoraws(config.mejoraws.ruta)
+        except MejoraWsNoEncontradoError as exc:
+            return str(exc)
+        return "✓ Abriendo MejoraWS... la ventana puede tardar unos segundos en aparecer."
     return f"Acción desconocida: {nombre}"
 
 

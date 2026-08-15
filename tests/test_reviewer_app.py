@@ -1,7 +1,17 @@
 from dataclasses import replace
 from unittest.mock import patch
 
-from motor.config import Config, DedupConfig, EmailConfig, GoogleConfig, LlmConfig, RevisorConfig, RutasConfig, TelefonoConfig
+from motor.config import (
+    Config,
+    DedupConfig,
+    EmailConfig,
+    GoogleConfig,
+    LlmConfig,
+    MejoraWsConfig,
+    RevisorConfig,
+    RutasConfig,
+    TelefonoConfig,
+)
 from motor.reviewer_app import crear_app
 from motor.staging_db import conectar
 
@@ -168,6 +178,33 @@ def test_accion_importar_archivo_sin_extractor_muestra_error_claro(tmp_path):
 
     assert respuesta.status_code == 200
     assert "no tiene ning".encode() in respuesta.data
+
+
+def test_accion_abrir_mejoraws_lanza_la_app(tmp_path):
+    config = replace(_config_prueba(tmp_path), mejoraws=MejoraWsConfig(ruta=tmp_path / "MejoraWS"))
+    conn = conectar(config.rutas.base_sqlite)
+    cliente = crear_app(config, conn).test_client()
+
+    with patch("motor.mejoraws_launcher.abrir_mejoraws") as mock_abrir:
+        respuesta = cliente.post("/accion/abrir-mejoraws", follow_redirects=True)
+
+    assert respuesta.status_code == 200
+    assert "Abriendo MejoraWS".encode() in respuesta.data
+    mock_abrir.assert_called_once_with(config.mejoraws.ruta)
+
+
+def test_accion_abrir_mejoraws_sin_encontrar_la_carpeta_muestra_error_claro(tmp_path):
+    from motor.mejoraws_launcher import MejoraWsNoEncontradoError
+
+    config = replace(_config_prueba(tmp_path), mejoraws=MejoraWsConfig(ruta=tmp_path / "no-existe"))
+    conn = conectar(config.rutas.base_sqlite)
+    cliente = crear_app(config, conn).test_client()
+
+    with patch("motor.mejoraws_launcher.abrir_mejoraws", side_effect=MejoraWsNoEncontradoError("no se encontró")):
+        respuesta = cliente.post("/accion/abrir-mejoraws", follow_redirects=True)
+
+    assert respuesta.status_code == 200
+    assert "no se encontr".encode() in respuesta.data
 
 
 def test_pagina_revisar_sin_pendientes(tmp_path):

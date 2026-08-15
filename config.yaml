@@ -126,5 +126,12 @@ google:
     - pablo
     - sindy
 
+# MejoraWS (proyecto hermano, Electron+Baileys, envío de WhatsApp) -- el
+# panel lo abre como app aparte con el botón "Abrir MejoraWS", no lo
+# reimplementa. Default ya apunta a donde vive -- solo hace falta esto si
+# se mueve de carpeta.
+# mejoraws:
+#   ruta: "C:/Github/Herramientas/MejoraWS"
+
 # Las API keys (GROQ_API_KEY, ANTHROPIC_API_KEY) NUNCA van acá — se leen de
 # variables de entorno vía motor-contactos/.env (ver .env.example).

@@ -264,6 +264,55 @@ línea operativos. Lo único que sigue vivo en este archivo es Fase 4
       nuevo.
 - **201 tests en verde** (200 → 201).
 
+## Pantalla "Importar" + integración de MejoraWS como módulo (2026-08-14, cont. 3)
+
+- [x] ~~Botón que loguea/conecta solo y trae los contactos de Google~~ —
+      nuevo despachador `importar-google-<cuenta>` (panel clásico y
+      `/api/accion`, comparten `_ejecutar_accion`). Con una cuenta ya
+      autorizada, conecta y trae los nuevos/modificados sin ninguna
+      interacción — la primera vez por cuenta abre el navegador para el
+      login (eso sigue siendo del usuario).
+- [x] ~~Importar de una carpeta (recorre subcarpetas) y de un archivo
+      suelto (cualquier formato)~~ — `ingest.py` refactorizado
+      (`_procesar_un_archivo` compartido) para soportar una `raiz`
+      arbitraria y `todas_las_extensiones=True` (ignora
+      `extensiones_permitidas`, usa cualquier extractor registrado);
+      nueva `extraer_archivo()` para un único archivo. Diálogos nativos
+      de Windows vía `file_dialogs.py` (powershell.exe +
+      System.Windows.Forms, cero dependencias nuevas) porque el backend
+      corre en la misma máquina y necesita la ruta real en disco, no
+      bytes subidos por HTTP.
+- [x] ~~Pantalla "Importar" dedicada en la UI React~~ —
+      `ImportPanel.tsx` consolida las 3 formas de traer contactos
+      (Google por cuenta, carpeta, archivo) en un solo lugar, con nav
+      item propio. El panel clásico tiene la sección equivalente.
+- [x] ~~MejoraWS como módulo dentro del sistema~~ — decisión de diseño:
+      NO se reimplementa el envío de WhatsApp en Python (dos stacks
+      distintos, y la automatización de WhatsApp ya tiene riesgo real de
+      ban si se hace mal — MejoraWS ya lo tiene resuelto y afinado con
+      delay random/tope diario). Se integra como módulo lanzable: nueva
+      pestaña "WhatsApp" (`WhatsAppPanel.tsx` + sección equivalente en
+      el panel clásico) con el paso a paso completo (exportar CSV →
+      abrir MejoraWS → importar ahí → configurar y mandar), y un botón
+      "Abrir MejoraWS" que lanza esa app aparte sin bloquear
+      (`mejoraws_launcher.py`, `subprocess.Popen` + `cmd /c start`).
+      Ruta configurable en `config.yaml` → `mejoraws.ruta` (default
+      apunta a donde vive hoy).
+- **221 tests en verde** (201 → 221: 9 de importar-google/carpeta/archivo,
+  5 de ingest.py, 6 de config/mejoraws_launcher/abrir-mejoraws).
+- Verificado en vivo (Browser pane, backend de prueba en puerto aparte
+  para no interferir con la app real que el usuario pudiera tener
+  abierta): las 2 pestañas nuevas renderizan bien, sin errores de
+  consola propios del código (un solo error de conexión rechazada fue
+  residuo de mi propio backend de prueba reiniciándose entre rondas, no
+  del producto).
+- **No probado en vivo**: hacer clic de verdad en "Abrir MejoraWS" (abre
+  una app de Electron real) ni en los diálogos nativos de
+  carpeta/archivo (requieren interacción humana con una ventana de
+  Windows) — la lógica de cada uno está cubierta por tests con mocks,
+  pero el flujo de punta a punta con clic real queda para que el usuario
+  lo pruebe cuando quiera.
+
 ## Fase 4 — Google Contacts
 
 - [ ] Probar `Sync.gs` (ya migrado a People API) contra una cuenta de

@@ -888,3 +888,84 @@ del reporte).
   resultado real.
 
 ---
+
+## 2026-08-14 (cont. 3) — Pantalla "Importar" y MejoraWS integrado como módulo
+
+- El usuario pidió, en mensajes sueltos dentro de la misma ronda: (1) un
+  botón que loguee/conecte solo a Google Contacts e importe, (2) una
+  pantalla de importación con "importar de carpeta" (recorre subcarpetas)
+  e "importar archivo" (cualquier formato), y (3) incorporar todo el
+  proyecto MejoraWS como un módulo usable desde adentro del sistema —
+  todo esto bajo la directiva ya vigente de actuar sin esperar
+  confirmación salvo bloqueo real de manos/login.
+- **Botón de Google**: reusa `google_contacts_source.importar_google_contactos`
+  ya existente (antes solo accesible por CLI) — con una cuenta ya
+  autorizada (caso normal, `pablo`/`sindy` ya tienen `token_*.json`
+  vigente) conecta y trae los nuevos/modificados sin ninguna interacción
+  humana. Solo si fuera una cuenta NUNCA antes autorizada abriría el
+  navegador para pedir login — no aplica hoy, ambas cuentas reales ya
+  están autorizadas desde 2026-08-12.
+- **Importar carpeta/archivo — decisión de diseño clave**: se descartó
+  `<input type="file" webkitdirectory>` del navegador porque el
+  Flask corre en la MISMA máquina que el usuario — un input HTML normal
+  solo da bytes/nombres relativos, nunca la ruta real en disco, así que
+  habría forzado a subir todo por HTTP en vez de leerlo directo del
+  filesystem (mucho más lento e innecesario para un caso 100% local). En
+  cambio, `file_dialogs.py` invoca `powershell.exe` con
+  `System.Windows.Forms.FolderBrowserDialog`/`OpenFileDialog` — diálogo
+  nativo de Windows, cero dependencias nuevas (mismo criterio que
+  `token_crypto.py` con DPAPI: `ctypes`/`.NET` del sistema en vez de sumar
+  una librería). Devuelve la ruta real; el backend la camina/lee
+  directo.
+- **`ingest.py` refactorizado, no duplicado**: `extraer_todo()` ahora
+  acepta `raiz` (carpeta arbitraria en vez de la `carpeta_raiz`
+  configurada) y `todas_las_extensiones` (ignora el allowlist de
+  `config.yaml`, usa cualquier extractor registrado — a propósito: si el
+  usuario eligió esa carpeta a mano, no tiene sentido limitarlo a los
+  formatos habilitados por default para la corrida automática). Nueva
+  `extraer_archivo()` para un solo archivo. Ambas comparten
+  `_procesar_un_archivo()` (antes era código inline dentro del loop de
+  `extraer_todo`) — mismo criterio incremental por hash que ya tenía el
+  flujo normal, sin reimplementar nada.
+- **MejoraWS — decisión de arquitectura, la más importante de esta
+  ronda**: NO se reimplementó el envío de WhatsApp/Baileys dentro de
+  motor-contactos. Motivos: (1) son dos stacks completamente distintos
+  (Python/Flask vs Node/Electron/Baileys), fusionarlos de verdad sería
+  una reescritura, no una integración; (2) la automatización de WhatsApp
+  ya tiene riesgo real y documentado de ban de cuenta si se hace mal
+  (ver `MejoraWS/README.md` — delay random y tope diario a propósito);
+  MejoraWS ya tiene esa lógica resuelta y afinada, duplicarla sería
+  repetir trabajo ya hecho con MÁS superficie de riesgo, no menos. En
+  cambio, "módulo integrado" se interpretó como: accesible y lanzable
+  desde adentro del panel de motor-contactos, sin salir a buscarlo al
+  Explorador — nueva pestaña "WhatsApp (MejoraWS)" con el flujo completo
+  (exportar CSV → botón "Abrir MejoraWS" → importar ahí → configurar y
+  mandar, todo eso último dentro de MejoraWS) y `mejoraws_launcher.py`
+  (`subprocess.Popen` + `cmd /c start`, sin bloquear — a diferencia de
+  las demás acciones del panel, esto abre una app de escritorio de larga
+  duración, no tiene sentido esperar a que termine). Ruta configurable
+  (`config.yaml` → `mejoraws.ruta`, nueva `MejoraWsConfig`), default
+  apunta a donde vive hoy (`C:\Github\Herramientas\MejoraWS`).
+- **221 tests en verde** (201 → 221). Verificado en vivo con el Browser
+  pane contra un backend de prueba en un puerto aparte (5051, no el 5000
+  real) para no interferir con una instancia real que el usuario pudiera
+  tener abierta — se detectó de hecho un proceso `MotorContactos.exe`
+  corriendo desde antes (probablemente el usuario probando el acceso
+  directo del Escritorio creado esta sesión), y se lo dejó intacto a
+  propósito. Ambas pestañas nuevas renderizan bien, sin errores de
+  consola propios (el único error visto fue un `ERR_CONNECTION_REFUSED`
+  residual de mi propio backend de prueba reiniciándose entre dos rondas
+  de verificación, no del producto).
+- **No probado con clic real**: "Abrir MejoraWS" (abriría una app de
+  Electron real) y los diálogos nativos de carpeta/archivo (requieren
+  interacción humana con una ventana de Windows) — ambos cubiertos por
+  tests con mocks, el flujo de punta a punta con clic real queda para
+  que el usuario lo pruebe.
+- Se corrigió al pasar un error propio de tooling: un `Select-Object
+  -First 40` sobre la salida en vivo de `handoff.ps1` cortó el pipeline
+  de PowerShell a mitad del build de PyInstaller en una ronda anterior de
+  esta misma sesión (ver entrada anterior) — no se repitió acá, todas las
+  corridas de `handoff.ps1`/tests de esta ronda se hicieron sin truncar
+  la salida.
+
+---

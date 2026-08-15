@@ -87,3 +87,7 @@ Push a `main` → GitHub Pages (automático).
 - **`CHANGELOG.md`** — Historial de cambios
 - **`CONTRIBUTING.md`** — Guía de contribución
 - **`SECURITY.md`** — Política de seguridad
+
+## MejoraSuite
+
+MejoraContactos sigue siendo un producto público independiente (este mismo deploy, este mismo negocio), pero además forma parte de **MejoraSuite** — se embebe dentro de [MejoraCRM](https://github.com/pabloeckert/MejoraCRM) (`/contactos`, iframe) y adentro de [MejoraWS](https://github.com/pabloeckert/MejoraWS) (`WebContentsView`), y a su vez muestra el estado de MejoraWS en Ajustes → panel MejoraWS (`src/components/MejoraWsPanel.tsx`, habla con el bridge local de esa app). Nada de esto acopla el código de los tres — cada uno sigue siendo su propio repo y deploy. Arquitectura completa: [`mejorasuite/` en el repo de MejoraCRM](https://github.com/pabloeckert/MejoraCRM/tree/main/mejorasuite).

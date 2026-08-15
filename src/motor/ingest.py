@@ -22,44 +22,79 @@ from motor.config import Config
 from motor.extractors.base import extractor_para
 
 
-def extraer_todo(config: Config, conn: sqlite3.Connection) -> int:
-    """Devuelve la cantidad de raw_records nuevos insertados."""
+def extraer_todo(
+    config: Config,
+    conn: sqlite3.Connection,
+    raiz: Path | None = None,
+    todas_las_extensiones: bool = False,
+) -> int:
+    """Devuelve la cantidad de raw_records nuevos insertados.
+
+    `raiz`: por default camina `config.rutas.carpeta_raiz` (el flujo
+    incremental normal). El botón "Importar de carpeta" del panel pasa
+    una carpeta elegida a mano por el usuario en vez de la configurada.
+
+    `todas_las_extensiones`: por default solo procesa lo que está en
+    `config.extensiones_permitidas` (la corrida automática/incremental no
+    debe ponerse a hacer OCR o parsear PDFs sin que alguien lo pida). El
+    botón "Importar de carpeta" pasa `True` -- si el usuario eligió esa
+    carpeta a mano, se procesa cualquier archivo con extractor
+    disponible, no solo los formatos habilitados por default."""
     total_insertados = 0
-    for path in sorted(config.rutas.carpeta_raiz.rglob("*")):
+    for path in sorted((raiz or config.rutas.carpeta_raiz).rglob("*")):
         if not path.is_file():
             continue
         extension = path.suffix.lstrip(".").lower()
-        if extension not in config.extensiones_permitidas:
+        if not todas_las_extensiones and extension not in config.extensiones_permitidas:
             continue
-        extractor = extractor_para(extension)
-        if extractor is None:
-            continue
-        if _ya_procesado(conn, path):
-            continue
-
-        try:
-            registros = extractor(path)
-        except Exception as exc:  # noqa: BLE001 — un archivo problemático no debe frenar el resto
-            print(f"aviso: no se pudo extraer {path} ({exc}); se sigue con el resto")
-            continue
-
-        for r in registros:
-            conn.execute(
-                "INSERT INTO raw_records "
-                "(source_file, source_row, raw_json, confianza_extraccion, creado_en) "
-                "VALUES (?, ?, ?, ?, ?)",
-                (
-                    r.source_file,
-                    r.source_row,
-                    json.dumps(r.campos, ensure_ascii=False),
-                    r.confianza_extraccion,
-                    _ahora(),
-                ),
-            )
-        _marcar_procesado(conn, path)
-        conn.commit()
-        total_insertados += len(registros)
+        total_insertados += _procesar_un_archivo(conn, path, extension)
     return total_insertados
+
+
+def extraer_archivo(conn: sqlite3.Connection, path: Path) -> int:
+    """Extrae contactos de UN archivo puntual, cualquier formato con
+    extractor registrado (ver extractors/base.py) -- ignora
+    `config.extensiones_permitidas` a propósito: el botón "Importar
+    archivo" es una elección explícita del usuario sobre un archivo
+    puntual, no la corrida automática/incremental, así que no tiene
+    sentido limitarlo a la lista por default. Levanta ValueError si la
+    extensión no tiene ningún extractor (mensaje claro para el panel, en
+    vez de silenciarlo como hace el flujo de carpeta)."""
+    extension = path.suffix.lstrip(".").lower()
+    if extractor_para(extension) is None:
+        raise ValueError(f"Formato .{extension} no tiene ningún extractor disponible.")
+    return _procesar_un_archivo(conn, path, extension)
+
+
+def _procesar_un_archivo(conn: sqlite3.Connection, path: Path, extension: str) -> int:
+    extractor = extractor_para(extension)
+    if extractor is None:
+        return 0
+    if _ya_procesado(conn, path):
+        return 0
+
+    try:
+        registros = extractor(path)
+    except Exception as exc:  # noqa: BLE001 — un archivo problemático no debe frenar el resto
+        print(f"aviso: no se pudo extraer {path} ({exc}); se sigue con el resto")
+        return 0
+
+    for r in registros:
+        conn.execute(
+            "INSERT INTO raw_records "
+            "(source_file, source_row, raw_json, confianza_extraccion, creado_en) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (
+                r.source_file,
+                r.source_row,
+                json.dumps(r.campos, ensure_ascii=False),
+                r.confianza_extraccion,
+                _ahora(),
+            ),
+        )
+    _marcar_procesado(conn, path)
+    conn.commit()
+    return len(registros)
 
 
 def _ya_procesado(conn: sqlite3.Connection, path: Path) -> bool:

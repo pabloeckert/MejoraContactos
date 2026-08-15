@@ -41,6 +41,10 @@ def registrar_rutas_api(app: Flask, config: Config, conn: sqlite3.Connection) ->
     def api_stats():
         return jsonify(_calcular_stats(conn))
 
+    @app.get("/api/cuentas-google")
+    def api_cuentas_google():
+        return jsonify({"cuentas": list(config.google.cuentas)})
+
     @app.get("/api/contactos")
     def api_contactos():
         consulta = request.args.get("q", "").strip()

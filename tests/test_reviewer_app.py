@@ -1,4 +1,7 @@
-from motor.config import Config, DedupConfig, EmailConfig, LlmConfig, RevisorConfig, RutasConfig, TelefonoConfig
+from dataclasses import replace
+from unittest.mock import patch
+
+from motor.config import Config, DedupConfig, EmailConfig, GoogleConfig, LlmConfig, RevisorConfig, RutasConfig, TelefonoConfig
 from motor.reviewer_app import crear_app
 from motor.staging_db import conectar
 
@@ -56,6 +59,115 @@ def test_accion_desconocida_no_rompe(tmp_path):
 
     assert respuesta.status_code == 200
     assert "Acción desconocida".encode() in respuesta.data
+
+
+def test_accion_importar_google_de_cuenta_configurada(tmp_path):
+    # No se llama nunca a la API real de Google ni se abre un navegador --
+    # se mockea importar_google_contactos, el resto del botón (dispatch,
+    # mensaje) se prueba de verdad.
+    config = _config_prueba(tmp_path)
+    config = replace(config, google=GoogleConfig(cuentas=("pablo",)))
+    conn = conectar(config.rutas.base_sqlite)
+    cliente = crear_app(config, conn).test_client()
+
+    with patch("motor.google_contacts_source.importar_google_contactos", return_value=7) as mock_importar:
+        respuesta = cliente.post("/accion/importar-google-pablo", follow_redirects=True)
+
+    assert respuesta.status_code == 200
+    assert "raw_records nuevos: 7".encode() in respuesta.data
+    mock_importar.assert_called_once_with(config, conn, "pablo")
+
+
+def test_accion_importar_google_de_cuenta_no_configurada_no_rompe(tmp_path):
+    config = _config_prueba(tmp_path)  # google.cuentas queda vacío por default
+    conn = conectar(config.rutas.base_sqlite)
+    cliente = crear_app(config, conn).test_client()
+
+    respuesta = cliente.post("/accion/importar-google-inexistente", follow_redirects=True)
+
+    assert respuesta.status_code == 200
+    assert "no está en config.yaml".encode() in respuesta.data
+
+
+def test_dashboard_sin_boton_de_importar_si_no_hay_cuentas_configuradas(tmp_path):
+    config = _config_prueba(tmp_path)
+    conn = conectar(config.rutas.base_sqlite)
+
+    respuesta = crear_app(config, conn).test_client().get("/")
+
+    assert "Importar de Google (".encode() not in respuesta.data
+
+
+def test_dashboard_muestra_boton_de_importar_por_cada_cuenta_configurada(tmp_path):
+    config = replace(_config_prueba(tmp_path), google=GoogleConfig(cuentas=("sindy",)))
+    conn = conectar(config.rutas.base_sqlite)
+
+    respuesta = crear_app(config, conn).test_client().get("/")
+
+    assert "Importar de Google (Sindy)".encode() in respuesta.data
+
+
+def test_accion_importar_carpeta_recorre_subcarpetas_y_cualquier_formato(tmp_path):
+    config = _config_prueba(tmp_path)  # extensiones_permitidas = {"csv"} solamente
+    conn = conectar(config.rutas.base_sqlite)
+    cliente = crear_app(config, conn).test_client()
+
+    carpeta_elegida = tmp_path / "ElegidaEnElDialogo"
+    (carpeta_elegida / "sub").mkdir(parents=True)
+    (carpeta_elegida / "a.csv").write_text("Nombre,Telefono\nJuan,3743504517\n", encoding="utf-8")
+    (carpeta_elegida / "sub" / "b.json").write_text(
+        '[{"nombre": "Ana", "telefono_1": "3743504518"}]', encoding="utf-8"
+    )
+
+    with patch("motor.file_dialogs.elegir_carpeta", return_value=carpeta_elegida):
+        respuesta = cliente.post("/accion/importar-carpeta", follow_redirects=True)
+
+    assert respuesta.status_code == 200
+    assert "raw_records nuevos: 2".encode() in respuesta.data  # csv + json (subcarpeta), aunque json no esté en extensiones_permitidas
+    assert conn.execute("SELECT COUNT(*) FROM raw_records").fetchone()[0] == 2
+
+
+def test_accion_importar_carpeta_cancelada_no_rompe(tmp_path):
+    config = _config_prueba(tmp_path)
+    conn = conectar(config.rutas.base_sqlite)
+    cliente = crear_app(config, conn).test_client()
+
+    with patch("motor.file_dialogs.elegir_carpeta", return_value=None):
+        respuesta = cliente.post("/accion/importar-carpeta", follow_redirects=True)
+
+    assert respuesta.status_code == 200
+    assert "Cancelado".encode() in respuesta.data
+
+
+def test_accion_importar_archivo_de_formato_fuera_de_extensiones_permitidas(tmp_path):
+    config = _config_prueba(tmp_path)  # extensiones_permitidas = {"csv"} solamente
+    conn = conectar(config.rutas.base_sqlite)
+    cliente = crear_app(config, conn).test_client()
+
+    archivo = tmp_path / "suelto.json"
+    archivo.write_text('[{"nombre": "Ana", "telefono_1": "3743504518"}]', encoding="utf-8")
+
+    with patch("motor.file_dialogs.elegir_archivo", return_value=archivo):
+        respuesta = cliente.post("/accion/importar-archivo", follow_redirects=True)
+
+    assert respuesta.status_code == 200
+    assert "raw_records nuevos: 1".encode() in respuesta.data
+    assert conn.execute("SELECT COUNT(*) FROM raw_records").fetchone()[0] == 1
+
+
+def test_accion_importar_archivo_sin_extractor_muestra_error_claro(tmp_path):
+    config = _config_prueba(tmp_path)
+    conn = conectar(config.rutas.base_sqlite)
+    cliente = crear_app(config, conn).test_client()
+
+    archivo = tmp_path / "no-soportado.xyz"
+    archivo.write_text("lo que sea", encoding="utf-8")
+
+    with patch("motor.file_dialogs.elegir_archivo", return_value=archivo):
+        respuesta = cliente.post("/accion/importar-archivo", follow_redirects=True)
+
+    assert respuesta.status_code == 200
+    assert "no tiene ning".encode() in respuesta.data
 
 
 def test_pagina_revisar_sin_pendientes(tmp_path):

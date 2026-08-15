@@ -52,3 +52,7 @@ export function decidir(patron: string, aceptar: boolean): Promise<{ ok: boolean
 export function correrAccion(nombre: string): Promise<{ ok: boolean; mensaje?: string; error?: string }> {
   return pedir(`/api/accion/${nombre}`, { method: "POST" });
 }
+
+export function obtenerCuentasGoogle(): Promise<{ cuentas: string[] }> {
+  return pedir("/api/cuentas-google");
+}

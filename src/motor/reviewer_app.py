@@ -18,7 +18,7 @@ from motor.config import Config
 from motor.dedup import learning
 from motor.dedup.merge_engine import aplicar_decision_lote, deduplicar_todo, deshacer, deshacer_ultima_corrida
 from motor.export import buscar_contactos, exportar_lista_maestra, exportar_whatsapp_csv, guardar_edicion_manual, obtener_contacto
-from motor.ingest import extraer_todo
+from motor.ingest import extraer_archivo, extraer_todo
 from motor.normalize_pipeline import normalizar_todo
 from motor.tagging import _TAGS_VALIDOS
 
@@ -59,6 +59,23 @@ _PLANTILLA_DASHBOARD = _ESTILO + """
 <form method="post" action="/accion/run" style="display:inline">
   <button type="submit">▶ Correr todo (extraer + normalizar + deduplicar + exportar)</button>
 </form>
+
+<h3>Importar</h3>
+{% if cuentas_google %}
+<div class="acciones">
+  {% for cuenta in cuentas_google %}
+  <form method="post" action="/accion/importar-google-{{ cuenta }}">
+    <button class="secundario" type="submit">Importar de Google ({{ cuenta|capitalize }})</button>
+  </form>
+  {% endfor %}
+</div>
+<p style="color:#6B7280; font-size:0.85rem;">Si la cuenta ya está autorizada, se conecta y trae los contactos nuevos/modificados sola, sin pedir nada. La primera vez por cuenta abre el navegador para el login de Google — eso sí lo tenés que completar vos.</p>
+{% endif %}
+<div class="acciones">
+  <form method="post" action="/accion/importar-carpeta"><button class="secundario" type="submit">Importar de una carpeta...</button></form>
+  <form method="post" action="/accion/importar-archivo"><button class="secundario" type="submit">Importar un archivo...</button></form>
+</div>
+<p style="color:#6B7280; font-size:0.85rem;">Ambos abren un diálogo nativo de Windows para elegir. "Carpeta" recorre también las subcarpetas y acepta cualquier formato con extractor disponible (CSV, Excel, VCF, JSON, TXT, HTML, DOCX, PDF, imágenes con texto vía OCR). "Archivo" hace lo mismo para un único archivo puntual, de cualquiera de esos formatos.</p>
 
 <h3>Pasos individuales</h3>
 <div class="acciones">
@@ -222,6 +239,7 @@ def crear_app(config: Config, conn: sqlite3.Connection) -> Flask:
             es_error=request.args.get("error") == "1",
             xlsx_existe=xlsx_existe,
             xlsx_fecha=xlsx_fecha,
+            cuentas_google=config.google.cuentas,
         )
 
     @app.post("/accion/<nombre>")
@@ -300,6 +318,41 @@ def _ejecutar_accion(config: Config, conn: sqlite3.Connection, nombre: str) -> s
     if nombre == "deshacer-ultima-corrida":
         resumen = deshacer_ultima_corrida(conn)
         return f"Última corrida revertida — {resumen}"
+    if nombre.startswith("importar-google-"):
+        cuenta = nombre[len("importar-google-") :]
+        if cuenta not in config.google.cuentas:
+            return f"Cuenta '{cuenta}' no está en config.yaml -> google.cuentas"
+        # Import local: google-api-python-client/google-auth son pesados y
+        # solo hacen falta acá, no en el resto del panel. Si la cuenta ya
+        # está autorizada (token_<cuenta>.json existente) esto conecta y
+        # trae los contactos sin ninguna interacción -- si es la primera
+        # vez, abre el navegador solo para pedir el login/consentimiento
+        # (lo único de este botón que no puede resolver un clic solo).
+        from motor.google_contacts_source import importar_google_contactos
+
+        nuevos = importar_google_contactos(config, conn, cuenta)
+        return f"✓ Importado de Google ({cuenta}) — raw_records nuevos: {nuevos}"
+    if nombre == "importar-carpeta":
+        from motor.file_dialogs import elegir_carpeta
+
+        carpeta = elegir_carpeta()
+        if carpeta is None:
+            return "Cancelado — no se eligió ninguna carpeta."
+        if not carpeta.is_dir():
+            return f"'{carpeta}' no es una carpeta válida."
+        nuevos = extraer_todo(config, conn, raiz=carpeta, todas_las_extensiones=True)
+        return f"✓ Importado desde '{carpeta.name}' (con subcarpetas) — raw_records nuevos: {nuevos}"
+    if nombre == "importar-archivo":
+        from motor.file_dialogs import elegir_archivo
+
+        archivo = elegir_archivo()
+        if archivo is None:
+            return "Cancelado — no se eligió ningún archivo."
+        try:
+            nuevos = extraer_archivo(conn, archivo)
+        except ValueError as exc:
+            return str(exc)
+        return f"✓ Importado '{archivo.name}' — raw_records nuevos: {nuevos}"
     return f"Acción desconocida: {nombre}"
 
 

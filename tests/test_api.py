@@ -2,7 +2,9 @@
 panel HTML. Mismas fixtures sintéticas que test_reviewer_app.py, nunca
 datos reales de pablo.csv/Sindy.csv."""
 
-from motor.config import Config, DedupConfig, EmailConfig, LlmConfig, RevisorConfig, RutasConfig, TelefonoConfig
+from dataclasses import replace
+
+from motor.config import Config, DedupConfig, EmailConfig, GoogleConfig, LlmConfig, RevisorConfig, RutasConfig, TelefonoConfig
 from motor.reviewer_app import crear_app
 from motor.staging_db import conectar
 
@@ -38,6 +40,17 @@ def test_api_stats_en_cero_sin_datos(tmp_path):
         "contactos_finales": 0,
         "pendientes": 0,
     }
+
+
+def test_api_cuentas_google_devuelve_las_configuradas(tmp_path):
+    config = replace(_config_prueba(tmp_path), google=GoogleConfig(cuentas=("pablo", "sindy")))
+    conn = conectar(config.rutas.base_sqlite)
+    cliente = crear_app(config, conn).test_client()
+
+    respuesta = cliente.get("/api/cuentas-google")
+
+    assert respuesta.status_code == 200
+    assert respuesta.get_json() == {"cuentas": ["pablo", "sindy"]}
 
 
 def test_api_cors_solo_refleja_origenes_localhost(tmp_path):

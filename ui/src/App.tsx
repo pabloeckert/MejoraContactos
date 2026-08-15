@@ -3,13 +3,14 @@ import type { ReactNode } from "react";
 
 import { correrAccion, obtenerStats } from "./api";
 import ContactsTable from "./components/ContactsTable";
-import { IconAlert, IconCheck, IconClock, IconDatabase, IconPlay, IconSync, IconUsers } from "./components/icons";
+import { IconAlert, IconCheck, IconClock, IconDatabase, IconDownload, IconPlay, IconSync, IconUsers } from "./components/icons";
+import ImportPanel from "./components/ImportPanel";
 import ReviewQueue from "./components/ReviewQueue";
 import StatCard from "./components/StatCard";
 import SyncPanel from "./components/SyncPanel";
 import type { Stats } from "./types";
 
-type Vista = "contactos" | "revisar" | "sync";
+type Vista = "contactos" | "revisar" | "importar" | "sync";
 
 export default function App() {
   const [vista, setVista] = useState<Vista>("contactos");
@@ -73,6 +74,13 @@ export default function App() {
           >
             Revisión pendiente
           </NavItem>
+          <NavItem
+            activo={vista === "importar"}
+            onClick={() => setVista("importar")}
+            icono={<IconDownload className="h-4 w-4" />}
+          >
+            Importar
+          </NavItem>
           <NavItem activo={vista === "sync"} onClick={() => setVista("sync")} icono={<IconSync className="h-4 w-4" />}>
             Sync a Google
           </NavItem>
@@ -129,6 +137,7 @@ export default function App() {
         <div className="min-h-0 flex-1 overflow-hidden">
           {vista === "contactos" && <ContactsTable />}
           {vista === "revisar" && <ReviewQueue onCambio={recargarStats} />}
+          {vista === "importar" && <ImportPanel />}
           {vista === "sync" && <SyncPanel />}
         </div>
       </main>

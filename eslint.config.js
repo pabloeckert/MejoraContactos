@@ -5,7 +5,11 @@ import reactRefresh from "eslint-plugin-react-refresh";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["dist"] },
+  // motor-contactos/ui tiene su PROPIO proyecto TS/ESLint (tsconfig y
+  // reglas distintas) -- sin este ignore, el glob "**/*.{ts,tsx}" de acá
+  // abajo intentaría lintearlo también con el parser/reglas del repo
+  // raíz y rompería CI.
+  { ignores: ["dist", "motor-contactos"] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ["**/*.{ts,tsx}"],

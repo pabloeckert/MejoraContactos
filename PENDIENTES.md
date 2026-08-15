@@ -313,6 +313,33 @@ línea operativos. Lo único que sigue vivo en este archivo es Fase 4
   pero el flujo de punta a punta con clic real queda para que el usuario
   lo pruebe cuando quiera.
 
+## Reset de datos + investigación de raw_records duplicado (2026-08-15)
+
+- [x] ~~raw_records apareció duplicado x2 (72.207 en vez de 36.103)~~ —
+      investigado a fondo, NO era un bug de código de esta sesión (ver
+      DECISIONES.md 2026-08-15 para el detalle completo): rotación de
+      etags del lado de Google, tolerada por diseño (`raw_records` es
+      append-only a propósito). Se intentó un fix con índice `UNIQUE`
+      que resultó estar basado en un supuesto falso — 4 tests lo
+      confirmaron, se revirtió limpio (`git diff` vacío en los 3
+      archivos tocados).
+- [x] ~~Reset completo de la base a estado de primer uso~~ — pedido
+      explícito del usuario, no relacionado con el punto anterior: el
+      foco pasa a la interfaz/funcionalidad, los datos reales se
+      retoman más adelante en fase de testing. `Data/Salida/
+      staging.sqlite` borrado y recreado vacío (8 tablas en 0),
+      `lista-maestra.xlsx`/`contactos-whatsapp.csv` borrados (exports
+      viejos). **Estado real de antes queda recuperable** — commit de
+      backup en el repo local de `Data/` justo antes del reset, más un
+      backup limpio previo del 2026-08-13_2054. Tokens OAuth de Google
+      NO se tocaron.
+- **Estado actual real de la base: 0 contactos, 0 registros** — cualquier
+  cifra de "8.541 contactos"/"36.103 raw_records" en entradas anteriores
+  de este archivo es HISTÓRICA (lo que se logró en su momento), no el
+  estado presente. La próxima sesión que retome esto debe volver a
+  importar desde Google (tokens ya autorizados, no requiere login) o
+  esperar instrucción del usuario sobre cuándo hacerlo.
+
 ## Fase 4 — Google Contacts
 
 - [ ] Probar `Sync.gs` (ya migrado a People API) contra una cuenta de

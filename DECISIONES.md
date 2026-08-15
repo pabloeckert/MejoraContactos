@@ -969,3 +969,84 @@ del reporte).
   la salida.
 
 ---
+
+## 2026-08-15 — raw_records se duplicó x2 (investigado, NO era bug de código) + reset completo de datos por pedido explícito
+
+- El usuario reportó "varios errores" sin detalle inicial; al pedir
+  precisión dijo "no pasó nada al hacer clic". Se reprodujo contra el
+  `.exe` real (Browser pane apuntando a `http://127.0.0.1:5000`, el mismo
+  puerto que usa la ventana nativa) en vez de asumir: el clic en "Abrir
+  MejoraWS" SÍ disparaba el POST, SÍ volvía 200 OK, y SÍ mostraba el
+  mensaje en pantalla — ese botón funcionaba bien. Pero `/api/stats`
+  mostró **raw_records: 72.207** en vez de los 36.103 esperados —
+  exactamente el doble.
+- **Investigación (antes de tocar nada)**: se confirmó que TODO el
+  crecimiento fue de hoy (`creado_en` = 2026-08-15, distinto de los
+  36.103 originales de 2026-08-12). De los 36.103 pares
+  `google:<cuenta>:<resourceName>` con 2 filas, **36.099 tenían
+  `raw_json` byte-a-byte idéntico** entre la fila vieja y la nueva, y
+  **4 tenían contenido genuinamente distinto** (ej. un teléfono ganó el
+  prefijo "+"). `normalized_records`/`contactos_finales` NO habían
+  cambiado — el pipeline nunca llegó a normalizar/deduplicar estas filas
+  nuevas, así que la lista maestra/vista de contactos nunca estuvo
+  afectada.
+- **Primer intento de fix, INCORRECTO — revertido**: se asumió que
+  cualquier duplicado de `(source_file, source_row)` era por definición
+  un bug, y se agregó un índice `UNIQUE` + `ON CONFLICT ... DO UPDATE`
+  en `staging_db.py`/`ingest.py`/`google_contacts_source.py`. Al correr
+  la suite completa, **4 tests fallaron**, y revelaron que el supuesto
+  era falso: `test_google_contacts_source.py::
+  test_importar_google_contactos_reimporta_si_cambio_el_etag` verifica
+  EXPLÍCITAMENTE que un cambio de etag debe AGREGAR una fila nueva, no
+  pisar la vieja — `raw_records` es append-only/inmutable a propósito
+  (documentado en el propio docstring de `staging_db.py`: "Nada acá
+  borra ni edita raw_records"). Y `test_dedup_blocking.py` inserta
+  varias filas con el mismo `source_file`/`source_row` a propósito (usa
+  esos campos como placeholder, no como clave única) para poder generar
+  candidatos de dedup en los tests. **Se revirtieron los tres archivos a
+  su estado exacto de antes** (`git diff` vacío) — commitear un fix
+  sobre un supuesto falso, sin haber corrido los tests primero, hubiera
+  sido peor que no arreglar nada.
+- **Explicación real, sin cambio de código necesario**: `_ya_procesado()`
+  compara el etag ACTUAL que devuelve la People API contra el
+  `hash_sha256` guardado en `fuentes_procesadas` — si no coinciden,
+  re-importa (por diseño, para no perderse cambios reales). El etag de
+  Google no es puramente un hash del contenido que nosotros mapeamos
+  (nombre/teléfono/email/etc.) — puede rotar por metadata interna de
+  Google (sync tokens, campos que no extraemos, reindexados del lado de
+  Google) sin que el contenido visible cambie. Que ~36.099 contactos
+  hayan rotado de etag el mismo día, en las dos cuentas, con el
+  `raw_json` resultante idéntico en la enorme mayoría, es consistente
+  con una rotación de etags del lado de Google (no un bug de esta
+  sesión) — el propio hecho de que exactamente 4 SÍ mostraran contenido
+  distinto confirma que el mecanismo de comparación funciona
+  correctamente (si estuviera roto, no habría manera de distinguir esos
+  4 de los otros 36.099). **No se tocó nada de código para esto** — el
+  diseño ya tolera este escenario: el siguiente `normalizar`+`deduplicar`
+  hubiera colapsado las filas repetidas al mismo cluster por
+  teléfono/email igual que siempre, sin inflar el conteo final de
+  contactos. Queda documentado acá para que la próxima vez que
+  `raw_records` crezca de golpe sin una razón obvia, no se asuma pánico
+  de entrada — primero verificar si el contenido resultante es
+  realmente distinto o es ruido de etag.
+- **Reset completo de datos, pedido explícito y aparte del usuario**: no
+  relacionado con el hallazgo de arriba — el usuario pidió borrar TODOS
+  los datos ("ahora nos enfocamos en la interfaz y en que funcione,
+  después trabajaremos con los datos en la parte de tester"). Antes de
+  borrar: `git commit` en el repo local de `Data/` con el estado tal
+  cual estaba (con las 36.104 filas de hoy incluidas, por las dudas) —
+  además ya existía un backup limpio previo del 2026-08-13_2054, así que
+  el estado de antes del reset queda recuperable en dos puntos
+  distintos si alguna vez hiciera falta. Se borró
+  `Data/Salida/staging.sqlite` (se recrea vacío solo al conectar,
+  `staging_db.conectar()` corre `CREATE TABLE IF NOT EXISTS`) y los
+  exports generados (`lista-maestra.xlsx`, `contactos-whatsapp.csv`,
+  reflejaban datos viejos). `Data/Crudos/` ya estaba vacío de antes (el
+  proyecto usa Google Contacts en vivo, no CSV manuales, desde
+  2026-08-11). Verificado: las 8 tablas en 0 filas tras reconectar con
+  la config real. Los tokens OAuth (`token_pablo.json`/`token_sindy.
+  json`) NO se tocaron — no son "datos de contactos", son credenciales,
+  y no se pidió revocar el acceso.
+- **221 tests en verde** (sin cambios netos de código en esta entrada).
+
+---

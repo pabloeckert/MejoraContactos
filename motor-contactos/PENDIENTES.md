@@ -1,0 +1,423 @@
+# Pendientes — motor-contactos
+
+Lista viva. Se tacha (no se borra) lo completado, se agrega lo nuevo. Es lo
+primero que lee una cuenta de Claude nueva después de `ESPECIFICACION.md`.
+
+## Resuelto — pivote de fuente de datos (2026-08-11)
+
+- [x] ~~Confirmar destino de Data/Crudos/pablo.csv y Sindy.csv~~ — el
+      usuario confirmó que borró la Papelera A PROPÓSITO y NO quiere
+      regenerar los CSV. Decisión: el sistema se conecta directo a Google
+      Contacts (People API) en vez de depender de exports manuales. Ver
+      `google_contacts_source.py`, `GOOGLE_SETUP.md`, y § "Fuente de
+      datos" en `ESPECIFICACION.md`. `Data/Crudos/` queda como carpeta
+      secundaria para el día que haga falta importar algo que no vive en
+      Google Contacts (PDF, capturas, etc.) — no es más el camino
+      principal.
+
+## Resuelto — primera carga real desde Google Contacts (2026-08-12)
+
+- [x] ~~Setup de Google Cloud Console~~ — `credentials.json` verificado
+      (tipo "installed"/Desktop app correcto).
+- [x] ~~Autorizar cada cuenta~~ — `token_pablo.json` y `token_sindy.json`
+      generados, ambas cuentas autorizadas.
+- [x] ~~importar-google pablo/sindy~~ — **36.103 raw_records reales**
+      importados (18.135 Pablo + 17.968 Sindy). Nota para la próxima
+      cuenta: el mensaje final "raw_records nuevos: 0" que a veces imprime
+      el comando es ENGAÑOSO (parece un artefacto de este entorno donde el
+      comando en background se ejecuta/reporta más de una vez) — **no
+      confiar en ese número impreso, siempre verificar contra la base**
+      (`SELECT COUNT(*) FROM raw_records`) antes de asumir que algo falló.
+- [x] ~~normalizar / deduplicar / exportar~~ — corridos sobre los datos
+      reales. Resultado: 36.102 normalizados (1 excluido, contacto técnico
+      de Contacts+), **8.593 contactos finales**, 92.533 fusiones por
+      regla, 46.766 separados, **658 en cola de revisión pendiente**.
+      `Data/Salida/lista-maestra.xlsx` generado (815KB) y respaldado en el
+      repo git local de `Data/` (commit `7ed78b7`).
+
+## Resuelto — API keys cargadas y LLM-judge corriendo (2026-08-12)
+
+- [x] ~~API keys~~ — `GROQ_API_KEY`/`ANTHROPIC_API_KEY`/`OPENROUTER_API_KEY`
+      cargadas en `.env` (el usuario las pegó primero por error en
+      `.env.example` — se corrigió antes de que llegara a commitearse,
+      sin dejar rastro en git; `.env.example` quedó restaurado al template
+      vacío).
+- [x] ~~Primera corrida (Groq→Anthropic, sin rotación OpenRouter todavía)~~
+      — verificada contra la base: resolvió 62 de 658 (56 Anthropic
+      "separar", 6 Groq "fusionar"). Quedaron **596 pendientes**.
+
+## Resuelto — rotación de modelos gratis de OpenRouter (2026-08-12)
+
+- [x] ~~Configurar OpenRouter para rotar entre modelos gratis~~ — el
+      usuario generó una API key de OpenRouter con credit limit en 0
+      (garantizado gratis) y pidió que se use en rotación mientras
+      esperaba la corrida de dedup. Implementado en `llm_judge.py`:
+      `LlmJudge` ahora prueba Groq (primario) + una lista de modelos
+      `:free` de OpenRouter en **round-robin** (cada llamada a `decidir()`
+      arranca en el siguiente candidato, no siempre el mismo — reparte
+      carga) antes de escalar a Anthropic. Lista de 13 modelos verificada
+      en vivo contra `https://openrouter.ai/api/v1/models` el 2026-08-12
+      (19 gratis de 410 totales; se excluyeron 2 modelos de generación de
+      música y 1 que expiraba al día siguiente — ver comentario en
+      `config.yaml` § `llm.rotacion_gratis_openrouter`). 6 tests nuevos
+      (`test_llm_judge.py`, todo mockeado, nunca llama a una API real).
+      **Esa lista de modelos cambia con el tiempo** — si en el futuro
+      muchos fallan seguido, volver a chequear esa URL.
+## Resuelto — bug de rendimiento en la rotación (2026-08-12, mismo día)
+
+- [x] ~~Corrida con rotación OpenRouter sin tope~~ — un modelo devolvía
+      `"content": null`, tiraba `AttributeError` sin atrapar y rompía
+      TODA la corrida (crasheó a mitad de camino; la base no se corrompió
+      porque la transacción nunca se commiteó — SQLite en modo WAL revierte
+      sola). Arreglado en `_extraer_json` (`llm_judge.py`) + test de
+      regresión.
+- [x] ~~Corrida sin tope de intentos por caso~~ — sin límite, un caso podía
+      probar los 14 candidatos gratis en secuencia (hasta 14×20s de
+      timeout = ~5min por UN caso). 596 casos así: **más de 2 horas sin
+      terminar**, y sin ningún progreso visible en pantalla mientras
+      tanto. Se frenó a mano. Arreglado: `maximo_intentos_gratis: 3` en
+      `config.yaml`/`LlmConfig`, timeout bajado de 20s a 12s, progreso
+      impreso cada 10 casos en `deduplicar_todo()`. Test de regresión que
+      confirma el tope. **177 tests en verde.**
+
+## Resuelto — corrida interrumpida DOS veces, dedup ahora es reanudable (2026-08-12/13)
+
+- [x] ~~Corrida desprendida (PID 18880) también murió~~ — no fue un bug de
+      código esta vez: se cortó en el caso 40/596 SIN ningún traceback,
+      consistente con que el entorno/máquina completo se reinició de noche
+      (no solo la sesión de Claude) — el proceso desprendido tampoco lo
+      sobrevivió. Los 40 casos procesados se perdieron igual, porque
+      `deduplicar_todo()` solo comiteaba una vez, al terminar TODO el lote.
+- [x] ~~Sin reanudación real, cada corte cuesta la corrida entera~~ —
+      arreglado de raíz en `merge_engine.py`: `deduplicar_todo()` ahora
+      commitea cada 50 pares procesados, y al arrancar busca si hay una
+      "corrida incompleta" (un `corrida_id` en `decisiones_log` que nunca
+      llegó a materializar `clusters` — eso solo pasa al final de una
+      corrida completa) y la retoma con el MISMO `corrida_id`, reusando
+      las decisiones ya guardadas para esos pares en vez de volver a
+      gastar una llamada a reglas/LLM. Parámetro `continuar: bool = True`
+      (default) en `deduplicar_todo()`, pasar `continuar=False` para
+      forzar una corrida 100% fresca si hiciera falta. 2 tests nuevos que
+      confirman: (a) retoma sin recalcular (se fuerza una decisión vieja
+      distinta de lo que la regla daría fresca, y se confirma que gana la
+      vieja), (b) `continuar=False` la ignora. **179 tests en verde.**
+      Con esto, un corte a partir de ahora cuesta como mucho 50 pares, no
+      la corrida entera.
+
+## Resuelto — corrida de dedup completada, lanzador sin terminal, aviso mensual real (2026-08-13, cont.)
+
+- [x] ~~Corrida de dedup sobre los pendientes~~ — completada (una sesión
+      con contexto compactado la retomó sin saberlo, vía `continuar=True`
+      default). Estado actual verificado en base: **8.590 contactos
+      finales, 649 pendientes de revisión**, un solo `corrida_id`
+      materializado, sin inconsistencias. Ver DECISIONES.md 2026-08-13
+      (cont. 2) para el detalle completo de cómo se verificó que no hubo
+      costo de IA ni pérdida de datos.
+- [x] ~~"¿Hay ejecutable o hay que usar el prompt?"~~ — `Iniciar Panel.bat`
+      / `Instalar (primera vez).bat` en la raíz de `motor-contactos/`
+      (doble clic, sin terminal).
+- [x] ~~Aviso mensual del día 30~~ — tarea programada real
+      (`aviso-mensual-contactos`, `mcp__scheduled-tasks`, cron
+      `0 9 30 * *`), NO `CronCreate` (expira a los 7 días, no servía).
+      Limitación real: corre mientras la app de Claude esté abierta, si
+      está cerrada corre al próximo inicio — no es un disparador duro de
+      Windows independiente de la app. Evaluar Task Scheduler si hace
+      falta más garantía.
+- [x] ~~Bug real en `/buscar`/`/editar` en vivo~~ — `threaded=False` en
+      `cli.py` (ver DECISIONES.md), sqlite no es thread-safe entre
+      requests del server de desarrollo de Flask.
+
+## MVP cerrado (2026-08-13, decisión explícita del usuario)
+
+- [x] ~~Revisar los 649 pendientes~~ — el usuario decidió el criterio
+      estándar por defecto: "mismo teléfono = misma persona" para el
+      patrón `tel=si|mail=no|nombre=baja|nombres_distintos`. Se encontró
+      y corrigió un bug real al ejecutar esto: aprobar un lote solo
+      marcaba `decisiones_log`, nunca fusionaba `clusters` de verdad (la
+      lista maestra exportada seguía mostrando los contactos separados
+      aunque el contador de pendientes bajara a 0). Fix real en
+      `merge_engine.py` (`aplicar_decision_lote` +
+      `_fusionar_pares_de_clusters`, con test de regresión), usado tanto
+      por el panel clásico (`/decidir`) como por la API de la UI nueva
+      (`/api/decidir`) — no era solo un problema de esta corrida, era un
+      gap real de la función que se iba a repetir cada vez que alguien
+      aprobara un lote. **Resultado verificado en base: 649 → 0
+      pendientes, 8.590 → 8.541 contactos finales** (colapsó más de 8590
+      porque varios de esos pares comparten teléfono transitivamente —
+      un mismo número de oficina/familia vinculaba a más de 2 personas en
+      varios casos). `lista-maestra.xlsx` reexportado (10.267 filas).
+- [x] ~~Fase 5~~ — descartada explícitamente, ver sección debajo.
+- [x] ~~Lanzador sin terminal~~ — `Iniciar Panel.bat` (panel clásico,
+      proceso único, sin dependencias extra más allá del venv ya armado)
+      confirmado como default. Sección "Fase 4" del panel ahora tiene
+      links directos a Google Sheets y Apps Script para minimizar
+      fricción del único paso que queda (login de Google).
+
+**Con esto, el MVP queda 100% resuelto de punta a punta**: 0 pendientes,
+lista maestra exportada, panel funcional, auto-etiquetado y edición en
+línea operativos. Lo único que sigue vivo en este archivo es Fase 4
+(requiere login de Google, no lo puede hacer Claude) — ver debajo.
+
+## Auditoría contra la encuesta original (2026-08-13, cont. 4) — 2 gaps reales cerrados
+
+- [x] ~~Cumpleaños y Foto (Ficha 7.1, campos imprescindibles)~~ — no se
+      estaban capturando ni exportando. Agregados a `_persona_a_campos`,
+      schema, `normalize_pipeline.py`, `export.py`, `api.py`. Backfill
+      real corrido contra Google (tokens ya autorizados, sin login
+      nuevo): 2.288 contactos de Pablo + 3.267 de Sindy actualizados.
+      Lista maestra: 896 filas con cumpleaños, 2.824 con foto. Ver
+      DECISIONES.md para el detalle de por qué hizo falta un script de
+      backfill aparte (el import incremental normal no lo iba a traer
+      solo) y `scripts/backfill_cumpleanos_foto.py`.
+- [x] ~~Info de contacto en la cola de revisión (Ficha 6.1)~~ — antes
+      mostraba solo ids numéricos y score. Ahora muestra nombre,
+      organización, teléfono, email, fuente y foto de cada lado del par.
+- [x] ~~Confirmado sin cambios~~: Nombre/Apellido separados, una
+      fila/celda por WhatsApp-fijo-email (verificado a mano contra el
+      xlsx real), criterio 4.1/4.2 (LLM decide en la banda media).
+- **184 tests en verde.**
+
+## Sesión nocturna sin supervisión (2026-08-13, cont. 5) — Ficha 15 retomada
+
+- [x] ~~UI más pulida + identidad Mejora Continua~~ — `ui/` con paleta,
+      tipografía (Bw Modelica/League Spartan embebidas) y logo reales del
+      manual de marca. Bug real encontrado y arreglado de paso
+      (`ContactsTable.tsx` mostraba "?" para contactos sin nombre).
+- [x] ~~Ejecutable real~~ — `App/MotorContactos.exe` (PyInstaller +
+      pywebview), ventana nativa, sin terminal. `Iniciar App.bat` lo
+      lanza. Reconstruir con `scripts/build_exe.ps1`. Dos bugs reales
+      arreglados en el camino (threading de sqlite, resolución de
+      config.yaml real vs. embebido — ver DECISIONES.md, riesgo real de
+      operar contra datos equivocados si se resolvía mal).
+- [x] ~~Fase 4 "lista para un clic"~~ — `Sync.gs` sincroniza Cumpleaños
+      también ahora; sección "Sync a Google" nueva en la UI React con
+      links directos. Sigue sin probarse en vivo (login de Google).
+- [x] ~~HubSpot/Mailchimp/Brevo~~ — encabezados típicos de las 3
+      agregados a `column_mapping.py` (no hicieron falta extractores
+      nuevos). 3 tests con encabezados reales de cada plataforma.
+- [x] ~~Lectura de contactos de mail~~ — `importar-otros-contactos
+      <cuenta>` (People API `otherContacts`, scope y token separados de
+      Fase 4). Pide login nuevo, no probado en vivo.
+- [x] ~~WhatsApp / MejoraWS~~ — `exportar_whatsapp_csv()`, formato exacto
+      que espera MejoraWS (`C:\Github\Herramientas\MejoraWS`, renombrado
+      esta sesión de "Mejora Contacto"). 6.046 contactos reales
+      exportados y verificados.
+- [x] ~~Agente autónomo~~ — acotado a: aviso mensual ahora también
+      importa de Google (antes solo reprocesaba), `dedup/learning.py` ya
+      existía (documentado mejor), `anomalias.py` nuevo (teléfono
+      compartido por +5 contactos finales distintos — 0 en la base real).
+- [x] ~~Tutorial rápido de uso~~ — `TUTORIAL.md`.
+- **194 tests en verde** (180 → 194).
+
+## Auditoría .docx + segunda ronda de revisión UX/seguridad (2026-08-14)
+
+- [x] ~~Auditoría técnica real en `.docx` (identidad Mejora Continua)~~ —
+      `scripts/generar_auditoria.py`, contenido leído del código real en
+      el momento (no de memoria), fuentes verificadas con Word COM real
+      (cero "Calibri" de fallback, colores de marca confirmados).
+- [x] ~~Panel "Columnas"/popovers de filtro tapaban datos y se salían del
+      viewport~~ — unificados en un solo drawer lateral fijo
+      (`PanelColumnasFiltros`, `ContactsTable.tsx`) que resuelve oclusión
+      y desborde con el mismo cambio.
+- [x] ~~KPIs muy pesados visualmente~~ — `StatCard` pasó de tarjeta a
+      línea inline compacta, una sola barra en `App.tsx`.
+- [x] ~~"(sin nombre)" sin ningún dato útil~~ — `identidad()` en
+      `ContactsTable.tsx` usa WhatsApp > teléfono fijo > email > empresa
+      como texto principal antes de rendirse.
+- [x] ~~Avatares con colores genéricos de Tailwind~~ — paleta de marca
+      (azul/rojo/amarillo + 2 neutros), amarillo con texto oscurecido a
+      mano por contraste WCAG.
+- [x] ~~Rutas absolutas de Windows filtrando a mensajes de la UI~~ —
+      `_ejecutar_accion` en `reviewer_app.py` interpola `destino.name` en
+      vez del `Path` completo.
+- [x] ~~`Sync.gs` sin red de seguridad para su primera corrida en vivo~~ —
+      `CONFIG.DRY_RUN = true` por defecto, no escribe nada real hasta que
+      se cambia a mano tras revisar el log. Documentado en 4 lugares
+      consistentes (`Sync.gs`, README, `SyncPanel.tsx`, panel clásico).
+- [x] ~~`token_pablo.json`/`token_sindy.json` en texto plano~~ — cifrados
+      en reposo con DPAPI de Windows (`token_crypto.py`, sin dependencias
+      nuevas), migración transparente para tokens viejos, **los dos
+      archivos reales ya migrados y verificados end-to-end** en esta
+      sesión (no quedó pendiente para "la próxima vez que se usen"). 5
+      tests nuevos, todos con archivos sintéticos.
+- **200 tests en verde** (194 → 200). `.exe` reconstruido y verificado en
+  vivo.
+
+## Cierre de los 2 hallazgos restantes de la revisión (2026-08-14, cont.)
+
+- [x] ~~Ausencia de auto-build del ejecutable~~ — como el repo es local
+      sin remoto a propósito (privacidad, contactos reales), no hay CI
+      posible en el sentido clásico. En cambio, `scripts/handoff.ps1`
+      (el checkpoint que ya se corre al cerrar cada ronda) ahora detecta
+      si hay código en `ui/src`, `src/motor` o `assets` más nuevo que el
+      último build de `App/MotorContactos.exe` y lo reconstruye solo,
+      antes de correr los tests — ya no depende de que alguien se
+      acuerde de correr `build_exe.ps1` a mano. Probado en vivo en esta
+      misma sesión: detectó el `.exe` desactualizado, lo reconstruyó, y
+      el binario nuevo levantó con el título y los datos correctos.
+- [x] ~~Fallo silencioso de Tesseract-OCR~~ — antes, "Tesseract no está
+      instalado" y "esta imagen no tenía ningún contacto" se veían
+      exactamente igual desde afuera (ambos devuelven `[]` sin ningún
+      aviso). `image_ocr_extractor.py` ahora distingue
+      `TesseractNotFoundError` del resto de errores y avisa UNA vez por
+      corrida (no por archivo) que el binario falta. Test de regresión
+      nuevo.
+- **201 tests en verde** (200 → 201).
+
+## Pantalla "Importar" + integración de MejoraWS como módulo (2026-08-14, cont. 3)
+
+- [x] ~~Botón que loguea/conecta solo y trae los contactos de Google~~ —
+      nuevo despachador `importar-google-<cuenta>` (panel clásico y
+      `/api/accion`, comparten `_ejecutar_accion`). Con una cuenta ya
+      autorizada, conecta y trae los nuevos/modificados sin ninguna
+      interacción — la primera vez por cuenta abre el navegador para el
+      login (eso sigue siendo del usuario).
+- [x] ~~Importar de una carpeta (recorre subcarpetas) y de un archivo
+      suelto (cualquier formato)~~ — `ingest.py` refactorizado
+      (`_procesar_un_archivo` compartido) para soportar una `raiz`
+      arbitraria y `todas_las_extensiones=True` (ignora
+      `extensiones_permitidas`, usa cualquier extractor registrado);
+      nueva `extraer_archivo()` para un único archivo. Diálogos nativos
+      de Windows vía `file_dialogs.py` (powershell.exe +
+      System.Windows.Forms, cero dependencias nuevas) porque el backend
+      corre en la misma máquina y necesita la ruta real en disco, no
+      bytes subidos por HTTP.
+- [x] ~~Pantalla "Importar" dedicada en la UI React~~ —
+      `ImportPanel.tsx` consolida las 3 formas de traer contactos
+      (Google por cuenta, carpeta, archivo) en un solo lugar, con nav
+      item propio. El panel clásico tiene la sección equivalente.
+- [x] ~~MejoraWS como módulo dentro del sistema~~ — decisión de diseño:
+      NO se reimplementa el envío de WhatsApp en Python (dos stacks
+      distintos, y la automatización de WhatsApp ya tiene riesgo real de
+      ban si se hace mal — MejoraWS ya lo tiene resuelto y afinado con
+      delay random/tope diario). Se integra como módulo lanzable: nueva
+      pestaña "WhatsApp" (`WhatsAppPanel.tsx` + sección equivalente en
+      el panel clásico) con el paso a paso completo (exportar CSV →
+      abrir MejoraWS → importar ahí → configurar y mandar), y un botón
+      "Abrir MejoraWS" que lanza esa app aparte sin bloquear
+      (`mejoraws_launcher.py`, `subprocess.Popen` + `cmd /c start`).
+      Ruta configurable en `config.yaml` → `mejoraws.ruta` (default
+      apunta a donde vive hoy).
+- **221 tests en verde** (201 → 221: 9 de importar-google/carpeta/archivo,
+  5 de ingest.py, 6 de config/mejoraws_launcher/abrir-mejoraws).
+- Verificado en vivo (Browser pane, backend de prueba en puerto aparte
+  para no interferir con la app real que el usuario pudiera tener
+  abierta): las 2 pestañas nuevas renderizan bien, sin errores de
+  consola propios del código (un solo error de conexión rechazada fue
+  residuo de mi propio backend de prueba reiniciándose entre rondas, no
+  del producto).
+- **No probado en vivo**: hacer clic de verdad en "Abrir MejoraWS" (abre
+  una app de Electron real) ni en los diálogos nativos de
+  carpeta/archivo (requieren interacción humana con una ventana de
+  Windows) — la lógica de cada uno está cubierta por tests con mocks,
+  pero el flujo de punta a punta con clic real queda para que el usuario
+  lo pruebe cuando quiera.
+
+## Reset de datos + investigación de raw_records duplicado (2026-08-15)
+
+- [x] ~~raw_records apareció duplicado x2 (72.207 en vez de 36.103)~~ —
+      investigado a fondo, NO era un bug de código de esta sesión (ver
+      DECISIONES.md 2026-08-15 para el detalle completo): rotación de
+      etags del lado de Google, tolerada por diseño (`raw_records` es
+      append-only a propósito). Se intentó un fix con índice `UNIQUE`
+      que resultó estar basado en un supuesto falso — 4 tests lo
+      confirmaron, se revirtió limpio (`git diff` vacío en los 3
+      archivos tocados).
+- [x] ~~Reset completo de la base a estado de primer uso~~ — pedido
+      explícito del usuario, no relacionado con el punto anterior: el
+      foco pasa a la interfaz/funcionalidad, los datos reales se
+      retoman más adelante en fase de testing. `Data/Salida/
+      staging.sqlite` borrado y recreado vacío (8 tablas en 0),
+      `lista-maestra.xlsx`/`contactos-whatsapp.csv` borrados (exports
+      viejos). **Estado real de antes queda recuperable** — commit de
+      backup en el repo local de `Data/` justo antes del reset, más un
+      backup limpio previo del 2026-08-13_2054. Tokens OAuth de Google
+      NO se tocaron.
+- **Estado actual real de la base: 0 contactos, 0 registros** — cualquier
+  cifra de "8.541 contactos"/"36.103 raw_records" en entradas anteriores
+  de este archivo es HISTÓRICA (lo que se logró en su momento), no el
+  estado presente. La próxima sesión que retome esto debe volver a
+  importar desde Google (tokens ya autorizados, no requiere login) o
+  esperar instrucción del usuario sobre cuándo hacerlo.
+
+## Meta-auditoría + evaluación de propuestas de rediseño de Lovable (2026-08-15, cont.)
+
+- [x] ~~Meta-auditoría de la auditoría .docx del 2026-08-14~~ — entregada
+      en el chat (crítica + prompt de mejoras enfocado en riesgos/
+      seguridad, sin cambios de código en este proyecto, tal como se
+      pidió). Hallazgo más serio, no estaba en la auditoría original:
+      `llm_judge.py` manda nombre/teléfonos/emails completos de ambos
+      contactos a proveedores de IA externos (Groq/OpenRouter/Anthropic)
+      en cada caso de dedup "zona gris" — ver DECISIONES.md para el
+      detalle y el prompt de mejoras completo (no ejecutado todavía, el
+      usuario no lo pidió).
+- [x] ~~Evaluar 2 propuestas de rediseño de interfaz de Lovable~~ — se
+      rechazó el "rediseño integral" (tema oscuro, command palette,
+      layout maestro-detalle, cola de revisión par-a-par con atajos)
+      por alcance/riesgo y porque parte describía debilidades ya
+      resueltas en la ronda anterior de esta misma sesión. Se aplicaron
+      3 mejoras acotadas de valor real: badges de calidad del dato
+      (`movil-asumido`/`incompleto`/`corregido`, ya calculados por el
+      pipeline, nunca mostrados), pantalla Anomalías (`anomalias.py` ya
+      existía, era CLI-only), tipografía monoespaciada para teléfono/
+      email. Detalle completo y razones en DECISIONES.md.
+- **224 tests en verde** (221 → 224).
+
+## Fase 4 — Google Contacts
+
+- [ ] Probar `Sync.gs` (ya migrado a People API) contra una cuenta de
+      Google de PRUEBA, con 2-3 contactos ficticios — requiere login de
+      Google del usuario, Claude no puede hacerlo.
+- [ ] Si funciona: recién ahí correr contra las cuentas reales de Pablo y
+      Sindy.
+- [ ] "Otros contactos" (`importar-otros-contactos`, gente de Gmail sin
+      guardar): requiere un login de Google APARTE (scope
+      `contacts.other.readonly`, distinto al de Fase 4) — tampoco probado
+      en vivo.
+
+## UI nueva (Fase 1 del plan "v2")
+
+- [x] Scaffold del proyecto (Vite+React+TS+Tailwind, sin marca).
+- [x] API JSON en el backend (`src/motor/api.py`).
+- [x] Primera pantalla: tabla virtualizada + cola de revisión.
+- [x] Rediseño visual (sidebar, stat cards, íconos propios, avatares).
+- [x] Bug de conteo de pendientes corregido (filtrar por corrida más
+      reciente).
+- [x] ~~Confirmación visual en navegador~~ — confirmado 2026-08-13 (Browser
+      pane): `motor-contactos-ui` (`.claude/launch.json`, puerto 5174) +
+      backend `:5000` corriendo en paralelo, `/api/stats` y
+      `/api/contactos?pagina=1&tamano=500` responden 200 OK, la UI muestra
+      los números reales (8.590 contactos, 36.102 normalizados, 36.103
+      crudos, 649 pendientes), sin errores de consola. Fue Claude quien lo
+      confirmó (visualmente vía herramientas de navegador), no Pablo
+      todavía en persona — sigue valiendo la pena que él lo vea con sus
+      propios ojos, pero ya no es un bloqueante técnico.
+- [x] ~~Edición de teléfono/WhatsApp/email desde la UI nueva~~ — confirmado
+      que `EditDialog.tsx` ya existe y carga (`network requests` lo lista
+      entre los módulos servidos) — no hace falta portar nada, ya está.
+
+## Infraestructura de continuidad (este pedido)
+
+- [x] `ESPECIFICACION.md`, `DECISIONES.md`, `PENDIENTES.md` creados.
+- [x] Repos git locales sin remoto para `motor-contactos/` y `Data/`
+      (backup contra borrados accidentales).
+- [x] `scripts/setup_project.ps1` — corrido, verificado (163 tests en verde
+      en esa corrida, antes del conector de Google).
+- [x] `scripts/handoff.ps1` — corrido, verificado, bug de encoding de
+      tildes encontrado y arreglado (`Get-Content -Encoding UTF8`).
+- [x] ~~`PROMPT_CONTINUACION.md` probado con cuenta nueva~~ — validado en
+      la práctica: esta misma cadena de sesiones lo usó para retomar
+      trabajo sin perder contexto (ver handoffs de 2026-08-13). Funciona.
+
+## Descartado (decisión explícita del usuario, 2026-08-13 — cierre del MVP)
+
+- **Fase 5 (escaneo de directorios completos de la PC)**: descartada, no
+  pospuesta. No se retoma salvo pedido explícito y nuevo del usuario.
+
+## Pospuesto a propósito (no arrancar sin pedirlo explícitamente)
+
+- Fase 2 "v2" (blocking por embeddings, formalizar bandas con Claude Agent
+  SDK, agente de auto-mejora).
+- Fase 3 "v2" (diseño multi-usuario/producto) — ya diseñada en el
+  historial, no construida; el usuario pidió resetear el foco al MVP, así
+  que esto queda fuera de alcance hasta que lo pida de nuevo.

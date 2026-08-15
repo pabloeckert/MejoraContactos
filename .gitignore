@@ -34,16 +34,20 @@ test-results/
 playwright-report/
 coverage/
 
-# Proyecto privado motor-contactos + datos personales de contactos —
-# nunca a este repo. motor-contactos/ y Data/ tienen SUS PROPIOS repos git
-# locales (sin remoto) para versionado/backup independiente — ver
-# motor-contactos/scripts/setup_project.ps1. Un blanket ignore acá evita
-# que un `git add -A` en la raíz los trate como submódulos por error.
+# Data/ (contactos personales reales de terceros — Pablo y Sindy) NUNCA a
+# este repo, público en GitHub. Tiene su PROPIO repo git local (sin
+# remoto) para versionado/backup independiente — ver
+# motor-contactos/scripts/setup_project.ps1.
 Data/
-motor-contactos/
 __pycache__/
 *.pyc
 .pytest_cache/
+
+# motor-contactos/ (2026-08-15): se fusionó el CÓDIGO al repo raíz
+# (verificado sin secretos ni datos reales en su historial) — sigue
+# teniendo, ADEMÁS, su propio repo git local independiente adentro
+# (motor-contactos/.git) para el flujo de trabajo de scripts/handoff.ps1
+# entre sesiones; no se toca ni se borra.
 
 # Transcripción de sesión (puede contener datos personales reales) — nunca a git
 MejoraContactos.md

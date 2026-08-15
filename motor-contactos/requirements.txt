@@ -1,0 +1,27 @@
+pandas>=3.0
+openpyxl>=3.1
+xlrd>=2.0
+odfpy>=1.4
+chardet>=5.2
+phonenumbers>=9.0
+PyYAML>=6.0
+rapidfuzz>=3.14
+vobject>=0.9
+beautifulsoup4>=4.13
+lxml>=5.3
+python-docx>=1.2
+pdfplumber>=0.11
+pytesseract>=0.3
+Pillow>=11.0
+Flask>=3.1
+requests>=2.32
+python-dotenv>=1.1
+google-auth>=2.35
+google-auth-oauthlib>=1.2
+google-api-python-client>=2.149
+pywebview>=6.2
+pytest>=9.0
+
+# Solo hace falta para reconstruir App/MotorContactos.exe
+# (scripts/build_exe.ps1) -- no lo usa el resto del pipeline.
+pyinstaller>=6.22

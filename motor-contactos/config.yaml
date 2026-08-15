@@ -1,0 +1,137 @@
+# Configuración del motor de consolidación de contactos.
+# Lo que se puede querer ajustar sin tocar código vive acá.
+
+rutas:
+  carpeta_raiz: "../Data/Crudos"   # relativo a este archivo; se resuelve a absoluto al cargar
+  carpeta_salida: "../Data/Salida"
+  base_sqlite: "../Data/Salida/staging.sqlite"
+
+extensiones_permitidas:
+  - csv
+  - tsv
+  - txt
+  - xls
+  - xlsx
+  - xlsm
+  - ods
+  - vcf
+  - json
+  - html
+  - md
+  - log
+  - docx
+  - pdf
+  - png
+  - jpg
+  - jpeg
+
+telefono:
+  codigo_area_default: "376"       # Posadas — usado para completar números cortos (6-8 dígitos)
+  asumir_movil_por_defecto: true   # si no hay marca de móvil (15 / 9) ni pista de etiqueta, asumir celular
+
+email:
+  dominios_frecuentes:
+    - gmail.com
+    - hotmail.com
+    - hotmail.com.ar
+    - outlook.com
+    - outlook.com.ar
+    - yahoo.com
+    - yahoo.com.ar
+    - live.com
+    - live.com.ar
+    - icloud.com
+    - fibertel.com.ar
+    - speedy.com.ar
+    - arnet.com.ar
+    - ciudad.com.ar
+    - uol.com.ar
+  umbral_levenshtein: 2   # distancia máxima para corregir un dominio contra la lista de arriba
+
+dedup:
+  # Umbral "agresivo" (mismo teléfono fusiona directo) por decisión
+  # explícita del usuario — dedup/learning.py lo va afinando con evidencia
+  # real de sus propias decisiones de revisión, nunca se sale de estas
+  # bandas por sí solo.
+  umbral_fusion_automatica: 0.80
+  umbral_no_fusionar: 0.55
+  pesos:
+    telefono_exacto: 0.5
+    email_exacto: 0.3
+    nombre_similitud: 0.15
+    organizacion: 0.05
+  tope_bucket: 500
+
+llm:
+  # Casos en la banda ambigua (entre los dos umbrales de arriba) se le
+  # consultan a un LLM antes de mandarlos a la cola de revisión humana.
+  # Orden: Groq (primario) -> rotación de modelos gratis de OpenRouter
+  # (round-robin, reparte carga para no agotar la cuota gratis de uno
+  # solo) -> si ninguno respondió con confianza suficiente, se escala a
+  # Anthropic (pago, mejor calidad) -- así el costo se paga solo en los
+  # casos genuinamente difíciles.
+  activar_para_dudosos: true
+  primario:
+    proveedor: "groq"
+    modelo: "llama-3.3-70b-versatile"
+  # Lista verificada contra https://openrouter.ai/api/v1/models el
+  # 2026-08-12 (410 modelos totales, 19 gratis) -- quedan afuera 2 modelos
+  # de generación de música (no sirven para esta tarea de texto) y 1 que
+  # figuraba por expirar al día siguiente. Esta lista cambia con el tiempo
+  # -- si empiezan a fallar muchos, volver a chequear esa URL.
+  rotacion_gratis_openrouter:
+    - "openai/gpt-oss-20b:free"
+    - "google/gemma-4-31b-it:free"
+    - "google/gemma-4-26b-a4b-it:free"
+    - "nvidia/nemotron-3-super-120b-a12b:free"
+    - "nvidia/nemotron-3-ultra-550b-a55b:free"
+    - "nvidia/nemotron-3-nano-30b-a3b:free"
+    - "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free"
+    - "nvidia/nemotron-nano-9b-v2:free"
+    - "nvidia/nemotron-nano-12b-v2-vl:free"
+    - "liquid/lfm-2.5-2.6b:free"
+    - "cohere/north-mini-code:free"
+    - "poolside/laguna-s-2.1:free"
+    - "poolside/laguna-xs-2.1:free"
+  # Tope de candidatos gratis probados POR CASO antes de escalar a
+  # Anthropic (incluye a `primario`) -- sin este tope, un caso puede
+  # terminar probando los 14 candidatos gratis en secuencia si todos
+  # fallan/tardan (encontrado en la práctica: 596 casos así tardaron más
+  # de 2hs). Con 3 alcanza para repartir carga sin que un caso lento se
+  # coma minutos enteros.
+  maximo_intentos_gratis: 3
+  escalado:
+    proveedor: "anthropic"
+    modelo: "claude-sonnet-4-5"
+    umbral_confianza_groq: 0.6   # si ningún gratis respondió con al menos esta confianza, escala
+
+revisor:
+  puerto: 5000
+  tamano_lote: 25
+
+# Fase 3 — solo hace falta si el instalador de Tesseract-OCR no agregó el
+# binario al PATH de Windows. Ejemplo de ruta típica, comentado:
+# ocr:
+#   tesseract_cmd: "C:\\Program Files\\Tesseract-OCR\\tesseract.exe"
+
+# Fuente de datos: Google Contacts en vivo (People API) en vez de exports
+# CSV manuales -- decisión explícita del usuario (2026-08-11): no quiere
+# mantener archivos en Data/Crudos, prefiere que el sistema se conecte
+# directo. Cada nombre acá es una cuenta de Google distinta; cada una se
+# autoriza por separado corriendo `motor importar-google <cuenta>` la
+# primera vez (abre el navegador, pide login -- eso lo hace el usuario,
+# no Claude). Ver GOOGLE_SETUP.md para el setup de credentials.json.
+google:
+  cuentas:
+    - pablo
+    - sindy
+
+# MejoraWS (proyecto hermano, Electron+Baileys, envío de WhatsApp) -- el
+# panel lo abre como app aparte con el botón "Abrir MejoraWS", no lo
+# reimplementa. Default ya apunta a donde vive -- solo hace falta esto si
+# se mueve de carpeta.
+# mejoraws:
+#   ruta: "C:/Github/Herramientas/MejoraWS"
+
+# Las API keys (GROQ_API_KEY, ANTHROPIC_API_KEY) NUNCA van acá — se leen de
+# variables de entorno vía motor-contactos/.env (ver .env.example).

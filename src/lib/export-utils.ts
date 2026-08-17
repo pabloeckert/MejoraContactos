@@ -52,7 +52,7 @@ function buildCSV(headers: string[], rows: string[][]): string {
 export function exportCSV(contacts: UnifiedContact[]): string {
   const rows = contacts.map(contactToRow);
   const headers = Object.keys(rows[0] || {});
-  const data = rows.map(r => headers.map(h => String((r as Record<string, string>)[h] || "")));
+  const data = rows.map(r => headers.map(h => String((r as unknown as Record<string, string>)[h] || "")));
   return buildCSV(headers, data);
 }
 

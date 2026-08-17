@@ -158,7 +158,7 @@ export function ProcessingPanel({ files, onProcessingComplete, onResetAll }: Pro
                       <p className="text-[11px] font-medium flex items-center gap-1">{STAGE_INFO[stage].icon} {STAGE_INFO[stage].label}</p>
                       <p className="text-[9px] text-muted-foreground">{STAGE_INFO[stage].desc}</p>
                     </div>
-                    <Select value={p.stageConfig[stage]} onValueChange={(v) => p.setStageConfig(prev => ({ ...prev, [stage]: v }))}>
+                    <Select value={p.stageConfig[stage]} onValueChange={(v) => p.setStageConfig({ ...p.stageConfig, [stage]: v })}>
                       <SelectTrigger className="h-7 text-xs flex-1"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         {p.activeProviders.length > 0 ? p.activeProviders.map(id => (

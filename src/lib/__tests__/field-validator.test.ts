@@ -272,4 +272,21 @@ describe("validateContactBatch", () => {
   it("should handle empty array", () => {
     expect(validateContactBatch([])).toHaveLength(0);
   });
+
+  it("should validate a local-format phone correctly regardless of its position in the batch", () => {
+    // Regresión: contacts.map(validateContactFields) le pasaba el índice del
+    // array como defaultCountry (map llama al callback con (item, index,
+    // array)). Un número que necesita el defaultCountry 'AR' para parsear
+    // (formato local, sin +54) solo valida bien si el índice NO pisó ese
+    // parámetro — por eso este contacto va en la posición 1, no la 0.
+    const contacts = [
+      makeContact({ id: "0" }),
+      makeContact({ id: "1", whatsapp: "0111555551234" }), // formato local AR, sin +54
+      makeContact({ id: "2" }),
+    ];
+    const results = validateContactBatch(contacts);
+    const whatsappVal = results[1].validations.find(v => v.field === "whatsapp");
+    expect(whatsappVal?.isValid).toBe(true);
+    expect(whatsappVal?.score).toBeGreaterThan(0);
+  });
 });

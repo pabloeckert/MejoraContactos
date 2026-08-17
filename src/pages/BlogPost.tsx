@@ -307,7 +307,7 @@ export default function BlogPost() {
         "author": { "@type": "Organization", "name": "MejoraOK" },
         "publisher": { "@type": "Organization", "name": "MejoraOK" },
         "mainEntityOfPage": `https://pabloeckert.github.io/MejoraContactos/blog/${post.slug}`,
-        "keywords": post.keywords.join(", "),
+        "keywords": (post.keywords ?? post.tags ?? []).join(", "),
       });
       document.head.appendChild(script);
 

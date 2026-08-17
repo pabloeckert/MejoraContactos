@@ -10,7 +10,11 @@ const WORKER_THRESHOLD = 10000; // Use worker for 10K+ contacts
 type RuleCleanResult = CleanResult;
 
 interface DedupResult {
-  id: string;
+  // Solo lo agrega el camino que corre adentro del Worker (pipeline.worker.ts
+  // lo suma a mano). Los caminos de fallback (dataset chico, o el Worker no
+  // se pudo crear) llaman directo a DedupIndex.add() de @/lib/dedup, que no
+  // lo incluye — por eso es opcional acá y no obligatorio como estaba antes.
+  id?: string;
   isDuplicate: boolean;
   duplicateOf?: string;
   confidence: number;

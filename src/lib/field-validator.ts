@@ -337,7 +337,11 @@ export function validateContactFields(contact: UnifiedContact, defaultCountry: C
  * Valida un lote de contactos.
  */
 export function validateContactBatch(contacts: UnifiedContact[]): ContactValidationResult[] {
-  return contacts.map(validateContactFields);
+  // No pasar validateContactFields directo a .map(): map() llama al callback
+  // con (elemento, índice, array) — el índice terminaba pisando el
+  // parámetro defaultCountry (esperaba 'AR', recibía 0, 1, 2...), rompiendo
+  // la validación de WhatsApp para todo lote con números sin código de país.
+  return contacts.map((contact) => validateContactFields(contact));
 }
 
 /**

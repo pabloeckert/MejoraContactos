@@ -4,27 +4,40 @@ import { Badge } from "@/components/ui/badge";
 import { Calendar, ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
 
+// El slug de cada post tiene que coincidir con una clave real de ARTICLES en
+// BlogPost.tsx — si no, esa página muestra 404 aunque el post aparezca acá
+// en el listado (encontrado y corregido: los tres slugs estaban
+// desalineados con el contenido real, el blog entero estaba roto).
 export const BLOG_POSTS = [
   {
-    slug: "como-limpiar-contactos-ia",
+    slug: "como-limpiar-contactos-google",
     title: "Cómo limpiar tus contactos con IA en 5 minutos",
     excerpt: "Guía paso a paso para limpiar, deduplicar y normalizar tu agenda usando inteligencia artificial.",
     date: "2026-04-15",
     tags: ["Guía", "IA"],
+    category: "Guía",
+    readTime: "5 min",
+    keywords: ["limpiar contactos", "IA", "deduplicación", "Google Contacts"],
   },
   {
-    slug: "formato-e164-telefonos",
+    slug: "normalizar-telefonos-argentina-whatsapp",
     title: "¿Por qué deberías usar formato E.164 para teléfonos?",
     excerpt: "El estándar E.164 elimina la ambigüedad en números internacionales. Te explicamos cómo funciona.",
     date: "2026-04-10",
     tags: ["Técnico", "Telefonía"],
+    category: "Técnico",
+    readTime: "4 min",
+    keywords: ["E.164", "formato de teléfono", "normalización telefónica", "WhatsApp"],
   },
   {
-    slug: "deduplicacion-jaro-winkler",
-    title: "Deduplicación inteligente: más allá del email exacto",
-    excerpt: "Cómo el algoritmo Jaro-Winkler detecta contactos duplicados aunque los nombres estén escritos diferente.",
+    slug: "mejores-apis-gratis-limpieza-contactos-ia",
+    title: "Las mejores APIs gratis de IA para limpiar contactos (12 comparadas)",
+    excerpt: "Comparamos latencia, límites gratis y casos de uso de los 12 proveedores de IA que soporta MejoraContactos.",
     date: "2026-04-05",
-    tags: ["Técnico", "Algoritmos"],
+    tags: ["Técnico", "IA"],
+    category: "Técnico",
+    readTime: "6 min",
+    keywords: ["proveedores de IA", "Groq", "APIs gratis", "limpieza de contactos"],
   },
 ];
 

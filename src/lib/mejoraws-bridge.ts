@@ -72,5 +72,37 @@ export async function getBridgeStatus(token: string): Promise<BridgeStatus | nul
   }
 }
 
+export interface SendResult {
+  ok: boolean;
+  error?: string;
+}
+
+/**
+ * Dispara un envío de WhatsApp a un contacto vía el bridge de MejoraWS
+ * (Fase 6 de MejoraSuite). MejoraContactos no comparte datos con MejoraWS,
+ * así que del lado de MejoraWS esto da de alta al contacto en una carpeta
+ * dedicada ("Importados desde MejoraContactos") si hace falta, y usa el
+ * mismo `runCampaign` de siempre — no hay lógica de envío nueva ni acá ni
+ * del otro lado. Nunca tira excepción: siempre devuelve `{ ok, error? }`.
+ */
+export async function sendViaWhatsApp(token: string, telefono: string, nombre: string): Promise<SendResult> {
+  const { signal, cancel } = withTimeout(FETCH_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${BRIDGE_URL}/add-and-send`, {
+      method: "POST",
+      headers: { "X-Bridge-Token": token, "Content-Type": "application/json" },
+      body: JSON.stringify({ telefono, nombre }),
+      signal,
+    });
+    const data = (await res.json().catch(() => ({}))) as { error?: string };
+    if (!res.ok) return { ok: false, error: data.error || "MejoraWS no respondió el envío" };
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "No se pudo conectar con MejoraWS — ¿está abierto?" };
+  } finally {
+    cancel();
+  }
+}
+
 /** Link mejoraws:// para ofrecer "Abrir MejoraWS" cuando el bridge no responde. */
 export const MEJORAWS_PROTOCOL_URL = "mejoraws://open";

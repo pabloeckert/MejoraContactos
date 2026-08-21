@@ -47,14 +47,28 @@ jobs:
           echo "✅ Build OK — $(find dist -type f | wc -l) files"
 
       # E2E tests
+      #
+      # BASE_PATH tiene que estar declarado como `env:` de cada step (no
+      # como `BASE_PATH=/ vite build` inline en el script de npm) porque
+      # Playwright levanta `vite preview` en un proceso nuevo durante el
+      # step de "E2E tests" — un env var puesto solo para el comando de
+      # build no le llega a ese proceso posterior, y vite preview vuelve a
+      # caer en el base de producción (/mejoracontactos/), sirviendo el
+      # index.html con las rutas de assets pisadas. Eso fue lo que rompió
+      # el deploy automático silenciosamente: los 21 tests fallaban con
+      # recursos en 404 y nunca se notaba porque nadie miraba este workflow.
       - name: Build for E2E (root base)
         run: npm run build:test
+        env:
+          BASE_PATH: /
 
       - name: Install Playwright
         run: npx playwright install --with-deps chromium
 
       - name: E2E tests
         run: npx playwright test --reporter=list
+        env:
+          BASE_PATH: /
 
       # Rebuild with production base path
       - name: Rebuild for production

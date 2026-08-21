@@ -73,6 +73,12 @@ test.describe("MejoraContactos — E2E", () => {
   });
 
   test("shows empty states for results/export/dashboard", async ({ page }) => {
+    // El modo demostración precarga contactos ficticios por default (Fase 8
+    // de MejoraSuite) — para probar el estado realmente vacío hay que
+    // apagarlo antes de que el componente monte.
+    await page.evaluate(() => localStorage.setItem("mejorasuite_demo_mode", "false"));
+    await page.reload();
+
     await page.getByRole("button", { name: /saltar/i }).click();
 
     // Switch to advanced mode

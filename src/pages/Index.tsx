@@ -30,6 +30,9 @@ import { usePWAInstall } from "@/hooks/usePWAInstall";
 import { getUsageStats } from "@/lib/usage-limits";
 import { UsageBanner } from "@/components/UsageBanner";
 import { PricingSection } from "@/components/PricingSection";
+import { DemoModeToggle } from "@/components/DemoModeToggle";
+import { useDemoMode } from "@/lib/demoMode";
+import { DEMO_CONTACTS } from "@/lib/demoContacts";
 
 // Track page views
 analytics.pageView();
@@ -48,6 +51,31 @@ const Index = () => {
   const { theme, setTheme } = useTheme();
   const { isInstallable, isStandalone, install } = usePWAInstall();
   const { locale, setLocale } = useI18n();
+  const demoMode = useDemoMode();
+
+  // Modo demostración (Fase 7 de MejoraSuite): precarga un lote ficticio en
+  // memoria (nunca se persiste a IndexedDB, ver saveContacts más abajo) para
+  // poder recorrer dedup/limpieza/exportación sin subir un archivo real. Al
+  // apagarlo, si lo que hay cargado es justamente ese lote demo, se vuelve
+  // a blanco — pero no toca un archivo real que el usuario haya subido.
+  useEffect(() => {
+    if (demoMode && contacts.length === 0 && files.length === 0) {
+      setContacts(DEMO_CONTACTS);
+      setFiles([{
+        id: "demo-file",
+        name: "contactos-de-ejemplo.csv",
+        size: 1024,
+        type: "text/csv",
+        rows: [],
+        columns: ["firstName", "lastName", "whatsapp", "company", "jobTitle", "email"],
+        addedAt: new Date(),
+      }]);
+    } else if (!demoMode && files.some((f) => f.id === "demo-file")) {
+      setContacts([]);
+      setFiles([]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [demoMode]);
 
   // Onboarding state
   const [showOnboarding, setShowOnboarding] = useState(() => {
@@ -230,6 +258,7 @@ const Index = () => {
                 <span className="hidden sm:inline">Instalar</span>
               </button>
             )}
+            <DemoModeToggle />
             {/* Simple/Advanced mode toggle */}
             <button
               onClick={() => {

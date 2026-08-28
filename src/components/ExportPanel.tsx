@@ -127,22 +127,22 @@ export const ExportPanel = memo(function ExportPanel({ contacts }: ExportPanelPr
           <Button variant="outline" className="h-auto py-4 flex-col gap-2" onClick={() => handleExport("csv")} aria-label="Exportar contactos como CSV">
             <FileText className="h-5 w-5 text-green-600" />
             <span className="text-xs font-semibold">CSV</span>
-            <span className="text-[10px] text-muted-foreground">Genérico</span>
+            <span className="text-[10px] text-muted-foreground">Para tu planilla de siempre</span>
           </Button>
           <Button variant="outline" className="h-auto py-4 flex-col gap-2" onClick={() => handleExport("excel")} aria-label="Exportar contactos como Excel">
             <FileSpreadsheet className="h-5 w-5 text-blue-500" />
             <span className="text-xs font-semibold">Excel</span>
-            <span className="text-[10px] text-muted-foreground">2 hojas</span>
+            <span className="text-[10px] text-muted-foreground">Con hoja aparte de descartados</span>
           </Button>
           <Button variant="outline" className="h-auto py-4 flex-col gap-2" onClick={() => handleExport("vcf")} aria-label="Exportar contactos como VCF">
             <File className="h-5 w-5 text-primary" />
             <span className="text-xs font-semibold">VCF</span>
-            <span className="text-[10px] text-muted-foreground">vCard 3.0</span>
+            <span className="text-[10px] text-muted-foreground">Para importar al celular</span>
           </Button>
           <Button variant="outline" className="h-auto py-4 flex-col gap-2" onClick={() => handleExport("json")} aria-label="Exportar contactos como JSON">
             <FileText className="h-5 w-5 text-purple-500" />
             <span className="text-xs font-semibold">JSON</span>
-            <span className="text-[10px] text-muted-foreground">Completo</span>
+            <span className="text-[10px] text-muted-foreground">Datos completos (uso técnico)</span>
           </Button>
         </CardContent>
       </Card>
@@ -159,27 +159,27 @@ export const ExportPanel = memo(function ExportPanel({ contacts }: ExportPanelPr
           <Button variant="outline" className="h-auto py-4 flex-col gap-2" onClick={() => handleExport("google")} aria-label="Exportar para Google Contacts">
             <span className="text-lg">🔵</span>
             <span className="text-xs font-semibold">Google Contacts</span>
-            <span className="text-[10px] text-muted-foreground">Re-importable</span>
+            <span className="text-[10px] text-muted-foreground">Sincroniza tu agenda de Google</span>
           </Button>
           <Button variant="outline" className="h-auto py-4 flex-col gap-2" onClick={() => handleExport("hubspot")} aria-label="Exportar para HubSpot">
             <span className="text-lg">🟠</span>
             <span className="text-xs font-semibold">HubSpot</span>
-            <span className="text-[10px] text-muted-foreground">CRM</span>
+            <span className="text-[10px] text-muted-foreground">Listo para importar ahí</span>
           </Button>
           <Button variant="outline" className="h-auto py-4 flex-col gap-2" onClick={() => handleExport("salesforce")} aria-label="Exportar para Salesforce">
             <span className="text-lg">☁️</span>
             <span className="text-xs font-semibold">Salesforce</span>
-            <span className="text-[10px] text-muted-foreground">CRM</span>
+            <span className="text-[10px] text-muted-foreground">Listo para importar ahí</span>
           </Button>
           <Button variant="outline" className="h-auto py-4 flex-col gap-2" onClick={() => handleExport("zoho")} aria-label="Exportar para Zoho CRM">
             <span className="text-lg">🟢</span>
             <span className="text-xs font-semibold">Zoho CRM</span>
-            <span className="text-[10px] text-muted-foreground">CRM</span>
+            <span className="text-[10px] text-muted-foreground">Listo para importar ahí</span>
           </Button>
           <Button variant="outline" className="h-auto py-4 flex-col gap-2" onClick={() => handleExport("airtable")} aria-label="Exportar para Airtable">
             <span className="text-lg">🟡</span>
             <span className="text-xs font-semibold">Airtable</span>
-            <span className="text-[10px] text-muted-foreground">Base de datos</span>
+            <span className="text-[10px] text-muted-foreground">Listo para importar ahí</span>
           </Button>
         </CardContent>
       </Card>
@@ -196,12 +196,12 @@ export const ExportPanel = memo(function ExportPanel({ contacts }: ExportPanelPr
           <Button variant="outline" className="h-auto py-4 flex-col gap-2" onClick={() => handleExport("jsonl")} aria-label="Exportar para fine-tuning IA en formato JSONL">
             <Brain className="h-5 w-5 text-orange-500" />
             <span className="text-xs font-semibold">JSONL</span>
-            <span className="text-[10px] text-muted-foreground">Fine-tuning IA</span>
+            <span className="text-[10px] text-muted-foreground">Avanzado: entrenar una IA</span>
           </Button>
           <Button variant="outline" className="h-auto py-4 flex-col gap-2" onClick={() => handleExport("report")} aria-label="Generar informe HTML imprimible">
             <BarChart3 className="h-5 w-5 text-teal-500" />
             <span className="text-xs font-semibold">Informe</span>
-            <span className="text-[10px] text-muted-foreground">HTML imprimible</span>
+            <span className="text-[10px] text-muted-foreground">Para imprimir o compartir</span>
           </Button>
         </CardContent>
       </Card>

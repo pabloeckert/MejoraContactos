@@ -136,7 +136,7 @@ export const ContactsTable = memo(function ContactsTable({ contacts, onUpdateCon
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <div className="flex justify-center">
-                            <span className={`inline-flex items-center justify-center h-6 w-6 rounded-full text-[10px] font-bold ${scoreStyle.bg} ${scoreStyle.text}`}>
+                            <span className={`inline-flex items-center justify-center h-6 w-6 rounded-full text-[10px] font-bold ${scoreStyle.bg} ${scoreStyle.text} ${validation.needsReview ? "ring-2 ring-red-300" : ""}`}>
                               {validation.overallScore}
                             </span>
                           </div>
@@ -243,13 +243,16 @@ function FieldIcon({ validation }: { validation: FieldValidation }) {
   if (!validation) return null;
   const icon = getFieldIcon(validation);
   if (icon === '✅') return null; // Don't show check marks for valid fields (clean UI)
+  // Un dato inválido (❌) pesa más que una simple observación (⚠️): el tamaño
+  // y la opacidad marcan qué cambio importa revisar primero, no solo qué cambió.
+  const isCritical = !validation.isValid || validation.score < 60;
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <span className="cursor-help text-[10px] shrink-0">{icon}</span>
+        <span className={`cursor-help shrink-0 ${isCritical ? "text-xs" : "text-[10px] opacity-60"}`}>{icon}</span>
       </TooltipTrigger>
       <TooltipContent>
-        <p className="text-[10px]">{validation.reason || (validation.isValid ? 'Válido' : 'Inválido')}</p>
+        <p className={`text-[10px] ${isCritical ? "font-semibold text-red-600" : ""}`}>{validation.reason || (validation.isValid ? 'Válido' : 'Inválido')}</p>
         {validation.correctedValue && <p className="text-[10px] text-blue-400">Sugerencia: {validation.correctedValue}</p>}
       </TooltipContent>
     </Tooltip>

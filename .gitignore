@@ -52,3 +52,5 @@ __pycache__/
 
 # Transcripción de sesión (puede contener datos personales reales) — nunca a git
 MejoraContactos.md
+
+.claude/settings.local.json

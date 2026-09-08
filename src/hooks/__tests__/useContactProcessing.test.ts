@@ -73,22 +73,25 @@ describe("useContactProcessing", () => {
     vi.clearAllMocks();
   });
 
-  it("should initialize with correct defaults", () => {
+  it("should initialize with correct defaults", async () => {
     const { result } = renderHook(() => useContactProcessing([]));
+    await waitFor(() => expect(result.current.activeProviders.length).toBeGreaterThan(0));
     expect(result.current.mode).toBe("pipeline");
     expect(result.current.pipelineState).toEqual(INITIAL_PIPELINE);
     expect(result.current.stats.status).toBe("idle");
     expect(result.current.logs).toEqual([]);
   });
 
-  it("should auto-detect mappings when files are provided", () => {
+  it("should auto-detect mappings when files are provided", async () => {
     const { result } = renderHook(() => useContactProcessing(makeFiles()));
+    await waitFor(() => expect(result.current.activeProviders.length).toBeGreaterThan(0));
     expect(result.current.mappings.length).toBeGreaterThan(0);
     expect(result.current.allColumns).toEqual(["Nombre", "Apellido", "Email", "Teléfono"]);
   });
 
-  it("should handle mapping changes", () => {
+  it("should handle mapping changes", async () => {
     const { result } = renderHook(() => useContactProcessing(makeFiles()));
+    await waitFor(() => expect(result.current.activeProviders.length).toBeGreaterThan(0));
     act(() => {
       result.current.handleMappingChange(0, "firstName");
     });
@@ -103,13 +106,15 @@ describe("useContactProcessing", () => {
     });
   });
 
-  it("should compute progress correctly", () => {
+  it("should compute progress correctly", async () => {
     const { result } = renderHook(() => useContactProcessing([]));
+    await waitFor(() => expect(result.current.activeProviders.length).toBeGreaterThan(0));
     expect(result.current.progress).toBe(0);
   });
 
-  it("should reset state correctly", () => {
+  it("should reset state correctly", async () => {
     const { result } = renderHook(() => useContactProcessing(makeFiles()));
+    await waitFor(() => expect(result.current.activeProviders.length).toBeGreaterThan(0));
     act(() => {
       result.current.resetState();
     });
@@ -119,8 +124,9 @@ describe("useContactProcessing", () => {
     expect(result.current.logs.every(l => l.type === "info")).toBe(true);
   });
 
-  it("should toggle pause state", () => {
+  it("should toggle pause state", async () => {
     const { result } = renderHook(() => useContactProcessing(makeFiles()));
+    await waitFor(() => expect(result.current.activeProviders.length).toBeGreaterThan(0));
     act(() => {
       result.current.pause();
     });
@@ -131,8 +137,9 @@ describe("useContactProcessing", () => {
     expect(result.current.stats.status).toBe("processing");
   });
 
-  it("should set stop flag", () => {
+  it("should set stop flag", async () => {
     const { result } = renderHook(() => useContactProcessing(makeFiles()));
+    await waitFor(() => expect(result.current.activeProviders.length).toBeGreaterThan(0));
     act(() => {
       result.current.stop();
     });
@@ -149,24 +156,27 @@ describe("useContactProcessing", () => {
     expect(result.current.stats.status).toBe("idle");
   });
 
-  it("should switch mode", () => {
+  it("should switch mode", async () => {
     const { result } = renderHook(() => useContactProcessing(makeFiles()));
+    await waitFor(() => expect(result.current.activeProviders.length).toBeGreaterThan(0));
     act(() => {
       result.current.setMode("single");
     });
     expect(result.current.mode).toBe("single");
   });
 
-  it("should update stage config", () => {
+  it("should update stage config", async () => {
     const { result } = renderHook(() => useContactProcessing(makeFiles()));
+    await waitFor(() => expect(result.current.activeProviders.length).toBeGreaterThan(0));
     act(() => {
       result.current.setStageConfig({ clean: "together", verify: "mistral", correct: "deepseek" });
     });
     expect(result.current.stageConfig.clean).toBe("together");
   });
 
-  it("should update default country", () => {
+  it("should update default country", async () => {
     const { result } = renderHook(() => useContactProcessing([]));
+    await waitFor(() => expect(result.current.activeProviders.length).toBeGreaterThan(0));
     act(() => {
       result.current.setDefaultCountry("MX");
     });

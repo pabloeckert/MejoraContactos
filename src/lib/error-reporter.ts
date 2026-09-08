@@ -10,6 +10,8 @@
  * 3. Replace captureError() with Sentry.captureException()
  */
 
+import { getSupabase } from "@/integrations/supabase/client";
+
 interface ErrorContext {
   component?: string;
   action?: string;
@@ -108,7 +110,9 @@ async function sendToWebhook(report: ErrorReport) {
 
 async function sendToSupabase(report: ErrorReport) {
   try {
-    const { getSupabase } = await import("@/integrations/supabase/client");
+    // Import estático: otros 5 módulos ya importan supabase/client de forma
+    // estática, así que el import dinámico no lograba separar esto en su
+    // propio chunk de todos modos (Vite avisaba esto en cada build).
     await (await getSupabase()).functions.invoke("log-error", { body: report });
   } catch {
     // Edge Function not deployed yet — ignore

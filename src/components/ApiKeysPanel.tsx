@@ -151,6 +151,9 @@ export function ApiKeysPanel() {
             <p className="text-xs text-muted-foreground mt-1">
               Cargá <strong>varias keys por proveedor</strong>. Cuando una se agota o falla, MejoraContactos rota automáticamente a la siguiente.
             </p>
+            <p className="text-[11px] text-muted-foreground/80 mt-1">
+              Se guardan cifradas solo en este navegador — nunca viajan a un servidor de Mejora Continua. Si compartís esta computadora, quitalas antes de cerrar sesión.
+            </p>
             <div className="flex gap-2 mt-2">
               <Badge variant="secondary" className="text-[10px]">{totalKeys} keys totales</Badge>
               <Badge className="text-[10px] bg-green-500/15 text-green-600 border-green-500/30">{okKeys} verificadas OK</Badge>

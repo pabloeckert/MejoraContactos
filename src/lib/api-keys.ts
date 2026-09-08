@@ -1,11 +1,22 @@
 /**
  * Gestión de API keys en localStorage con cifrado AES-GCM (Web Crypto API).
  * El cifrado es transparente: las funciones públicas mantienen la API sync.
- * 
+ *
  * Estrategia: cache en memoria inicializado sync desde localStorage.
  * Las keys se almacenan cifradas en localStorage pero se descifran async
  * en background. Mientras tanto, el cache tiene las keys (posiblemente
  * cifradas) que son funcionales para las llamadas inmediatas.
+ *
+ * Riesgo conocido (hallazgo de la auditoría pre-beta, aceptado a propósito):
+ * la clave de cifrado (ENC_KEY_STORAGE) vive en el mismo localStorage que el
+ * texto cifrado. Esto protege contra un volcado casual del storage, pero NO
+ * contra un XSS o script corriendo en el mismo origen — quien pueda leer
+ * localStorage puede descifrar todo. Es la razón por la que las keys nunca
+ * salen del navegador del usuario (no viajan a ningún backend de Mejora
+ * Continua). Antes de ofrecer sync entre dispositivos o cualquier lugar
+ * donde estas keys salgan de este storage, hay que resolver esto de fondo
+ * (ej. derivar la clave de un passphrase que el usuario ingresa, no
+ * guardarla junto a lo que cifra).
  */
 
 export interface KeyEntry {

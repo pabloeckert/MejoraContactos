@@ -143,6 +143,7 @@ def _aplicar_ediciones_manuales(conn: sqlite3.Connection, clusters: list[dict]) 
         if not edicion:
             continue
         cluster["editado_manualmente"] = True
+        cluster["updated_at"] = max(cluster["updated_at"], edicion["actualizado_en"] or "")
         for campo in _CAMPOS:
             valor = edicion[campo]
             if valor is not None and valor != "":
@@ -203,6 +204,18 @@ def exportar_whatsapp_csv(config: Config, conn: sqlite3.Connection) -> Path:
         escritor.writerows(filas)
 
     return destino
+
+
+def obtener_contactos_por_persona(conn: sqlite3.Connection, persona_ids: set[str]) -> list[dict]:
+    """Contactos materializados (con ediciones manuales aplicadas) para un
+    conjunto de persona_id puntual -- usado por supabase_sync.py para
+    sincronizar solo lo que cambió en una operación, sin tener que
+    materializar los ~8.500 contactos completos cada vez."""
+    if not persona_ids:
+        return []
+    clusters = [c for c in _materializar_clusters(conn) if c["persona_id"] in persona_ids]
+    _aplicar_ediciones_manuales(conn, clusters)
+    return clusters
 
 
 def obtener_contacto(conn: sqlite3.Connection, cluster_id: str) -> dict | None:
@@ -312,6 +325,21 @@ def guardar_edicion_manual(
         },
     )
     conn.commit()
+    _sincronizar_edicion_best_effort(conn, cluster_id)
+
+
+def _sincronizar_edicion_best_effort(conn: sqlite3.Connection, cluster_id: str) -> None:
+    """Sincroniza a Supabase el contacto que acaba de editarse a mano. Import
+    local a propósito: supabase_sync.py importa de este mismo módulo
+    (export.py) para materializar el contacto, así que importarlo acá arriba
+    del archivo sería un import circular -- este import queda diferido hasta
+    que la función realmente corre, cuando ambos módulos ya están cargados."""
+    fila = conn.execute("SELECT persona_id FROM clusters WHERE cluster_id = ? LIMIT 1", (cluster_id,)).fetchone()
+    if fila is None or fila["persona_id"] is None:
+        return
+    from motor import supabase_sync
+
+    supabase_sync.sincronizar_contactos(conn, {fila["persona_id"]})
 
 
 def _normalizar_multivalor_edicion(raw, transformar, valor_previo):
@@ -370,7 +398,7 @@ def _expandir_filas(cluster: dict) -> list[dict]:
 
 def _materializar_clusters(conn: sqlite3.Connection) -> list[dict]:
     filas = conn.execute(
-        "SELECT c.cluster_id, n.nombre, n.apellido, n.organizacion, n.cargo, "
+        "SELECT c.cluster_id, c.persona_id, c.actualizado_en, n.nombre, n.apellido, n.organizacion, n.cargo, "
         "n.telefonos_e164, n.telefonos_fijo_e164, n.emails, n.tag, "
         "n.domicilio, n.ciudad, n.provincia, n.pais, n.cumpleanos, n.foto_url, n.notas, n.flags "
         "FROM clusters c "
@@ -384,6 +412,15 @@ def _materializar_clusters(conn: sqlite3.Connection) -> list[dict]:
             fila["cluster_id"],
             {
                 "cluster_id": fila["cluster_id"],
+                # persona_id: igual para todos los raw_records de un mismo
+                # cluster_id por construcción (ver dedup/persona_id.py) --
+                # alcanza con quedarse con el último que aparezca.
+                "persona_id": None,
+                # updated_at del contacto final: el más reciente entre el
+                # actualizado_en de cualquiera de sus raw_records agrupados
+                # y el de su edición manual (esto último lo suma
+                # _aplicar_ediciones_manuales, que corre después).
+                "updated_at": "",
                 "nombre": "",
                 "apellido": "",
                 "cargo": "",
@@ -410,6 +447,8 @@ def _materializar_clusters(conn: sqlite3.Connection) -> list[dict]:
                 "editado_manualmente": False,
             },
         )
+        cluster["persona_id"] = fila["persona_id"] or cluster["persona_id"]
+        cluster["updated_at"] = max(cluster["updated_at"], fila["actualizado_en"] or "")
         cluster["nombre"] = cluster["nombre"] or fila["nombre"] or ""
         cluster["apellido"] = cluster["apellido"] or fila["apellido"] or ""
         cluster["cargo"] = cluster["cargo"] or fila["cargo"] or ""

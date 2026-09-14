@@ -132,6 +132,8 @@ def _a_entero(valor: str | None, default: int) -> int:
 def _serializar_contacto(c: dict) -> dict:
     return {
         "cluster_id": c.get("cluster_id", ""),
+        "persona_id": c.get("persona_id"),
+        "updated_at": c.get("updated_at") or None,
         "nombre": c.get("nombre", ""),
         "apellido": c.get("apellido", ""),
         "cargo": c.get("cargo", ""),

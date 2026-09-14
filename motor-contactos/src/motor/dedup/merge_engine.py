@@ -28,6 +28,7 @@ from datetime import datetime, timezone
 from motor.config import Config
 from motor.dedup import learning, scoring
 from motor.dedup.blocking import generar_candidatos
+from motor.dedup.persona_id import crear_persona, elegir_persona_id_superviviente
 from motor.dedup.scoring import RegistroParaScoring
 from motor.dedup.union_find import UnionFind
 from motor.llm_judge import LlmJudge
@@ -110,8 +111,9 @@ def deduplicar_todo(config: Config, conn: sqlite3.Connection, continuar: bool = 
             conn.commit()
             sin_commitear = 0
 
-    _materializar_clusters(conn, uf, corrida_id)
+    personas_afectadas = _materializar_clusters(conn, uf, corrida_id)
     conn.commit()
+    _sincronizar_best_effort(conn, personas_afectadas)
     return contadores
 
 
@@ -198,16 +200,18 @@ def aplicar_decision_lote(conn: sqlite3.Connection, patron: str, aceptar: bool) 
             (nueva_accion, fila["id"]),
         )
 
+    personas_afectadas: set[str] = set()
     if aceptar:
-        _fusionar_pares_de_clusters(
+        personas_afectadas = _fusionar_pares_de_clusters(
             conn, [(f["raw_record_id_a"], f["raw_record_id_b"]) for f in filas]
         )
 
     conn.commit()
+    _sincronizar_best_effort(conn, personas_afectadas)
     return len(filas)
 
 
-def _fusionar_pares_de_clusters(conn: sqlite3.Connection, pares_normalized_ids: list[tuple[int, int]]) -> None:
+def _fusionar_pares_de_clusters(conn: sqlite3.Connection, pares_normalized_ids: list[tuple[int, int]]) -> set[str]:
     """pares_normalized_ids son pares de normalized_record.id (el nombre de
     columna decisiones_log.raw_record_id_a/b es heredado pero en realidad
     guarda normalized_record ids -- ver deduplicar_todo()). Traduce cada
@@ -216,10 +220,9 @@ def _fusionar_pares_de_clusters(conn: sqlite3.Connection, pares_normalized_ids: 
         fila["id"]: fila["raw_record_id"]
         for fila in conn.execute("SELECT id, raw_record_id FROM normalized_records").fetchall()
     }
-    cluster_de_raw = {
-        fila["raw_record_id"]: fila["cluster_id"]
-        for fila in conn.execute("SELECT raw_record_id, cluster_id FROM clusters").fetchall()
-    }
+    filas_clusters = conn.execute("SELECT raw_record_id, cluster_id, persona_id FROM clusters").fetchall()
+    cluster_de_raw = {fila["raw_record_id"]: fila["cluster_id"] for fila in filas_clusters}
+    persona_de_raw = {fila["raw_record_id"]: fila["persona_id"] for fila in filas_clusters}
 
     padres: dict[str, str] = {}
 
@@ -252,6 +255,7 @@ def _fusionar_pares_de_clusters(conn: sqlite3.Connection, pares_normalized_ids: 
     for cluster_id in cluster_ids_afectados:
         grupos.setdefault(raiz(cluster_id), []).append(cluster_id)
 
+    personas_afectadas: set[str] = set()
     for miembros in grupos.values():
         if len(miembros) < 2:
             continue
@@ -259,27 +263,49 @@ def _fusionar_pares_de_clusters(conn: sqlite3.Connection, pares_normalized_ids: 
             raw_id for raw_id, cid in cluster_de_raw.items() if cid in miembros
         )
         nuevo_cluster_id = f"c-{uuid.uuid5(uuid.NAMESPACE_OID, str(raw_ids_del_grupo))}"
+
+        votos: dict[str, int] = {}
+        for raw_id in raw_ids_del_grupo:
+            pid = persona_de_raw.get(raw_id)
+            if pid is not None:
+                votos[pid] = votos.get(pid, 0) + 1
+        persona_id = elegir_persona_id_superviviente(conn, votos)
+        personas_afectadas.add(persona_id)
+
         marcadores = ",".join("?" * len(raw_ids_del_grupo))
         conn.execute(
-            f"UPDATE clusters SET cluster_id = ?, decidido_por = 'humano', actualizado_en = ? "
+            f"UPDATE clusters SET cluster_id = ?, persona_id = ?, decidido_por = 'humano', actualizado_en = ? "
             f"WHERE raw_record_id IN ({marcadores})",
-            (nuevo_cluster_id, _ahora(), *raw_ids_del_grupo),
+            (nuevo_cluster_id, persona_id, _ahora(), *raw_ids_del_grupo),
         )
+    return personas_afectadas
 
 
 def deshacer(conn: sqlite3.Connection, cluster_id: str) -> int:
     """Separa todos los raw_records de un cluster en clusters propios de
     nuevo. No borra decisiones_log — queda como auditoría de que hubo una
-    fusión y se revirtió."""
+    fusión y se revirtió.
+
+    persona_id al separar: el grupo pasa a ser N personas distintas, así que
+    ya no hay un persona_id "correcto" único. Se queda con el existente el
+    raw_record_id más chico (mínima disrupción para quien ya lo tenga
+    cacheado); el resto recibe un persona_id nuevo cada uno — ver
+    motor/dedup/persona_id.py."""
     filas = conn.execute(
-        "SELECT raw_record_id FROM clusters WHERE cluster_id = ?", (cluster_id,)
+        "SELECT raw_record_id FROM clusters WHERE cluster_id = ? ORDER BY raw_record_id ASC",
+        (cluster_id,),
     ).fetchall()
-    for fila in filas:
-        nuevo_cluster_id = f"c-{fila['raw_record_id']}"
+    personas_afectadas: set[str] = set()
+    persona_previa = _persona_actual(conn, cluster_id)
+    for indice, fila in enumerate(filas):
+        raw_record_id = fila["raw_record_id"]
+        nuevo_cluster_id = f"c-{raw_record_id}"
+        persona_id = persona_previa if indice == 0 else crear_persona(conn)
+        personas_afectadas.add(persona_id)
         conn.execute(
-            "UPDATE clusters SET cluster_id = ?, decidido_por = 'humano', actualizado_en = ? "
+            "UPDATE clusters SET cluster_id = ?, persona_id = ?, decidido_por = 'humano', actualizado_en = ? "
             "WHERE raw_record_id = ?",
-            (nuevo_cluster_id, _ahora(), fila["raw_record_id"]),
+            (nuevo_cluster_id, persona_id, _ahora(), raw_record_id),
         )
     conn.execute(
         "INSERT INTO decisiones_log "
@@ -288,7 +314,20 @@ def deshacer(conn: sqlite3.Connection, cluster_id: str) -> int:
         (cluster_id, _ahora()),
     )
     conn.commit()
+    _sincronizar_best_effort(conn, personas_afectadas)
     return len(filas)
+
+
+def _persona_actual(conn: sqlite3.Connection, cluster_id: str) -> str:
+    """persona_id de un cluster ya existente. Todos los raw_records de un
+    mismo cluster_id comparten persona_id por construcción, así que alcanza
+    con mirar cualquiera; si por algún motivo no hay ninguno asignado (dato
+    viejo de antes de esta migración), crea uno ahora en vez de romper."""
+    fila = conn.execute(
+        "SELECT persona_id FROM clusters WHERE cluster_id = ? AND persona_id IS NOT NULL LIMIT 1",
+        (cluster_id,),
+    ).fetchone()
+    return fila["persona_id"] if fila else crear_persona(conn)
 
 
 def deshacer_ultima_corrida(conn: sqlite3.Connection) -> dict[str, int]:
@@ -305,17 +344,31 @@ def deshacer_ultima_corrida(conn: sqlite3.Connection) -> dict[str, int]:
 
     corrida_id = fila["corrida_id"]
     filas = conn.execute(
-        "SELECT raw_record_id, cluster_id FROM clusters WHERE corrida_id = ?", (corrida_id,)
+        "SELECT raw_record_id, cluster_id, persona_id FROM clusters WHERE corrida_id = ? "
+        "ORDER BY raw_record_id ASC",
+        (corrida_id,),
     ).fetchall()
     cluster_ids = {f["cluster_id"] for f in filas}
 
+    # Mismo criterio que deshacer(): cada cluster_id original se separa en
+    # N personas -- el raw_record_id más chico DE CADA cluster conserva el
+    # persona_id que tenía, el resto de ese mismo cluster recibe uno nuevo.
+    por_cluster: dict[str, list] = {}
     for f in filas:
-        nuevo_cluster_id = f"c-{f['raw_record_id']}"
-        conn.execute(
-            "UPDATE clusters SET cluster_id = ?, decidido_por = 'humano', corrida_id = NULL, actualizado_en = ? "
-            "WHERE raw_record_id = ?",
-            (nuevo_cluster_id, _ahora(), f["raw_record_id"]),
-        )
+        por_cluster.setdefault(f["cluster_id"], []).append(f)
+
+    personas_afectadas: set[str] = set()
+    for miembros in por_cluster.values():
+        persona_previa = miembros[0]["persona_id"] or crear_persona(conn)
+        for indice, f in enumerate(miembros):
+            nuevo_cluster_id = f"c-{f['raw_record_id']}"
+            persona_id = persona_previa if indice == 0 else crear_persona(conn)
+            personas_afectadas.add(persona_id)
+            conn.execute(
+                "UPDATE clusters SET cluster_id = ?, persona_id = ?, decidido_por = 'humano', "
+                "corrida_id = NULL, actualizado_en = ? WHERE raw_record_id = ?",
+                (nuevo_cluster_id, persona_id, _ahora(), f["raw_record_id"]),
+            )
     conn.execute(
         "INSERT INTO decisiones_log "
         "(cluster_id, raw_record_id_a, raw_record_id_b, accion, decidido_por, confianza, detalle, corrida_id, creado_en) "
@@ -323,6 +376,7 @@ def deshacer_ultima_corrida(conn: sqlite3.Connection) -> dict[str, int]:
         (corrida_id, f"{len(filas)} raw_records revertidos", corrida_id, _ahora()),
     )
     conn.commit()
+    _sincronizar_best_effort(conn, personas_afectadas)
     return {
         "corrida_id": corrida_id,
         "clusters_afectados": len(cluster_ids),
@@ -330,26 +384,47 @@ def deshacer_ultima_corrida(conn: sqlite3.Connection) -> dict[str, int]:
     }
 
 
-def _materializar_clusters(conn: sqlite3.Connection, uf: UnionFind, corrida_id: str) -> None:
+def _materializar_clusters(conn: sqlite3.Connection, uf: UnionFind, corrida_id: str) -> set[str]:
     mapa_raw = {
         fila["id"]: fila["raw_record_id"]
         for fila in conn.execute("SELECT id, raw_record_id FROM normalized_records").fetchall()
     }
+    # persona_id existente de cada raw_record ANTES de esta corrida (una sola
+    # lectura, no una por grupo) -- necesario para aplicar la regla de
+    # supervivencia cuando un grupo mezcla raw_records que ya tenían
+    # personas distintas asignadas.
+    persona_previa_por_raw: dict[int, str] = {
+        fila["raw_record_id"]: fila["persona_id"]
+        for fila in conn.execute("SELECT raw_record_id, persona_id FROM clusters WHERE persona_id IS NOT NULL").fetchall()
+    }
+
+    personas_afectadas: set[str] = set()
     for raiz, miembros in uf.grupos().items():
         cluster_id = (
             f"c-{raiz}" if len(miembros) == 1 else f"c-{uuid.uuid5(uuid.NAMESPACE_OID, str(sorted(miembros)))}"
         )
-        for normalized_id in miembros:
-            raw_record_id = mapa_raw.get(normalized_id)
-            if raw_record_id is None:
-                continue
+        raw_ids_del_grupo = [mapa_raw[nid] for nid in miembros if mapa_raw.get(nid) is not None]
+        if not raw_ids_del_grupo:
+            continue
+
+        votos: dict[str, int] = {}
+        for raw_id in raw_ids_del_grupo:
+            pid = persona_previa_por_raw.get(raw_id)
+            if pid is not None:
+                votos[pid] = votos.get(pid, 0) + 1
+        persona_id = elegir_persona_id_superviviente(conn, votos)
+        personas_afectadas.add(persona_id)
+
+        for raw_record_id in raw_ids_del_grupo:
             conn.execute(
-                "INSERT INTO clusters (raw_record_id, cluster_id, decidido_por, confianza, corrida_id, actualizado_en) "
-                "VALUES (?, ?, 'regla', NULL, ?, ?) "
+                "INSERT INTO clusters (raw_record_id, cluster_id, persona_id, decidido_por, confianza, corrida_id, actualizado_en) "
+                "VALUES (?, ?, ?, 'regla', NULL, ?, ?) "
                 "ON CONFLICT(raw_record_id) DO UPDATE SET "
-                "cluster_id=excluded.cluster_id, corrida_id=excluded.corrida_id, actualizado_en=excluded.actualizado_en",
-                (raw_record_id, cluster_id, corrida_id, _ahora()),
+                "cluster_id=excluded.cluster_id, persona_id=excluded.persona_id, "
+                "corrida_id=excluded.corrida_id, actualizado_en=excluded.actualizado_en",
+                (raw_record_id, cluster_id, persona_id, corrida_id, _ahora()),
             )
+    return personas_afectadas
 
 
 def _loguear(
@@ -382,3 +457,16 @@ def _a_dict(reg: RegistroParaScoring) -> dict:
 
 def _ahora() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _sincronizar_best_effort(conn: sqlite3.Connection, persona_ids: set[str]) -> None:
+    """Empuja a Supabase los contactos finales que cambiaron en esta
+    operación. Nunca debe romper el pipeline de dedup: si Supabase no está
+    configurado (uso normal hoy, ver .env.example) o la red falla, queda
+    logueado y el motor sigue funcionando exactamente igual que antes de
+    que existiera esta sincronización -- ver motor/supabase_sync.py."""
+    if not persona_ids:
+        return
+    from motor import supabase_sync
+
+    supabase_sync.sincronizar_contactos(conn, persona_ids)

@@ -68,9 +68,15 @@ CREATE TABLE IF NOT EXISTS email_index (
 );
 CREATE INDEX IF NOT EXISTS idx_email_index_email ON email_index(email);
 
+CREATE TABLE IF NOT EXISTS personas (
+    persona_id TEXT PRIMARY KEY,
+    creado_en TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS clusters (
     raw_record_id INTEGER PRIMARY KEY REFERENCES raw_records(id),
     cluster_id TEXT NOT NULL,
+    persona_id TEXT REFERENCES personas(persona_id),
     decidido_por TEXT NOT NULL,
     confianza REAL,
     corrida_id TEXT,
@@ -135,6 +141,12 @@ _COLUMNAS_NUEVAS = {
     "normalized_records": {
         "cumpleanos": "TEXT",
         "foto_url": "TEXT",
+    },
+    "clusters": {
+        # persona_id (2026-09-14): identificador estable por persona real,
+        # separado de cluster_id (que sí cambia con cada fusión/separación).
+        # Ver motor/dedup/persona_id.py para cómo se asigna y sobrevive.
+        "persona_id": "TEXT",
     },
 }
 

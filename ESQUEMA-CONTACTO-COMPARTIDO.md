@@ -1,10 +1,14 @@
 # Esquema de contacto compartido
 
-**Última actualización:** 2026-09-14 — implementadas las 5 decisiones de diseño. El resto del documento (a partir de "Esquema de contacto compartido — diagnóstico") queda como historial: es el diagnóstico original, antes de resolver nada, y ya no describe el estado actual del código en los puntos que se resolvieron acá.
+**Última actualización:** 2026-09-16 — extensión de doble vía (ver abajo). El resto del documento (a partir de "Esquema de contacto compartido — diagnóstico") queda como historial: es el diagnóstico original, antes de resolver nada, y ya no describe el estado actual del código en los puntos que se resolvieron acá.
+
+## Actualización 2026-09-16 — sincronización de doble vía con MejoraCRM
+
+`contactos-api` ahora acepta también POST (crear/actualizar un contacto), gateado por un permiso `puede_escribir` nuevo por API key — hasta acá era solo lectura. `cluster_id` pasa a ser opcional en `contactos_finales` (un contacto creado desde MejoraCRM no tiene uno hasta que, eventualmente, pase por el pipeline de dedup local). Nueva tabla `contactos_sync_log` para auditar cada push/pull. El diseño completo, el registro de riesgos, y el checklist de activación viven en `INFORME-SINCRONIZACION-CONTACTOS.md`, en el repo **MejoraCRM** (no acá) — es la mitad de una integración entre dos repos, tiene más sentido como un solo documento del lado que orquesta la sincronización. Igual que el resto de esta sesión: código escrito y verificado (type-check + lint con Deno real), **nada corrido contra Supabase real, nada commiteado todavía**.
 
 ## Resuelto (2026-09-14)
 
-Estado: implementado y con tests en verde (238/238 en motor-contactos, incluida toda la suite de integración del pipeline de dedup sin cambios de comportamiento). **Todavía sin commitear** — a la espera de tu OK antes de subir esto.
+Estado: implementado, commiteado y pusheado a `main` (`c87607e`), con tests en verde (238/238 en motor-contactos, incluida toda la suite de integración del pipeline de dedup sin cambios de comportamiento).
 
 ### 1. Base definitiva: `motor-contactos`
 Confirmado, sin cambios sobre `src/` (sigue existiendo tal cual, no se tocó).

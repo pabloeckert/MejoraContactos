@@ -1,1 +1,4 @@
 project_id = "tzatuvxatsduuslxqdtm"
+
+[functions.contactos-api]
+verify_jwt = false

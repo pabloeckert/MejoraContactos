@@ -68,7 +68,7 @@ const CAMPOS_CONTACTO = [
 function corsHeaders(): Record<string, string> {
   return {
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, X-Api-Key",
+    "Access-Control-Allow-Headers": "Content-Type, X-Api-Key, Authorization",
   };
 }
 
@@ -94,7 +94,7 @@ type ResultadoVerificacion = Verificacion | { ok: false; error: string; status: 
 
 async function verificarApiKey(supabaseUrl: string, serviceKey: string, apiKey: string | null): Promise<ResultadoVerificacion> {
   if (!apiKey) {
-    return { ok: false, error: "Falta el header X-Api-Key", status: 401 };
+    return { ok: false, error: "Falta el header X-Api-Key o Authorization", status: 401 };
   }
 
   const hash = await sha256Hex(apiKey);
@@ -161,6 +161,10 @@ async function manejarGet(req: Request, supabaseUrl: string, serviceKey: string,
   if (desde) {
     query += `&updated_at=gte.${encodeURIComponent(desde)}`;
   }
+  const tag = params.get("tag");
+  if (tag) {
+    query += `&tag=eq.${encodeURIComponent(tag)}`;
+  }
 
   const res = await fetch(query, {
     headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, Prefer: "count=exact" },
@@ -197,6 +201,23 @@ async function manejarPost(req: Request, supabaseUrl: string, serviceKey: string
   const fila: Record<string, unknown> = {};
   for (const campo of CAMPOS_CONTACTO) {
     if (body[campo] !== undefined) fila[campo] = body[campo];
+  }
+
+  // Compatibilidad con payloads planos (ej. MejoraDiagnostico)
+  if (typeof body.email === "string" && body.email.trim() && (!fila.emails || (Array.isArray(fila.emails) && fila.emails.length === 0))) {
+    fila.emails = [body.email.trim()];
+  }
+  if (typeof body.telefono === "string" && body.telefono.trim() && (!fila.whatsapp || (Array.isArray(fila.whatsapp) && fila.whatsapp.length === 0))) {
+    fila.whatsapp = [body.telefono.trim()];
+  }
+
+  // Compatibilidad con metadata (ej. MejoraSM { red: "instagram/facebook/linkedin" })
+  if (body.metadata && typeof body.metadata === "object") {
+    const meta = body.metadata as Record<string, unknown>;
+    if (meta.red && typeof meta.red === "string") {
+      if (!fila.tag) fila.tag = meta.red;
+      if (!fila.nota_referencia) fila.nota_referencia = `[MejoraSM] Canal: ${meta.red}`;
+    }
   }
 
   const ahora = new Date().toISOString();
@@ -280,7 +301,11 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ error: "Server misconfiguration" }, 500, cors);
   }
 
-  const verificacion = await verificarApiKey(supabaseUrl, serviceKey, req.headers.get("X-Api-Key"));
+  const authHeader = req.headers.get("Authorization");
+  const bearerToken = authHeader ? authHeader.replace(/^Bearer\s+/i, "").trim() : null;
+  const apiKey = req.headers.get("X-Api-Key") || (bearerToken || null);
+
+  const verificacion = await verificarApiKey(supabaseUrl, serviceKey, apiKey);
   if (!verificacion.ok) {
     return jsonResponse({ error: verificacion.error }, verificacion.status, cors);
   }

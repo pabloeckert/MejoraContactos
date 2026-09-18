@@ -211,12 +211,15 @@ async function manejarPost(req: Request, supabaseUrl: string, serviceKey: string
     fila.whatsapp = [body.telefono.trim()];
   }
 
-  // Compatibilidad con metadata (ej. MejoraSM { red: "instagram/facebook/linkedin" })
+  // Compatibilidad con metadata (ej. MejoraSM { red: "instagram/facebook/linkedin", handle: "@usuario" })
   if (body.metadata && typeof body.metadata === "object") {
     const meta = body.metadata as Record<string, unknown>;
     if (meta.red && typeof meta.red === "string") {
       if (!fila.tag) fila.tag = meta.red;
-      if (!fila.nota_referencia) fila.nota_referencia = `[MejoraSM] Canal: ${meta.red}`;
+      if (!fila.nota_referencia) {
+        const handleSuffix = meta.handle && typeof meta.handle === "string" ? ` (@${meta.handle.replace(/^@/, '')})` : "";
+        fila.nota_referencia = `[MejoraSM] Canal: ${meta.red}${handleSuffix}`;
+      }
     }
   }
 
@@ -260,7 +263,18 @@ async function manejarPost(req: Request, supabaseUrl: string, serviceKey: string
   // (no pasó por motor-contactos todavía).
   const nuevoPersonaId = crypto.randomUUID();
   fila.persona_id = nuevoPersonaId;
-  fila.origen = v.sistema;
+  let origenFinal = v.sistema;
+  const rawOrigen = (typeof body.source === "string" && body.source.trim()) || (typeof body.origen === "string" && body.origen.trim());
+  if (rawOrigen) {
+    if (rawOrigen.toLowerCase() === "mejora_sm" || rawOrigen.toLowerCase() === "mejorasm") {
+      origenFinal = "MejoraSM";
+    } else if (rawOrigen.toLowerCase() === "mejora_app" || rawOrigen.toLowerCase() === "mejoraapp") {
+      origenFinal = "MejoraApp";
+    } else {
+      origenFinal = rawOrigen;
+    }
+  }
+  fila.origen = origenFinal;
 
   const res = await fetch(`${supabaseUrl}/rest/v1/contactos_finales`, {
     method: "POST",
@@ -284,6 +298,46 @@ async function manejarPost(req: Request, supabaseUrl: string, serviceKey: string
   return jsonResponse({ persona_id: nuevoPersonaId, creado: true }, 201, cors);
 }
 
+async function manejarHealth(supabaseUrl: string, serviceKey: string, cors: Record<string, string>): Promise<Response> {
+  // 1. Total de contactos en contactos_finales
+  const resCount = await fetch(`${supabaseUrl}/rest/v1/contactos_finales?select=persona_id&limit=1`, {
+    headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, Prefer: "count=exact" },
+  });
+  let totalContactos = 0;
+  if (resCount.ok) {
+    const contentRange = resCount.headers.get("content-range");
+    if (contentRange && contentRange.includes("/")) {
+      totalContactos = parseInt(contentRange.split("/")[1] || "0", 10);
+    }
+  }
+
+  // 2. Sistemas activos en contactos_api_keys
+  const resKeys = await fetch(
+    `${supabaseUrl}/rest/v1/contactos_api_keys?select=sistema,activo,ultimo_uso_en,puede_escribir&activo=eq.true&order=sistema.asc`,
+    {
+      headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
+    }
+  );
+  let sistemasConectados: string[] = [];
+  let detallesSistemas: Record<string, unknown>[] = [];
+  if (resKeys.ok) {
+    detallesSistemas = await resKeys.json();
+    sistemasConectados = detallesSistemas.map((f) => f.sistema as string);
+  }
+
+  return jsonResponse(
+    {
+      status: "ok",
+      total_contactos: totalContactos,
+      sistemas_conectados: sistemasConectados,
+      detalles_sistemas: detallesSistemas,
+      timestamp: new Date().toISOString(),
+    },
+    200,
+    cors
+  );
+}
+
 Deno.serve(async (req: Request) => {
   const cors = corsHeaders();
 
@@ -305,6 +359,19 @@ Deno.serve(async (req: Request) => {
   const bearerToken = authHeader ? authHeader.replace(/^Bearer\s+/i, "").trim() : null;
   const apiKey = req.headers.get("X-Api-Key") || (bearerToken || null);
 
+  const urlObj = new URL(req.url);
+  const isHealth = urlObj.pathname.endsWith("/health") || urlObj.searchParams.get("health") === "true";
+
+  if (isHealth && req.method === "GET") {
+    if (apiKey) {
+      const verificacion = await verificarApiKey(supabaseUrl, serviceKey, apiKey);
+      if (verificacion.ok) {
+        marcarUltimoUso(supabaseUrl, serviceKey, verificacion.keyId);
+      }
+    }
+    return manejarHealth(supabaseUrl, serviceKey, cors);
+  }
+
   const verificacion = await verificarApiKey(supabaseUrl, serviceKey, apiKey);
   if (!verificacion.ok) {
     return jsonResponse({ error: verificacion.error }, verificacion.status, cors);
@@ -316,3 +383,4 @@ Deno.serve(async (req: Request) => {
   }
   return manejarGet(req, supabaseUrl, serviceKey, verificacion, cors);
 });
+

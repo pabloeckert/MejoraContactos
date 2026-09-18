@@ -19,7 +19,7 @@ ALTER TABLE contactos_finales ALTER COLUMN cluster_id DROP NOT NULL;
 -- tocó por última vez" (eso ya lo cubre sincronizado_en).
 ALTER TABLE contactos_finales ADD COLUMN IF NOT EXISTS origen TEXT NOT NULL DEFAULT 'motor-contactos';
 ALTER TABLE contactos_finales ADD CONSTRAINT chk_contactos_finales_origen
-  CHECK (origen IN ('motor-contactos', 'mejoracrm', 'mejoraws', 'MejoraDiagnostico', 'mejoradiagnostico', 'mejora_diagnostico'));
+  CHECK (origen IN ('motor-contactos', 'mejoracrm', 'mejoraws', 'MejoraDiagnostico', 'mejoradiagnostico', 'mejora_diagnostico', 'MejoraSM', 'mejorasm', 'mejora_sm'));
 
 CREATE INDEX IF NOT EXISTS idx_contactos_finales_origen ON contactos_finales(origen);
 

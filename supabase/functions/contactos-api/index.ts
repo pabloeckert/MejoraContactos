@@ -211,7 +211,7 @@ async function manejarPost(req: Request, supabaseUrl: string, serviceKey: string
     fila.whatsapp = [body.telefono.trim()];
   }
 
-  // Compatibilidad con metadata (ej. MejoraSM { red: "instagram/facebook/linkedin", handle: "@usuario" })
+  // Compatibilidad con metadata (ej. MejoraSM { red, handle } o Mejoraok { origen_cta })
   if (body.metadata && typeof body.metadata === "object") {
     const meta = body.metadata as Record<string, unknown>;
     if (meta.red && typeof meta.red === "string") {
@@ -219,6 +219,12 @@ async function manejarPost(req: Request, supabaseUrl: string, serviceKey: string
       if (!fila.nota_referencia) {
         const handleSuffix = meta.handle && typeof meta.handle === "string" ? ` (@${meta.handle.replace(/^@/, '')})` : "";
         fila.nota_referencia = `[MejoraSM] Canal: ${meta.red}${handleSuffix}`;
+      }
+    }
+    if (meta.origen_cta && typeof meta.origen_cta === "string") {
+      if (!fila.tag) fila.tag = `landing_${meta.origen_cta}`;
+      if (!fila.nota_referencia) {
+        fila.nota_referencia = `[Mejoraok] CTA: ${meta.origen_cta}`;
       }
     }
   }
@@ -270,6 +276,8 @@ async function manejarPost(req: Request, supabaseUrl: string, serviceKey: string
       origenFinal = "MejoraSM";
     } else if (rawOrigen.toLowerCase() === "mejora_app" || rawOrigen.toLowerCase() === "mejoraapp") {
       origenFinal = "MejoraApp";
+    } else if (rawOrigen.toLowerCase() === "mejoraok" || rawOrigen.toLowerCase() === "mejora_ok") {
+      origenFinal = "Mejoraok";
     } else {
       origenFinal = rawOrigen;
     }

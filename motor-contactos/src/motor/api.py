@@ -24,18 +24,20 @@ from motor.export import buscar_contactos, guardar_edicion_manual, listar_contac
 def registrar_rutas_api(app: Flask, config: Config, conn: sqlite3.Connection) -> None:
     from motor.reviewer_app import _agrupar_pendientes, _calcular_stats, _ejecutar_accion
 
-    @app.after_request
-    def _cors(respuesta):
-        origen = request.headers.get("Origin", "")
-        if origen.startswith("http://localhost:") or origen.startswith("http://127.0.0.1:"):
-            respuesta.headers["Access-Control-Allow-Origin"] = origen
-            respuesta.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
-            respuesta.headers["Access-Control-Allow-Headers"] = "Content-Type"
-        return respuesta
+    if "_cors" not in [f.__name__ for f in app.after_request_funcs.get(None, [])]:
+        @app.after_request
+        def _cors(respuesta):
+            origen = request.headers.get("Origin", "")
+            if origen.startswith("http://localhost:") or origen.startswith("http://127.0.0.1:"):
+                respuesta.headers["Access-Control-Allow-Origin"] = origen
+                respuesta.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS, PUT, DELETE"
+                respuesta.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+            return respuesta
 
-    @app.route("/api/<path:_ruta>", methods=["OPTIONS"])
-    def _api_preflight(_ruta):
-        return "", 204
+    if "_api_preflight" not in app.view_functions:
+        @app.route("/api/<path:_ruta>", methods=["OPTIONS"])
+        def _api_preflight(_ruta):
+            return "", 204
 
     @app.get("/api/stats")
     def api_stats():

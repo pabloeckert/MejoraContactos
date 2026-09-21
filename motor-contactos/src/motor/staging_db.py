@@ -52,6 +52,9 @@ CREATE TABLE IF NOT EXISTS normalized_records (
     foto_url TEXT,
     notas TEXT,
     flags TEXT NOT NULL DEFAULT '[]',
+    atributos_dinamicos TEXT NOT NULL DEFAULT '{}',
+    calidad TEXT NOT NULL DEFAULT 'util',
+    calidad_motivo TEXT NOT NULL DEFAULT '',
     creado_en TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_normalized_raw ON normalized_records(raw_record_id);
@@ -70,6 +73,7 @@ CREATE INDEX IF NOT EXISTS idx_email_index_email ON email_index(email);
 
 CREATE TABLE IF NOT EXISTS personas (
     persona_id TEXT PRIMARY KEY,
+    atributos_dinamicos TEXT NOT NULL DEFAULT '{}',
     creado_en TEXT NOT NULL
 );
 
@@ -141,6 +145,12 @@ _COLUMNAS_NUEVAS = {
     "normalized_records": {
         "cumpleanos": "TEXT",
         "foto_url": "TEXT",
+        "atributos_dinamicos": "TEXT DEFAULT '{}'",
+        "calidad": "TEXT DEFAULT 'util'",
+        "calidad_motivo": "TEXT DEFAULT ''",
+    },
+    "personas": {
+        "atributos_dinamicos": "TEXT DEFAULT '{}'",
     },
     "clusters": {
         # persona_id (2026-09-14): identificador estable por persona real,

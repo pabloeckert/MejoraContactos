@@ -1,8 +1,10 @@
 const ALLOWED_ORIGINS = [
   "https://pabloeckert.github.io",
   "https://mejoraok.com",
+  "https://suite.mejoraok.com",
   "http://localhost:8080",
   "http://localhost:5173",
+  "http://localhost:5175",
 ];
 
 function getCorsHeaders(origin: string | null): Record<string, string> {

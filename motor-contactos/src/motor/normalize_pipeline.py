@@ -103,12 +103,27 @@ def _normalizar_registro(
     telefonos_fijo = sorted(set(telefonos_fijo))
     emails = sorted(set(emails))
 
+    atributos_dinamicos = campos.get("atributos_dinamicos") or "{}"
+
+    calidad, calidad_motivo = clasificar_calidad_registro(
+        nombre=nombre,
+        apellido=apellido,
+        organizacion=organizacion,
+        cargo=cargo,
+        telefonos_movil=telefonos_movil,
+        telefonos_fijo=telefonos_fijo,
+        emails=emails,
+        flags=flags,
+        notas=notas,
+    )
+    flags.append(f"calidad:{calidad}")
+
     cursor = conn.execute(
         "INSERT INTO normalized_records "
         "(raw_record_id, nombre, apellido, organizacion, cargo, telefonos_e164, "
         "telefonos_fijo_e164, emails, domicilio, ciudad, provincia, pais, tag, "
-        "cumpleanos, foto_url, notas, flags, creado_en) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "cumpleanos, foto_url, notas, flags, atributos_dinamicos, calidad, calidad_motivo, creado_en) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
             raw_record_id,
             nombre,
@@ -127,6 +142,9 @@ def _normalizar_registro(
             foto_url,
             notas,
             json.dumps(flags),
+            atributos_dinamicos,
+            calidad,
+            calidad_motivo,
             _ahora(),
         ),
     )
@@ -177,5 +195,64 @@ def _es_contacto_diagnostico(campos: dict[str, str]) -> bool:
     return any(firma in notas for firma in _FIRMAS_CONTACTO_DIAGNOSTICO)
 
 
+def clasificar_calidad_registro(
+    nombre: str | None,
+    apellido: str | None,
+    organizacion: str | None,
+    cargo: str | None,
+    telefonos_movil: list[str],
+    telefonos_fijo: list[str],
+    emails: list[str],
+    flags: list[str],
+    notas: str | None = None,
+) -> tuple[str, str]:
+    """Clasifica un registro normalizado en una de tres categorías:
+    - 'inutil': descarte absoluto (filas vacías, códigos técnicos/2FA, sin teléfono ni email válido).
+    - 'dudoso': requiere revisión humana en el panel (datos ambiguos, teléfonos incompletos o nombres genéricos).
+    - 'util': apto para CRM, WhatsApp y prospección comercial.
+    Devuelve (categoria, motivo)."""
+    total_telefonos = len(telefonos_movil) + len(telefonos_fijo)
+    total_emails = len(emails)
+
+    nombre_completo = f"{nombre or ''} {apellido or ''}".strip()
+    tiene_identidad = bool(nombre_completo or organizacion)
+
+    # 1. Filtro 'inutil' (basura, registros técnicos, sin contacto)
+    if total_telefonos == 0 and total_emails == 0:
+        return "inutil", "Sin teléfono ni email válido"
+
+    if not tiene_identidad:
+        return "inutil", "Sin nombre ni empresa identificable"
+
+    identidad_lower = (nombre_completo or organizacion or "").lower()
+    descartes = {"empty row", "empty row co", "unknown", "desconocido", "prueba", "test", "sin nombre", "no name"}
+    if identidad_lower in descartes:
+        return "inutil", f"Nombre o entidad descartada ({identidad_lower})"
+
+    if not any(c.isalpha() for c in identidad_lower):
+        return "inutil", "Identidad sin caracteres alfabéticos"
+
+    # 2. Filtro 'dudoso' (para revisión en panel de control)
+    motivos_dudoso: list[str] = []
+    flags_set = set(flags)
+
+    if any("revisar" in f for f in flags_set):
+        motivos_dudoso.append("Teléfono o email con bandera de revisión")
+    if any("incompleto" in f for f in flags_set):
+        motivos_dudoso.append("Teléfono incompleto completado con código de área")
+    if any("email:invalido" in f for f in flags_set):
+        motivos_dudoso.append("Email con formato inválido")
+    if not (nombre and apellido) and not organizacion:
+        if len(nombre_completo.split()) <= 1:
+            motivos_dudoso.append("Nombre incompleto (una sola palabra) sin empresa")
+
+    if motivos_dudoso:
+        return "dudoso", "; ".join(motivos_dudoso)
+
+    # 3. Filtro 'util' (apto para negocio)
+    return "util", "Apto CRM: identidad verificada con canales de contacto válidos"
+
+
 def _ahora() -> str:
     return datetime.now(timezone.utc).isoformat()
+

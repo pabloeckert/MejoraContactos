@@ -39,9 +39,19 @@ def test_mismo_email_da_score_alto():
     assert score >= CFG.umbral_fusion_automatica
 
 
-def test_nombre_identico_sin_otras_senales_no_alcanza_umbral_alto():
+def test_nombre_identico_o_muy_similar_alcanza_umbral_alto_determinista():
+    # Similitud de nombre >= 0.85 debe fusionarse por regla estricta sin invocar al LLM
     a = _reg(1, "Juan", "Perez")
     b = _reg(2, "Juan", "Perez")
+    score, _ = calcular_score(a, b, CFG)
+    assert score >= CFG.umbral_fusion_automatica
+    assert score == 1.0
+
+
+def test_nombre_con_similitud_baja_sin_otras_senales_no_alcanza_umbral_alto():
+    # Similitud de nombre < 0.85 sin teléfono/email no alcanza umbral alto
+    a = _reg(1, "Juan", "Perez")
+    b = _reg(2, "Carlos", "Perez")
     score, _ = calcular_score(a, b, CFG)
     assert score < CFG.umbral_fusion_automatica
 

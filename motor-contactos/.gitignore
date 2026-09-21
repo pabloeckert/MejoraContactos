@@ -24,4 +24,11 @@ motor-contactos-auditoria.docx
 
 # OAuth de Google Contacts -- secretos, nunca a git (ni siquiera al repo local)
 credentials.json
+token.json
 token_*.json
+
+# Datos y Backups
+Data/
+Data/Backups/
+Data/Salida/
+

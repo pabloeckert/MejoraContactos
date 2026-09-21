@@ -40,7 +40,8 @@ _TIENE_LETRA_RE = re.compile(r"[^\W\d_]", re.UNICODE)
 
 _HONORIFICOS = {
     "sr", "sr.", "sra", "sra.", "srta", "srta.", "dr", "dr.", "dra", "dra.",
-    "don", "doña", "dña", "dña.",
+    "don", "doña", "dña", "dña.", "ing", "ing.", "lic", "lic.", "arq", "arq.",
+    "prof", "prof.", "abog", "abog.",
 }
 
 _CONECTORES_MINUSCULA = {"de", "del", "la", "las", "los", "y", "el", "en"}
@@ -180,6 +181,45 @@ def normalizar_cargo(valor: str | None) -> str:
     return ""
 
 
+def desglosar_compuesto_nombre(valor: str | None) -> tuple[str, str, str]:
+    """Si un valor de nombre contiene separadores de rol o empresa (ej: 'Pedro Gomez - PM' o 'Juan Perez (Acme Corp)'),
+    devuelve (nombre_limpio, cargo_extraido, empresa_extraida)."""
+    if not valor:
+        return "", "", ""
+
+    s = valor.strip()
+    # Caso 'Nombre (Empresa o Cargo)'
+    m_parentesis = re.search(r"\(([^)]+)\)|\[([^\]]+)\]", s)
+    if m_parentesis:
+        extra = (m_parentesis.group(1) or m_parentesis.group(2) or "").strip()
+        nombre_base = re.sub(r"\([^)]+\)|\[[^\]]+\]", "", s).strip()
+        if extra:
+            if parece_empresa(extra):
+                return nombre_base, "", extra
+            elif parece_cargo_suelto(extra):
+                return nombre_base, extra, ""
+            else:
+                cargo = normalizar_cargo(extra)
+                if cargo:
+                    return nombre_base, cargo, ""
+                return nombre_base, "", extra
+
+    # Caso 'Nombre - Cargo o Empresa'
+    if " - " in s or " – " in s or " — " in s:
+        partes = re.split(r"\s+[-–—]\s+", s, maxsplit=1)
+        if len(partes) == 2:
+            nombre_base = partes[0].strip()
+            extra = partes[1].strip()
+            if parece_empresa(extra):
+                return nombre_base, "", extra
+            cargo = normalizar_cargo(extra)
+            if cargo:
+                return nombre_base, cargo, ""
+            return nombre_base, "", extra
+
+    return s, "", ""
+
+
 def clasificar_identidad(
     nombre_crudo: str | None,
     apellido_crudo: str | None,
@@ -190,8 +230,21 @@ def clasificar_identidad(
     reasignando valores que se colaron en el campo equivocado: un cargo
     escrito en el campo Nombre ("Gerente" como si fuera nombre de pila), o
     un nombre de empresa en Nombre/Apellido en vez de en Empresa."""
-    nombre = limpiar_nombre_persona(nombre_crudo)
+    nombre_base, cargo_emb, org_emb = desglosar_compuesto_nombre(nombre_crudo)
+    if cargo_emb and not cargo_crudo:
+        cargo_crudo = cargo_emb
+    if org_emb and not organizacion_crudo:
+        organizacion_crudo = org_emb
+
+    nombre = limpiar_nombre_persona(nombre_base)
     apellido = limpiar_nombre_persona(apellido_crudo)
+
+    # Si apellido no vino pero nombre tiene más de una palabra, separar nombre y apellido
+    if nombre and not apellido and " " in nombre:
+        partes = nombre.split(" ", maxsplit=1)
+        if len(partes) == 2 and partes[0] and partes[1]:
+            nombre = partes[0]
+            apellido = partes[1]
     organizacion = _title_case(limpiar_texto_libre(organizacion_crudo)) if organizacion_crudo else ""
     if organizacion and not _TIENE_LETRA_RE.search(organizacion):
         organizacion = ""  # ej. "**" — sin una sola letra, no es un nombre de empresa

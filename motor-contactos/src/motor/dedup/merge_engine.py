@@ -83,28 +83,49 @@ def deduplicar_todo(config: Config, conn: sqlite3.Connection, continuar: bool = 
         reg_a = scoring.cargar_registro(conn, id_a)
         reg_b = scoring.cargar_registro(conn, id_b)
         score, patron = scoring.calcular_score(reg_a, reg_b, config.dedup)
-        score = min(max(score + learning.obtener_ajuste(conn, patron), 0.0), 1.0)
 
-        if score >= config.dedup.umbral_fusion_automatica:
+        # Resolución local determinista estricta (sin invocar LLM):
+        # Todo par con coincidencia de teléfono exacto (+549...), email exacto o similitud de nombre >= 0.85
+        # debe fusionarse por regla estricta sin invocar al LLM ni depender de learning.
+        telefono_exacto = bool(reg_a.telefonos & reg_b.telefonos)
+        email_exacto = bool(reg_a.emails & reg_b.emails)
+        nombre_sim = scoring._similitud_nombre(reg_a, reg_b)
+        nombres_claramente_distintos = (
+            scoring._ambos_con_nombre(reg_a, reg_b)
+            and nombre_sim < scoring._UMBRAL_NOMBRE_CLARAMENTE_DISTINTO
+        )
+        es_fusion_determinista = (
+            ((telefono_exacto or email_exacto) and not nombres_claramente_distintos)
+            or nombre_sim >= 0.85
+        )
+
+        if es_fusion_determinista or score >= config.dedup.umbral_fusion_automatica:
             uf.unir(id_a, id_b)
-            _loguear(conn, id_a, id_b, "fusionar", "regla", score, corrida_id, patron)
+            _loguear(conn, id_a, id_b, "fusionar", "regla", max(score, 1.0), corrida_id, patron)
             contadores["regla"] += 1
-        elif score <= config.dedup.umbral_no_fusionar:
-            _loguear(conn, id_a, id_b, "separar", "regla", score, corrida_id, patron)
-            contadores["separados"] += 1
         else:
-            resuelto = _resolver_con_llm(conn, judge, uf, id_a, id_b, reg_a, reg_b, config, corrida_id)
-            clave = resuelto if resuelto else "revision_pendiente"
-            if not resuelto:
-                _loguear(conn, id_a, id_b, "revision_pendiente", "pendiente", score, corrida_id, patron)
-            contadores[clave] = contadores.get(clave, 0) + 1
-            # La banda media (LLM) es la única lenta -- red por caso, hasta
-            # varios segundos. Progreso visible cada 10 para no quedar a
-            # ciegas en una corrida larga (encontrado en la práctica: sin
-            # esto, 2hs sin ninguna señal de si seguía viva o colgada).
-            llamadas_llm += 1
-            if llamadas_llm % 10 == 0:
-                print(f"  ...LLM-judge: {llamadas_llm} casos ambiguos procesados", flush=True)
+            score_ajustado = min(max(score + learning.obtener_ajuste(conn, patron), 0.0), 1.0)
+            if score_ajustado >= config.dedup.umbral_fusion_automatica:
+                uf.unir(id_a, id_b)
+                _loguear(conn, id_a, id_b, "fusionar", "regla", score_ajustado, corrida_id, patron)
+                contadores["regla"] += 1
+            elif score_ajustado <= config.dedup.umbral_no_fusionar:
+                _loguear(conn, id_a, id_b, "separar", "regla", score_ajustado, corrida_id, patron)
+                contadores["separados"] += 1
+            elif 0.60 <= score_ajustado <= 0.79:
+                # Exclusivamente para casos estrictamente ambiguos (score entre 0.60 y 0.79) se consulta a Gemini
+                resuelto = _resolver_con_llm(conn, judge, uf, id_a, id_b, reg_a, reg_b, config, corrida_id)
+                clave = resuelto if resuelto else "revision_pendiente"
+                if not resuelto:
+                    _loguear(conn, id_a, id_b, "revision_pendiente", "pendiente", score_ajustado, corrida_id, patron)
+                contadores[clave] = contadores.get(clave, 0) + 1
+                llamadas_llm += 1
+                if llamadas_llm % 10 == 0:
+                    print(f"  ...LLM-judge: {llamadas_llm} casos ambiguos procesados", flush=True)
+            else:
+                # Casos ambiguos fuera de la ventana estricta de LLM (ej. 0.55 < score < 0.60): directo a revisión pendiente
+                _loguear(conn, id_a, id_b, "revision_pendiente", "pendiente", score_ajustado, corrida_id, patron)
+                contadores["revision_pendiente"] += 1
 
         sin_commitear += 1
         if sin_commitear >= COMMIT_CADA_N:

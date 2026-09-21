@@ -37,7 +37,8 @@ from motor.config import Config
 
 _SCOPES = ["https://www.googleapis.com/auth/contacts.readonly"]
 _CAMPOS_PERSONA = "names,phoneNumbers,emailAddresses,organizations,addresses,biographies,birthdays,photos"
-_RUTA_CREDENCIALES = Path("credentials.json")
+_DIR_BASE = Path(__file__).resolve().parent.parent.parent
+_RUTA_CREDENCIALES = _DIR_BASE / "credentials.json"
 
 # "Otros contactos" (people/otherContacts): la gente con la que tuviste
 # intercambio de mail en Gmail pero nunca guardaste como contacto -- Google
@@ -56,7 +57,25 @@ class CredencialesFaltantesError(RuntimeError):
 
 
 def _ruta_token(cuenta: str, sufijo: str = "") -> Path:
-    return Path(f"token_{cuenta}{sufijo}.json")
+    return _DIR_BASE / f"token_{cuenta}{sufijo}.json"
+
+
+def autenticar_cuenta(cuenta: str, forzar: bool = False) -> Path:
+    """Inicia o valida la autenticación interactiva OAuth para `cuenta` ('pablo' o 'sindy').
+    Guarda el token cifrado con DPAPI en token_<cuenta>.json y devuelve la ruta del token."""
+    cuenta = cuenta.strip().lower()
+    if cuenta not in ("pablo", "sindy"):
+        raise ValueError(f"Cuenta no reconocida '{cuenta}'. Las cuentas configuradas son 'pablo' y 'sindy'.")
+
+    ruta_token = _ruta_token(cuenta)
+    if forzar and ruta_token.exists():
+        try:
+            ruta_token.unlink()
+        except OSError:
+            pass
+
+    creds = obtener_credenciales(cuenta)
+    return ruta_token
 
 
 def obtener_credenciales(cuenta: str, scopes: list[str] = _SCOPES, sufijo_token: str = ""):
@@ -296,3 +315,42 @@ def _marcar_procesado(conn: sqlite3.Connection, ruta_virtual: str, etag: str) ->
 
 def _ahora() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def crear_snapshot_historico(
+    destino_drive_path: str | Path | None = None,
+    config: Config | None = None,
+) -> dict:
+    """Empaqueta el estado actual de staging.sqlite, crudos y XLSX en Data/Backups/."""
+    from motor.config import cargar_config
+    from motor.sync.backup import crear_snapshot_historico as _crear_snapshot
+    if config is None:
+        config = cargar_config("config.yaml")
+    return _crear_snapshot(config, destino_drive_path=destino_drive_path)
+
+
+def sincronizar_hacia_google(
+    cuenta: str,
+    lista_canonica: list[dict] | None = None,
+    dry_run: bool = False,
+    config: Config | None = None,
+    conn: sqlite3.Connection | None = None,
+) -> dict:
+    """Impacta los contactos consolidados hacia Google People API respetando la gobernanza de Sindy."""
+    from motor.config import cargar_config
+    from motor.sync.google_sync import sincronizar_hacia_google as _sincronizar
+    if config is None:
+        config = cargar_config("config.yaml")
+    return _sincronizar(cuenta, config, conn=conn, dry_run=dry_run, lista_canonica=lista_canonica)
+
+
+def deshacer_sincronizacion(
+    manifest_path: str | Path | None = None,
+    config: Config | None = None,
+) -> dict:
+    """Lee el manifiesto de rollback y restaura en Google People API los datos previos."""
+    from motor.config import cargar_config
+    from motor.sync.google_sync import deshacer_sincronizacion as _deshacer
+    if config is None:
+        config = cargar_config("config.yaml")
+    return _deshacer(config, manifest_path=manifest_path)

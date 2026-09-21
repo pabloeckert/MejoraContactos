@@ -11,6 +11,7 @@ from motor.extractors import (  # noqa: F401
     image_ocr_extractor,
     json_extractor,
     pdf_extractor,
+    universal_scanner,
     vcard_extractor,
 )
 from motor.extractors.base import extractor_para  # noqa: F401

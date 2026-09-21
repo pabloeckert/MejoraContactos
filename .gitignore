@@ -40,9 +40,21 @@ coverage/
 # remoto) para versionado/backup independiente — ver
 # motor-contactos/scripts/setup_project.ps1.
 Data/
+Data/Backups/
+Data/Salida/
 __pycache__/
 *.pyc
 .pytest_cache/
+*.sqlite
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
+
+# OAuth y credenciales sensibles (Google, API keys, bases de datos)
+credentials.json
+token.json
+token_*.json
+
 
 # motor-contactos/ (2026-08-15): se fusionó el CÓDIGO al repo raíz
 # (verificado sin secretos ni datos reales en su historial) — sigue

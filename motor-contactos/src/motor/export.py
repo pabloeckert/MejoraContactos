@@ -398,9 +398,10 @@ def _expandir_filas(cluster: dict) -> list[dict]:
 
 def _materializar_clusters(conn: sqlite3.Connection) -> list[dict]:
     filas = conn.execute(
-        "SELECT c.cluster_id, c.persona_id, c.actualizado_en, n.nombre, n.apellido, n.organizacion, n.cargo, "
+        "SELECT c.cluster_id, c.persona_id, c.actualizado_en, r.source_file, n.nombre, n.apellido, n.organizacion, n.cargo, "
         "n.telefonos_e164, n.telefonos_fijo_e164, n.emails, n.tag, "
-        "n.domicilio, n.ciudad, n.provincia, n.pais, n.cumpleanos, n.foto_url, n.notas, n.flags "
+        "n.domicilio, n.ciudad, n.provincia, n.pais, n.cumpleanos, n.foto_url, n.notas, n.flags, "
+        "COALESCE(n.atributos_dinamicos, '{}') AS atributos_dinamicos "
         "FROM clusters c "
         "JOIN raw_records r ON r.id = c.raw_record_id "
         "JOIN normalized_records n ON n.raw_record_id = r.id"
@@ -412,14 +413,7 @@ def _materializar_clusters(conn: sqlite3.Connection) -> list[dict]:
             fila["cluster_id"],
             {
                 "cluster_id": fila["cluster_id"],
-                # persona_id: igual para todos los raw_records de un mismo
-                # cluster_id por construcción (ver dedup/persona_id.py) --
-                # alcanza con quedarse con el último que aparezca.
                 "persona_id": None,
-                # updated_at del contacto final: el más reciente entre el
-                # actualizado_en de cualquiera de sus raw_records agrupados
-                # y el de su edición manual (esto último lo suma
-                # _aplicar_ediciones_manuales, que corre después).
                 "updated_at": "",
                 "nombre": "",
                 "apellido": "",
@@ -436,38 +430,108 @@ def _materializar_clusters(conn: sqlite3.Connection) -> list[dict]:
                 "cumpleanos": "",
                 "foto_url": "",
                 "notas": [],
-                # Unión de los flags de cada normalized_record que compone
-                # este cluster (ej. "telefono:movil-asumido",
-                # "telefono:incompleto") -- ya se calculaban en
-                # normalize_pipeline.py pero se perdían acá, nunca llegaban
-                # a la lista maestra ni a la UI (hallazgo real de la
-                # revisión UX del 2026-08-15: el sistema sabía que un dato
-                # era una suposición/corrección, pero no lo mostraba).
                 "flags": set(),
+                "atributos_dinamicos": {},
                 "editado_manualmente": False,
+                "_sindy_nombre_fijado": False,
+                "_sindy_apellido_fijado": False,
+                "_sindy_cargo_fijado": False,
+                "_sindy_org_fijado": False,
+                "_sindy_domicilio_fijado": False,
             },
         )
         cluster["persona_id"] = fila["persona_id"] or cluster["persona_id"]
         cluster["updated_at"] = max(cluster["updated_at"], fila["actualizado_en"] or "")
-        cluster["nombre"] = cluster["nombre"] or fila["nombre"] or ""
-        cluster["apellido"] = cluster["apellido"] or fila["apellido"] or ""
-        cluster["cargo"] = cluster["cargo"] or fila["cargo"] or ""
-        cluster["organizacion"] = cluster["organizacion"] or fila["organizacion"] or ""
+
+        source = (fila["source_file"] or "").lower()
+        es_sindy = "sindy" in source
+
+        # Regla de Gobernanza: Sindy tiene prioridad regente maestra en colisión de campos
+        if es_sindy:
+            cluster["flags"].add("sindy_regente")
+            if fila["nombre"]:
+                cluster["nombre"] = fila["nombre"]
+                cluster["_sindy_nombre_fijado"] = True
+            if fila["apellido"]:
+                cluster["apellido"] = fila["apellido"]
+                cluster["_sindy_apellido_fijado"] = True
+            if fila["cargo"]:
+                cluster["cargo"] = fila["cargo"]
+                cluster["_sindy_cargo_fijado"] = True
+            if fila["organizacion"]:
+                cluster["organizacion"] = fila["organizacion"]
+                cluster["_sindy_org_fijado"] = True
+            if fila["tag"]:
+                cluster["tag"] = fila["tag"]
+            if fila["domicilio"]:
+                cluster["domicilio"] = fila["domicilio"]
+                cluster["_sindy_domicilio_fijado"] = True
+            if fila["ciudad"]:
+                cluster["ciudad"] = fila["ciudad"]
+            if fila["provincia"]:
+                cluster["provincia"] = fila["provincia"]
+            if fila["pais"]:
+                cluster["pais"] = fila["pais"]
+            if fila["cumpleanos"]:
+                cluster["cumpleanos"] = fila["cumpleanos"]
+            if fila["foto_url"]:
+                cluster["foto_url"] = fila["foto_url"]
+            if fila["notas"]:
+                cluster["notas"].insert(0, fila["notas"])
+        else:
+            # Registro secundario: solo llena casilleros si Sindy no fijó un valor
+            if not cluster["_sindy_nombre_fijado"] and (not cluster["nombre"] and fila["nombre"]):
+                cluster["nombre"] = fila["nombre"]
+            if not cluster["_sindy_apellido_fijado"] and (not cluster["apellido"] and fila["apellido"]):
+                cluster["apellido"] = fila["apellido"]
+            if not cluster["_sindy_cargo_fijado"] and (not cluster["cargo"] and fila["cargo"]):
+                cluster["cargo"] = fila["cargo"]
+            if not cluster["_sindy_org_fijado"] and (not cluster["organizacion"] and fila["organizacion"]):
+                cluster["organizacion"] = fila["organizacion"]
+            if not cluster["tag"] and fila["tag"]:
+                cluster["tag"] = fila["tag"]
+            if not cluster["_sindy_domicilio_fijado"] and (not cluster["domicilio"] and fila["domicilio"]):
+                cluster["domicilio"] = fila["domicilio"]
+            if not cluster["ciudad"] and fila["ciudad"]:
+                cluster["ciudad"] = fila["ciudad"]
+            if not cluster["provincia"] and fila["provincia"]:
+                cluster["provincia"] = fila["provincia"]
+            if not cluster["pais"] and fila["pais"]:
+                cluster["pais"] = fila["pais"]
+            if not cluster["cumpleanos"] and fila["cumpleanos"]:
+                cluster["cumpleanos"] = fila["cumpleanos"]
+            if not cluster["foto_url"] and fila["foto_url"]:
+                cluster["foto_url"] = fila["foto_url"]
+            if fila["notas"]:
+                cluster["notas"].append(fila["notas"])
+
+        # Identificadores de comunicación: se agregan todos (sin pérdida)
         cluster["whatsapp"] |= set(json.loads(fila["telefonos_e164"]))
         cluster["telefono_fijo"] |= set(json.loads(fila["telefonos_fijo_e164"]))
         cluster["emails"] |= set(json.loads(fila["emails"]))
-        cluster["tag"] = cluster["tag"] or fila["tag"] or ""
-        cluster["domicilio"] = cluster["domicilio"] or fila["domicilio"] or ""
-        cluster["ciudad"] = cluster["ciudad"] or fila["ciudad"] or ""
-        cluster["provincia"] = cluster["provincia"] or fila["provincia"] or ""
-        cluster["pais"] = cluster["pais"] or fila["pais"] or ""
-        cluster["cumpleanos"] = cluster["cumpleanos"] or fila["cumpleanos"] or ""
-        cluster["foto_url"] = cluster["foto_url"] or fila["foto_url"] or ""
         cluster["flags"] |= set(json.loads(fila["flags"] or "[]"))
-        if fila["notas"]:
-            cluster["notas"].append(fila["notas"])
+
+        # Ingesta elástica de atributos dinámicos
+        try:
+            dinamicos = json.loads(fila["atributos_dinamicos"] or "{}")
+            if isinstance(dinamicos, dict) and dinamicos:
+                cluster["atributos_dinamicos"].update(dinamicos)
+        except Exception:
+            pass
 
     for cluster in por_cluster.values():
         cluster["nota_referencia"] = " | ".join(dict.fromkeys(cluster["notas"]))
+        cluster.pop("_sindy_nombre_fijado", None)
+        cluster.pop("_sindy_apellido_fijado", None)
+        cluster.pop("_sindy_cargo_fijado", None)
+        cluster.pop("_sindy_org_fijado", None)
+        cluster.pop("_sindy_domicilio_fijado", None)
+
+        if cluster["persona_id"] and cluster["atributos_dinamicos"]:
+            conn.execute(
+                "UPDATE personas SET atributos_dinamicos = ? WHERE persona_id = ?",
+                (json.dumps(cluster["atributos_dinamicos"], ensure_ascii=False), cluster["persona_id"]),
+            )
+    conn.commit()
 
     return list(por_cluster.values())

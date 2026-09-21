@@ -78,13 +78,13 @@ def calcular_score(
     # esto con evidencia real más adelante (ver config.dedup, comentario
     # sobre la contradicción Pablo/Sindy).
     #
-    # Salvaguarda: esto NO aplica si ambos registros traen nombre completo
-    # y son claramente distintos entre sí — ahí la señal exacta compartida
-    # es más probable que sea un teléfono/email de uso compartido (fijo de
-    # familia, oficina) que la misma persona, y el caso se manda a la banda
-    # media (LLM-judge -> revisión) en vez de fusionar en silencio.
+    # Resolución local determinista estricta:
+    # Coincidencia de teléfono exacto (+549...), email exacto o similitud de nombre >= 0.85
+    # debe fusionarse por regla estricta sin invocar al LLM (score = 1.0).
+    # Salvaguarda: si ambos registros traen nombre completo y son claramente distintos entre sí (< 0.5),
+    # un teléfono/email compartido (fijo/oficina) no fusiona en silencio.
     nombres_claramente_distintos = _ambos_con_nombre(a, b) and nombre_sim < _UMBRAL_NOMBRE_CLARAMENTE_DISTINTO
-    if (telefono_exacto or email_exacto) and not nombres_claramente_distintos:
+    if ((telefono_exacto or email_exacto) and not nombres_claramente_distintos) or nombre_sim >= 0.85:
         score = 1.0
 
     patron = (

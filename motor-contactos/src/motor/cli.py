@@ -1,14 +1,17 @@
 """CLI del motor de consolidación de contactos.
 
 Uso:
-    python -m motor.cli panel            # abre el panel web (dashboard con botones) en el navegador — EMPEZAR ACÁ
-    python -m motor.cli importar-google <cuenta>  # trae contactos en vivo desde Google Contacts (ver GOOGLE_SETUP.md)
-    python -m motor.cli importar-otros-contactos <cuenta>  # gente con la que hubo mail pero no está guardada como contacto (pide login aparte, scope distinto)
+    python -m motor.cli panel                     # abre el panel web (dashboard con botones) en el navegador — EMPEZAR ACÁ
+    python -m motor.cli auth-google <cuenta>      # autentica OAuth Google para 'pablo' o 'sindy' (abre navegador y cifra token con DPAPI)
+    python -m motor.cli sync-google               # descarga y consolida libretas Google (Sindy regente sobre Pablo)
+    python -m motor.cli scan-dir <ruta>           # escáner universal multiformato (.csv, .xlsx, .docx, .pdf, .txt, etc.)
+    python -m motor.cli importar-google <cuenta>  # trae contactos en vivo desde Google Contacts
+    python -m motor.cli importar-otros-contactos <cuenta>  # gente con la que hubo mail pero no está guardada como contacto
     python -m motor.cli extraer
     python -m motor.cli normalizar
     python -m motor.cli deduplicar
     python -m motor.cli exportar
-    python -m motor.cli run              # extraer + normalizar + deduplicar + exportar, en orden (NO incluye importar-google)
+    python -m motor.cli run                       # extraer + normalizar + deduplicar + exportar
     python -m motor.cli deshacer <cluster_id>
     python -m motor.cli deshacer-ultima-corrida
 
@@ -49,7 +52,90 @@ def main(argv: list[str] | None = None) -> int:
     conn = conectar(config.rutas.base_sqlite)
 
     try:
-        if comando == "importar-google":
+        if comando in ("auth-google", "autenticar-google"):
+            if len(argv) < 2:
+                print("uso: python -m motor.cli auth-google <cuenta>  (cuenta: 'pablo' o 'sindy')")
+                return 1
+            cuenta = argv[1].strip().lower()
+            from motor.google_contacts_source import CredencialesFaltantesError, autenticar_cuenta
+
+            try:
+                ruta_token = autenticar_cuenta(cuenta)
+                print(f"[OK] Cuenta '{cuenta}' autenticada exitosamente. Token cifrado en: {ruta_token}")
+            except CredencialesFaltantesError as exc:
+                print(f"[ERROR] {exc}")
+                return 1
+            except Exception as exc:
+                print(f"[ERROR] Falló la autenticación: {exc}")
+                return 1
+        elif comando in ("sync-google", "sincronizar-google"):
+            from motor.google_contacts_source import (
+                CredencialesFaltantesError,
+                importar_google_contactos,
+                _ruta_token,
+            )
+
+            cuentas = ["sindy", "pablo"]
+            print("=== Sincronización Google People API (Gobernanza: Sindy Regente) ===")
+            tokens_faltantes = [cta for cta in cuentas if not _ruta_token(cta).exists()]
+            if tokens_faltantes:
+                print(f"[AVISO] Las siguientes cuentas requieren autenticación en el navegador: {', '.join(tokens_faltantes)}")
+                for cta in tokens_faltantes:
+                    print(f"  -> Ejecutá: python -m motor.cli auth-google {cta}")
+                print()
+
+            cuentas_activas = [cta for cta in cuentas if _ruta_token(cta).exists()]
+            if not cuentas_activas:
+                print("[INFO] No hay tokens de Google activos aún. Iniciá sesión con los comandos indicados arriba.")
+                return 0
+
+            stats = {}
+            for cta in cuentas_activas:
+                try:
+                    nuevos = importar_google_contactos(config, conn, cta)
+                    stats[cta] = nuevos
+                    print(f"  [{cta.upper()}] Contactos sincronizados: {nuevos} nuevos")
+                except CredencialesFaltantesError as exc:
+                    print(f"  [{cta.upper()}] Error: {exc}")
+                except Exception as exc:
+                    print(f"  [{cta.upper()}] Error en sync: {exc}")
+
+            print("  Normalizando registros con filtro cognitivo y separación de entidades...")
+            norm_nuevos = normalizar_todo(config, conn)
+            print(f"  normalized_records nuevos: {norm_nuevos}")
+
+            print("  Ejecutando deduplicación y clusters (prioridad regente Sindy)...")
+            dedup_res = deduplicar_todo(config, conn)
+            print(f"  Deduplicación completada: {dedup_res}")
+
+            print("  Exportando listas finales maestras...")
+            ruta_export = exportar_lista_maestra(config, conn)
+            ruta_wa = exportar_whatsapp_csv(config, conn)
+            print(f"  [OK] Lista maestra generada: {ruta_export}")
+            print(f"  [OK] Export WhatsApp generado: {ruta_wa}")
+        elif comando in ("scan-dir", "escanear-directorio"):
+            if len(argv) < 2:
+                print("uso: python -m motor.cli scan-dir <ruta_directorio>")
+                return 1
+            from motor.extractors.universal_scanner import escanear_directorio
+
+            ruta_dir = argv[1]
+            print(f"=== Escáner Universal de Documentos: {ruta_dir} ===")
+            try:
+                res = escanear_directorio(ruta_dir, config, conn)
+                print(f"  Archivos analizados: {res['archivos_analizados']}")
+                print(f"  Formatos: {res['formatos_detectados']}")
+                print(f"  Raw records nuevos: {res['raw_records_nuevos']}")
+                print(f"  Normalized records nuevos: {res['normalized_records_nuevos']}")
+                print(f"  Deduplicación: {res['deduplicacion']}")
+                print(f"  Total personas unificadas: {res['total_personas_unificadas']}")
+                if res['atributos_dinamicos_descubiertos']:
+                    print(f"  Atributos elásticos descubiertos: {', '.join(res['atributos_dinamicos_descubiertos'])}")
+                print(f"  [OK] Export final: {res['archivos_salida']['lista_maestra']}")
+            except Exception as exc:
+                print(f"[ERROR] Error escaneando directorio: {exc}")
+                return 1
+        elif comando == "importar-google":
             if len(argv) < 2:
                 print("uso: importar-google <cuenta>  (cuentas configuradas: " f"{', '.join(config.google.cuentas) or '(ninguna en config.yaml)'})")
                 return 1

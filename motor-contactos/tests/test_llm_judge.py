@@ -1,56 +1,71 @@
-"""LlmJudge: rotación round-robin entre Groq + modelos gratis de
-OpenRouter, con escalado a Anthropic. Nunca llama a una API real — todo
-mockeado vía requests.post."""
+"""Tests para LlmJudge usando Gemini Flash exclusivamente.
+Verifica que las llamadas se hagan a la API de Gemini y que ningún
+servicio pago externo (Anthropic, OpenAI, OpenRouter) sea invocado.
+"""
 
 from unittest.mock import patch
-
 import pytest
+import requests
 
 from motor.config import LlmConfig, LlmEscaladoConfig, LlmProveedorConfig
-from motor.llm_judge import LlmJudge
+from motor.llm_judge import LlmJudge, inferir_identidad_cognitiva, clasificar_calidad_cognitiva
 
 
-def _config(rotacion=(), umbral=0.6, activar=True):
+def _config(activar=True, proveedor="gemini"):
     return LlmConfig(
         activar_para_dudosos=activar,
-        primario=LlmProveedorConfig(proveedor="groq", modelo="modelo-groq"),
-        rotacion_gratis_openrouter=rotacion,
-        escalado=LlmEscaladoConfig(proveedor="anthropic", modelo="modelo-claude", umbral_confianza_groq=umbral),
+        primario=LlmProveedorConfig(proveedor=proveedor, modelo="gemini-flash-latest" if proveedor == "gemini" else "qwen2.5:3b"),
+        rotacion_gratis_openrouter=(),
+        escalado=LlmEscaladoConfig(proveedor=proveedor, modelo="gemini-flash-latest", umbral_confianza_groq=0.7),
     )
 
 
-class _RespuestaFalsa:
-    def __init__(self, cuerpo_json=None, anthropic=False, status=200, contenido_nulo=False):
+class _RespuestaGeminiFalsa:
+    def __init__(self, texto="{}", status=200):
         self.status_code = status
-        self._cuerpo = cuerpo_json
-        self._anthropic = anthropic
-        self._contenido_nulo = contenido_nulo
-
-    def raise_for_status(self):
-        if self.status_code >= 400:
-            import requests
-
-            raise requests.HTTPError(f"status {self.status_code}")
+        self._texto = texto
+        self.text = texto
 
     def json(self):
-        import json
+        return {
+            "candidates": [
+                {
+                    "content": {
+                        "parts": [
+                            {"text": self._texto}
+                        ]
+                    }
+                }
+            ]
+        }
 
-        if self._contenido_nulo:
-            # simula un modelo que responde "content": null (JSON real, no
-            # el string "null") -- ver test_content_null_no_rompe_la_corrida
-            return {"choices": [{"message": {"content": None}}]}
 
-        texto = json.dumps(self._cuerpo)
-        if self._anthropic:
-            return {"content": [{"text": texto}]}
-        return {"choices": [{"message": {"content": texto}}]}
+class _RespuestaOllamaFalsa:
+    def __init__(self, contenido="{}", status=200):
+        self.status_code = status
+        self._contenido = contenido
+        self.text = contenido
+
+    def json(self):
+        return {
+            "model": "qwen2.5:3b",
+            "message": {
+                "role": "assistant",
+                "content": self._contenido,
+            },
+            "done": True,
+        }
 
 
 @pytest.fixture(autouse=True)
 def _keys(monkeypatch):
-    monkeypatch.setenv("GROQ_API_KEY", "fake-groq")
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "fake-anthropic")
-    monkeypatch.setenv("OPENROUTER_API_KEY", "fake-openrouter")
+    monkeypatch.setenv("GEMINI_API_KEY", "fake-gemini-key")
+    # Asegurar que ninguna key externa esté configurada
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    # Por default en tests, evitar pausas de 4s
+    monkeypatch.setattr("time.sleep", lambda s: None)
 
 
 def test_desactivado_no_llama_a_nadie():
@@ -60,107 +75,168 @@ def test_desactivado_no_llama_a_nadie():
         post.assert_not_called()
 
 
-def test_groq_confiado_no_escala():
-    config = _config(rotacion=("modelo-a:free",))
-    judge = LlmJudge(config)
-    with patch("requests.post", return_value=_RespuestaFalsa({"misma_persona": True, "confianza": 0.9, "razon": "ok"})) as post:
-        veredicto = judge.decidir({"nombre": "Juan"}, {"nombre": "Juan"})
+def test_sin_api_key_no_llama(monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "")
+    with patch("dotenv.load_dotenv"):
+        judge = LlmJudge(_config(activar=True))
+        with patch("requests.post") as post:
+            assert judge.decidir({}, {}) is None
+            post.assert_not_called()
+
+
+def test_gemini_decidir_exito():
+    judge = LlmJudge(_config(activar=True))
+    respuesta = '{"misma_persona": true, "confianza": 0.95, "razon": "Mismo nombre y teléfono coincidente"}'
+    with patch("requests.post", return_value=_RespuestaGeminiFalsa(respuesta)) as post:
+        veredicto = judge.decidir({"nombre": "Carlos"}, {"nombre": "Carlos"})
+
     assert veredicto is not None
-    assert veredicto.proveedor == "groq"
-    assert veredicto.confianza == 0.9
-    assert post.call_count == 1  # ni siquiera probó la rotación
-
-
-def test_rotacion_prueba_siguiente_si_el_primero_falla(monkeypatch):
-    monkeypatch.delenv("GROQ_API_KEY", raising=False)  # groq sin key -> _consultar da None directo
-    config = _config(rotacion=("modelo-a:free",))
-    judge = LlmJudge(config)
-    with patch("requests.post", return_value=_RespuestaFalsa({"misma_persona": True, "confianza": 0.8, "razon": "ok"})) as post:
-        veredicto = judge.decidir({}, {})
-    assert veredicto.proveedor == "openrouter"
-    assert post.call_count == 1  # solo llamó al de OpenRouter, groq se salteó sin red
-
-
-def test_ninguno_confiado_escala_a_anthropic():
-    config = _config(rotacion=("modelo-a:free",), umbral=0.9)
-    judge = LlmJudge(config)
-    respuestas = [
-        _RespuestaFalsa({"misma_persona": True, "confianza": 0.3, "razon": "dudoso groq"}),
-        _RespuestaFalsa({"misma_persona": True, "confianza": 0.4, "razon": "dudoso openrouter"}),
-        _RespuestaFalsa({"misma_persona": True, "confianza": 0.95, "razon": "seguro claude"}, anthropic=True),
-    ]
-    with patch("requests.post", side_effect=respuestas) as post:
-        veredicto = judge.decidir({}, {})
-    assert veredicto.proveedor == "anthropic"
+    assert veredicto.misma_persona is True
     assert veredicto.confianza == 0.95
-    assert post.call_count == 3
+    assert veredicto.proveedor == "gemini"
+    assert post.call_count == 1
+    url_llamada = post.call_args[0][0]
+    assert "generativelanguage.googleapis.com" in url_llamada
+    assert "anthropic" not in url_llamada
+    assert "openrouter" not in url_llamada
+    assert post.call_args[1].get("timeout") == 30
 
 
-def test_content_null_no_rompe_la_corrida_prueba_el_siguiente():
-    """Regresión: un modelo gratis de OpenRouter devolvió "content": null en
-    vez de texto (formato de respuesta no estándar) y eso tiraba abajo TODA
-    la corrida de deduplicar_todo() con un AttributeError sin atrapar, no
-    solo ese caso puntual. No debe pasar más -- el candidato con
-    content=null se descarta como cualquier otro fallo y se prueba el
-    siguiente de la rotación."""
-    config = _config(rotacion=("modelo-raro:free",))
-    judge = LlmJudge(config)
-    respuestas = [
-        _RespuestaFalsa(contenido_nulo=True),  # groq: "content": null
-        _RespuestaFalsa({"misma_persona": False, "confianza": 0.85, "razon": "distinta persona"}),
-    ]
-    with patch("requests.post", side_effect=respuestas):
-        veredicto = judge.decidir({}, {})
-    assert veredicto is not None
-    assert veredicto.proveedor == "openrouter"
-    assert veredicto.misma_persona is False
-
-
-def test_tope_de_intentos_gratis_no_prueba_toda_la_rotacion():
-    """Regresión: sin tope, un caso con muchos candidatos fallando prueba
-    TODOS (14 en producción) antes de escalar -- eso fue lo que hizo tardar
-    más de 2hs una corrida de 596 casos. Con maximo_intentos_gratis=2, solo
-    debe llamar a 2 (groq + el primero de la rotación), nunca al segundo."""
-    import requests
-
-    config = _config(rotacion=("modelo-a:free", "modelo-b:free", "modelo-c:free"))
-    config = LlmConfig(
-        activar_para_dudosos=True,
-        primario=config.primario,
-        rotacion_gratis_openrouter=config.rotacion_gratis_openrouter,
-        maximo_intentos_gratis=2,
-        escalado=config.escalado,
-    )
-    judge = LlmJudge(config)
-    with patch("requests.post", side_effect=requests.ConnectionError("fallo")) as post:
-        judge.decidir({}, {})
-    assert post.call_count == 2 + 1  # 2 gratis + escalado a anthropic
-
-
-def test_si_nadie_responde_devuelve_none():
-    import requests
-
-    config = _config(rotacion=("modelo-a:free",))
-    judge = LlmJudge(config)
-    with patch("requests.post", side_effect=requests.ConnectionError("boom")):
+def test_gemini_status_error_retorna_none():
+    judge = LlmJudge(_config(activar=True))
+    with patch("requests.post", return_value=_RespuestaGeminiFalsa("error", status=402)):
         veredicto = judge.decidir({}, {})
     assert veredicto is None
 
 
-def test_rotacion_round_robin_entre_llamadas():
-    config = _config(rotacion=("modelo-a:free", "modelo-b:free"), umbral=0.5)
-    judge = LlmJudge(config)
-    confiado = _RespuestaFalsa({"misma_persona": True, "confianza": 0.9, "razon": "ok"})
+def test_throttle_preventivo_4_segundos():
+    judge = LlmJudge(_config(activar=True))
+    respuesta = '{"misma_persona": true, "confianza": 0.9, "razon": "ok"}'
+    with patch("requests.post", return_value=_RespuestaGeminiFalsa(respuesta)):
+        with patch("time.sleep") as mock_sleep:
+            judge.decidir({}, {})
+            mock_sleep.assert_called_with(4)
 
-    modelos_llamados = []
 
-    def registrar(*args, **kwargs):
-        modelos_llamados.append(kwargs["json"]["model"])
-        return confiado
+def test_error_429_captura_inmediata_sin_reintentos():
+    judge = LlmJudge(_config(activar=True))
+    with patch("requests.post", return_value=_RespuestaGeminiFalsa("rate limit", status=429)) as post:
+        with patch("time.sleep"):
+            veredicto = judge.decidir({}, {})
 
-    with patch("requests.post", side_effect=registrar):
-        judge.decidir({}, {})  # arranca en groq (indice 0)
-        judge.decidir({}, {})  # como groq respondió confiado, el indice avanzó a modelo-a
-        judge.decidir({}, {})  # y ahora a modelo-b
+    assert veredicto is None
+    # Captura inmediata: exactamente 1 llamada, sin bucle de reintentos
+    assert post.call_count == 1
 
-    assert modelos_llamados == ["modelo-groq", "modelo-a:free", "modelo-b:free"]
+
+def test_error_503_captura_inmediata_sin_reintentos():
+    judge = LlmJudge(_config(activar=True))
+    with patch("requests.post", return_value=_RespuestaGeminiFalsa("service unavailable", status=503)) as post:
+        with patch("time.sleep"):
+            veredicto = judge.decidir({}, {})
+
+    assert veredicto is None
+    # Captura inmediata: exactamente 1 llamada, sin bucle de reintentos
+    assert post.call_count == 1
+
+
+def test_error_read_timeout_captura_inmediata_sin_reintentos():
+    judge = LlmJudge(_config(activar=True))
+    with patch("requests.post", side_effect=requests.exceptions.ReadTimeout("Timeout")) as post:
+        with patch("time.sleep"):
+            veredicto = judge.decidir({}, {})
+
+    assert veredicto is None
+    # Captura inmediata: exactamente 1 llamada, sin bucle de reintentos
+    assert post.call_count == 1
+
+
+def test_inferir_identidad_cognitiva_gemini():
+    respuesta = '{"nombre": "Carlos", "apellido": "Rodriguez", "cargo": "CEO", "organizacion": "TechStart"}'
+    with patch("motor.dedup.llm_judge._consultar_ollama", return_value=None):
+        with patch("requests.post", return_value=_RespuestaGeminiFalsa(respuesta)):
+            res = inferir_identidad_cognitiva("Carlos Rodriguez - CEO de TechStart")
+
+    assert res["nombre"] == "Carlos"
+    assert res["apellido"] == "Rodriguez"
+    assert res["cargo"] == "CEO"
+    assert res["organizacion"] == "TechStart"
+
+
+def test_ollama_prioridad_decidir_exito():
+    judge = LlmJudge(_config(activar=True, proveedor="ollama"))
+    respuesta_json = '{"fusionar": true, "confianza": 0.98, "justificacion": "Misma persona validada por Ollama"}'
+    with patch("requests.post", return_value=_RespuestaOllamaFalsa(respuesta_json)) as post:
+        veredicto = judge.decidir({"nombre": "Carlos"}, {"nombre": "Carlos"})
+
+    assert veredicto is not None
+    assert veredicto.misma_persona is True
+    assert veredicto.confianza == 0.98
+    assert veredicto.proveedor == "ollama"
+    assert "Ollama" in veredicto.razon
+    # Verifica que se llamó al endpoint de Ollama
+    url = post.call_args[0][0]
+    assert "11434" in url
+
+
+def test_ollama_fallback_gemini_cuando_ollama_offline():
+    judge = LlmJudge(_config(activar=True, proveedor="ollama"))
+    resp_gemini = '{"misma_persona": true, "confianza": 0.92, "razon": "Mismo teléfono según Gemini"}'
+
+    def _mock_post(url, *args, **kwargs):
+        if "11434" in url:
+            raise requests.exceptions.ConnectionError("Ollama offline")
+        return _RespuestaGeminiFalsa(resp_gemini)
+
+    with patch("requests.post", side_effect=_mock_post):
+        veredicto = judge.decidir({"nombre": "Carlos"}, {"nombre": "Carlos"})
+
+    assert veredicto is not None
+    assert veredicto.proveedor == "gemini"
+    assert veredicto.misma_persona is True
+
+
+def test_ollama_extraccion_identidad_json_estricto():
+    json_ollama = '{"nombre": "Carlos", "apellido": "Pérez", "empresa": "Acme Corp", "cargo": "Director", "notas": "Cliente VIP"}'
+    with patch("requests.post", return_value=_RespuestaOllamaFalsa(json_ollama)):
+        res = inferir_identidad_cognitiva("Carlos Pérez - Director en Acme Corp")
+
+    assert res["nombre"] == "Carlos"
+    assert res["apellido"] == "Pérez"
+    assert res["empresa"] == "Acme Corp"
+    assert res["cargo"] == "Director"
+    assert res["notas"] == "Cliente VIP"
+
+
+def test_ollama_clasificacion_calidad_util():
+    json_calidad = '{"calidad": "util", "motivo": "Contacto con nombre y WhatsApp corporativo"}'
+    with patch("requests.post", return_value=_RespuestaOllamaFalsa(json_calidad)):
+        calidad, motivo = clasificar_calidad_cognitiva({"nombre": "Carlos", "telefonos": ["+5491122334455"]})
+
+    assert calidad == "util"
+    assert "WhatsApp" in motivo
+
+
+def test_fallback_local_extraccion_identidad_si_no_hay_llm(monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "")
+    with patch("motor.dedup.llm_judge._consultar_ollama", return_value=None):
+        res = inferir_identidad_cognitiva("Ing. Roberto Gómez - Gerente")
+
+    assert res["nombre"] == "Roberto"
+    assert res["apellido"] == "Gómez"
+    assert res["cargo"] == "Gerente"
+
+
+def test_fallback_local_clasificacion_calidad_si_no_hay_llm():
+    with patch("motor.dedup.llm_judge._consultar_ollama", return_value=None):
+        calidad, motivo = clasificar_calidad_cognitiva({
+            "nombre": "Ana",
+            "apellido": "Martínez",
+            "organizacion": "GlobalTech",
+            "cargo": "Ingeniera",
+            "telefonos": ["+5491177778888"],
+            "emails": ["ana@gt.com"]
+        })
+
+    assert calidad == "util"
+

@@ -16,10 +16,10 @@ import { analytics } from "@/lib/analytics";
 import { saveContacts, updateContact, deleteContact, clearContacts, saveHistorySnapshot } from "@/lib/db";
 import { handleError } from "@/lib/error-handler";
 import type { ParsedFile, UnifiedContact } from "@/types/contact";
-import { toast } from "sonner";
-import { Upload, Zap, Users, Download, BarChart3, Settings, Moon, Sun, Activity, History, Sparkles, Settings2, Globe } from "lucide-react";
+import { Upload, Zap, Users, Download, BarChart3, Settings, Moon, Sun, Activity, History, Sparkles, Settings2, Globe, FolderSearch } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { GoogleContactsPanel } from "@/components/GoogleContactsPanel";
+import { DirectorioScannerPanel } from "@/components/DirectorioScannerPanel";
 import { ApiKeysPanel } from "@/components/ApiKeysPanel";
 import { MejoraWsPanel } from "@/components/MejoraWsPanel";
 import { HealthCheckPanel } from "@/components/HealthCheckPanel";
@@ -42,7 +42,7 @@ const MODE_KEY = "__mc_simple_mode__";
 const COUNTRY_KEY = "__mc_default_country__";
 const PROVIDER_KEY = "__mc_single_provider__";
 
-const TABS = ["import", "process", "results", "export", "dashboard", "settings"] as const;
+const TABS = ["import", "scanner", "process", "results", "export", "dashboard", "settings"] as const;
 
 const Index = () => {
   const [files, setFiles] = useState<ParsedFile[]>([]);
@@ -331,10 +331,14 @@ const Index = () => {
         {/* Advanced mode (full tabs) */}
         {!simpleMode && (
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="w-full flex overflow-x-auto flex-nowrap h-11 bg-muted/50 justify-start sm:grid sm:grid-cols-6">
+            <TabsList className="w-full flex overflow-x-auto flex-nowrap h-11 bg-muted/50 justify-start sm:grid sm:grid-cols-7">
               <TabsTrigger value="import" className="text-xs gap-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 <Upload className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">Importar</span>
+              </TabsTrigger>
+              <TabsTrigger value="scanner" className="text-xs gap-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <FolderSearch className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Escáner Carpetas</span>
               </TabsTrigger>
               <TabsTrigger value="process" className="text-xs gap-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 <Zap className="h-3.5 w-3.5" />
@@ -362,10 +366,29 @@ const Index = () => {
 
             <TabsContent value="import">
               <div className="space-y-4">
+                <div className="flex items-center justify-between p-3.5 rounded-lg border border-primary/20 bg-primary/5">
+                  <div className="flex items-center gap-2.5">
+                    <FolderSearch className="h-4 w-4 text-primary shrink-0" />
+                    <div className="text-xs">
+                      <span className="font-semibold text-foreground">¿Querés escanear carpetas enteras de la PC o Google Drive?</span>
+                      <span className="text-muted-foreground hidden sm:inline"> — El Escáner Universal procesa recursivamente .xlsx, .docx, .pdf y más.</span>
+                    </div>
+                  </div>
+                  <Button size="sm" variant="secondary" onClick={() => setActiveTab("scanner")} className="text-xs h-7 gap-1 shrink-0">
+                    <span>Abrir Escáner</span>
+                    <span aria-hidden="true">→</span>
+                  </Button>
+                </div>
                 <GoogleContactsPanel onContactsImported={(file) => handleFilesAdded([file])} />
                 <FileDropzone files={files} onFilesAdded={handleFilesAdded} onRemoveFile={handleRemoveFile} />
                 {files.length > 0 && <PreviewPanel files={files} />}
               </div>
+            </TabsContent>
+
+            <TabsContent value="scanner">
+              <ErrorBoundary>
+                <DirectorioScannerPanel />
+              </ErrorBoundary>
             </TabsContent>
 
             <TabsContent value="process">

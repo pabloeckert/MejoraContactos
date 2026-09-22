@@ -63,47 +63,20 @@ dedup:
   tope_bucket: 500
 
 llm:
-  # Casos en la banda ambigua (entre los dos umbrales de arriba) se le
-  # consultan a un LLM antes de mandarlos a la cola de revisión humana.
-  # Orden: Groq (primario) -> rotación de modelos gratis de OpenRouter
-  # (round-robin, reparte carga para no agotar la cuota gratis de uno
-  # solo) -> si ninguno respondió con confianza suficiente, se escala a
-  # Anthropic (pago, mejor calidad) -- así el costo se paga solo en los
-  # casos genuinamente difíciles.
+  # En cumplimiento estricto de privacidad (Ley 25.326): para datos reales
+  # se prohíbe el envío a modelos :free o sin acuerdo comercial de privacidad.
+  # Se utiliza Anthropic Claude (de pago, sin reentrenamiento) o inferencia
+  # local (Ollama / determinista), siempre con teléfonos y correos enmascarados previamente.
   activar_para_dudosos: true
   primario:
-    proveedor: "groq"
-    modelo: "llama-3.3-70b-versatile"
-  # Lista verificada contra https://openrouter.ai/api/v1/models el
-  # 2026-08-12 (410 modelos totales, 19 gratis) -- quedan afuera 2 modelos
-  # de generación de música (no sirven para esta tarea de texto) y 1 que
-  # figuraba por expirar al día siguiente. Esta lista cambia con el tiempo
-  # -- si empiezan a fallar muchos, volver a chequear esa URL.
-  rotacion_gratis_openrouter:
-    - "openai/gpt-oss-20b:free"
-    - "google/gemma-4-31b-it:free"
-    - "google/gemma-4-26b-a4b-it:free"
-    - "nvidia/nemotron-3-super-120b-a12b:free"
-    - "nvidia/nemotron-3-ultra-550b-a55b:free"
-    - "nvidia/nemotron-3-nano-30b-a3b:free"
-    - "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free"
-    - "nvidia/nemotron-nano-9b-v2:free"
-    - "nvidia/nemotron-nano-12b-v2-vl:free"
-    - "liquid/lfm-2.5-2.6b:free"
-    - "cohere/north-mini-code:free"
-    - "poolside/laguna-s-2.1:free"
-    - "poolside/laguna-xs-2.1:free"
-  # Tope de candidatos gratis probados POR CASO antes de escalar a
-  # Anthropic (incluye a `primario`) -- sin este tope, un caso puede
-  # terminar probando los 14 candidatos gratis en secuencia si todos
-  # fallan/tardan (encontrado en la práctica: 596 casos así tardaron más
-  # de 2hs). Con 3 alcanza para repartir carga sin que un caso lento se
-  # coma minutos enteros.
-  maximo_intentos_gratis: 3
+    proveedor: "anthropic"
+    modelo: "claude-3-5-sonnet-20241022"
+  rotacion_gratis_openrouter: []
+  maximo_intentos_gratis: 0
   escalado:
     proveedor: "anthropic"
-    modelo: "claude-sonnet-4-5"
-    umbral_confianza_groq: 0.6   # si ningún gratis respondió con al menos esta confianza, escala
+    modelo: "claude-3-5-sonnet-20241022"
+    umbral_confianza_groq: 0.8
 
 revisor:
   puerto: 5000

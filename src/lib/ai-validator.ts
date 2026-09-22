@@ -1,3 +1,4 @@
+import { maskContactForAI } from "./privacy-mask";
 /**
  * Validación con IA para casos ambiguos que las reglas determinísticas
  * no pudieron resolver. Usa el prompt mínimo para ahorrar tokens.
@@ -20,9 +21,10 @@ function getCacheKey(contact: UnifiedContact): string {
  * Prompt compacto para validación de contacto — mínimo de tokens.
  */
 function buildValidationPrompt(contact: UnifiedContact): string {
+  const masked = maskContactForAI(contact);
   return `Valida estos campos de contacto. Responde SOLO en JSON válido sin markdown.
 
-Campos: nombre="${contact.firstName}", apellido="${contact.lastName}", empresa="${contact.company}", cargo="${contact.jobTitle}", email="${contact.email}", tel="${contact.whatsapp}"
+Campos: nombre="${masked.firstName}", apellido="${masked.lastName}", empresa="${masked.company}", cargo="${masked.jobTitle}", email="${masked.email}", tel="${masked.whatsapp}"
 
 Responde con este formato exacto:
 {"nombre":true/false,"apellido":true/false,"empresa":true/false,"cargo":true/false,"email":true/false,"correcciones":{"nombre":"valor_corregido_o_null","apellido":"valor_corregido_o_null","empresa":"valor_corregido_o_null","cargo":"valor_corregido_o_null"}}`;
@@ -107,15 +109,16 @@ export async function validateContactWithAI(
 
     // Enviamos el contacto real a la Edge Function para que lo limpie.
     // La IA corregirá los campos inválidos, y comparamos antes/después.
+    const safeContact = maskContactForAI(contact);
     const { data, error } = await (await getSupabase()).functions.invoke("clean-contacts", {
       body: {
         contacts: [{
-          firstName: contact.firstName,
-          lastName: contact.lastName,
-          whatsapp: contact.whatsapp,
-          company: contact.company,
-          jobTitle: contact.jobTitle,
-          email: contact.email,
+          firstName: safeContact.firstName,
+          lastName: safeContact.lastName,
+          whatsapp: safeContact.whatsapp,
+          company: safeContact.company,
+          jobTitle: safeContact.jobTitle,
+          email: safeContact.email,
         }],
         provider: "single",
         customKeys: keys,

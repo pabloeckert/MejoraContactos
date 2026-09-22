@@ -33,7 +33,11 @@ from motor.config import cargar_config
 from motor.dedup.merge_engine import deduplicar_todo
 from motor.dedup.merge_engine import deshacer as deshacer_cluster
 from motor.dedup.merge_engine import deshacer_ultima_corrida
-from motor.export import exportar_lista_maestra, exportar_whatsapp_csv
+from motor.export import (
+    exportar_contactos_finales_json,
+    exportar_lista_maestra,
+    exportar_whatsapp_csv,
+)
 from motor.ingest import extraer_todo
 from motor.normalize_pipeline import normalizar_todo
 from motor.staging_db import conectar
@@ -163,6 +167,35 @@ def main(argv: list[str] | None = None) -> int:
             print(f"normalized_records nuevos: {normalizar_todo(config, conn)}")
         elif comando == "deduplicar":
             print(f"deduplicación: {deduplicar_todo(config, conn)}")
+        elif comando in ("consolidar", "consolidacion"):
+            from motor.sync.backup import crear_snapshot_historico
+
+            print("=== CONSOLIDACIÓN DEFINITIVA Y AUTÓNOMA DE MEJORACONTACTOS ===")
+            print("1. Ejecutando deduplicación determinista y cognitiva...")
+            dedup_res = deduplicar_todo(config, conn)
+            print(f"   Deduplicación finalizada: {dedup_res}")
+
+            print("2. Generando lista maestra XLSX con hojas Útiles, Dudosos y Descartes...")
+            ruta_xlsx = exportar_lista_maestra(config, conn)
+            print(f"   [OK] Lista Maestra: {ruta_xlsx}")
+
+            print("3. Generando contactos-whatsapp.csv optimizado (+549...)...")
+            ruta_wa = exportar_whatsapp_csv(config, conn, con_prefijo_mas=True)
+            print(f"   [OK] WhatsApp CSV: {ruta_wa}")
+
+            print("4. Generando contactos_finales.json para Supabase...")
+            ruta_json = exportar_contactos_finales_json(config, conn)
+            print(f"   [OK] Supabase JSON: {ruta_json}")
+
+            print("5. Generando snapshot inmutable FINAL...")
+            snap = crear_snapshot_historico(config, prefijo="backup_contactos_FINAL")
+            print(f"   [OK] Snapshot: {snap['ruta_local']} ({snap['tamano_formateado']})")
+            if snap.get("ruta_drive"):
+                print(f"   [OK] Copia Google Drive: {snap['ruta_drive']}")
+
+            personas_count = conn.execute("SELECT COUNT(DISTINCT persona_id) FROM clusters WHERE persona_id IS NOT NULL").fetchone()[0]
+            norm_count = conn.execute("SELECT COUNT(*) FROM normalized_records").fetchone()[0]
+            print(f"=== CONSOLIDACIÓN COMPLETADA: {norm_count} normalizados -> {personas_count} identidades maestras ===")
         elif comando == "exportar":
             print(f"exportado: {exportar_lista_maestra(config, conn)}")
         elif comando == "exportar-whatsapp":

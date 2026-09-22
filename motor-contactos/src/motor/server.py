@@ -289,7 +289,7 @@ def calcular_resumen_calidad(config: Config) -> dict[str, Any]:
         top_motivos_dudoso = [{"motivo": r[0], "cantidad": r[1]} for r in filas_motivos]
 
         fuentes_count = conn.execute("SELECT COUNT(*) FROM fuentes_procesadas").fetchone()[0]
-        personas_count = conn.execute("SELECT COUNT(*) FROM personas").fetchone()[0]
+        personas_count = conn.execute("SELECT COUNT(DISTINCT persona_id) FROM clusters WHERE persona_id IS NOT NULL").fetchone()[0]
 
         return {
             "total": total,
@@ -404,6 +404,45 @@ _HTML_DASHBOARD = """<!DOCTYPE html>
 
   <!-- CONTENIDO PRINCIPAL EN 3 FILAS ESTRUCTURADAS -->
   <main class="max-w-6xl mx-auto px-4 sm:px-6 py-6 flex-1 w-full space-y-6">
+
+    <!-- WIZARD / FLUJO PRINCIPAL GUIADO (4 PASOS) -->
+    <div class="bg-white rounded-xl p-4 sm:p-5 border border-slate-200/80 shadow-[0_1px_3px_0_rgba(0,0,0,0.02)] mb-6">
+      <div class="flex items-center justify-between mb-3">
+        <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Flujo Guiado de Consolidación</span>
+        <span class="text-xs text-slate-500 font-medium">Completá los pasos en orden para sincronizar de forma segura</span>
+      </div>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3">
+        <div id="step-1" class="flex items-center space-x-2.5 p-2.5 rounded-lg border border-slate-200 bg-slate-50/80">
+          <div class="w-6 h-6 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-bold shrink-0">1</div>
+          <div class="truncate">
+            <p class="text-xs font-bold text-slate-800 truncate">Importar Fuentes</p>
+            <p class="text-[10px] text-slate-500 truncate">Google o archivos PC</p>
+          </div>
+        </div>
+        <div id="step-2" class="flex items-center space-x-2.5 p-2.5 rounded-lg border border-slate-200 bg-slate-50/80">
+          <div class="w-6 h-6 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center text-xs font-bold shrink-0">2</div>
+          <div class="truncate">
+            <p class="text-xs font-bold text-slate-800 truncate">Limpiar & Dedup</p>
+            <p class="text-[10px] text-slate-500 truncate">Unificar duplicados</p>
+          </div>
+        </div>
+        <div id="step-3" class="flex items-center space-x-2.5 p-2.5 rounded-lg border border-slate-200 bg-slate-50/80">
+          <div class="w-6 h-6 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center text-xs font-bold shrink-0">3</div>
+          <div class="truncate">
+            <p class="text-xs font-bold text-slate-800 truncate">Revisar Dudosos</p>
+            <p class="text-[10px] text-slate-500 truncate">Resolver zona gris</p>
+          </div>
+        </div>
+        <div id="step-4" class="flex items-center space-x-2.5 p-2.5 rounded-lg border border-slate-200 bg-slate-50/80">
+          <div class="w-6 h-6 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center text-xs font-bold shrink-0">4</div>
+          <div class="truncate">
+            <p class="text-xs font-bold text-slate-800 truncate">Exportar & Sync</p>
+            <p class="text-[10px] text-slate-500 truncate">CRM, WS y Google</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
 
     <!-- FILA 1: TARJETAS DE ESTADO EN VIVO (KPIS SOBRIOS) -->
     <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -566,6 +605,10 @@ _HTML_DASHBOARD = """<!DOCTYPE html>
           <!-- Cabecera de Telemetría -->
           <div class="flex items-center justify-between mb-4">
             <div class="flex items-center space-x-2.5">
+        <button onclick="abrirBienvenida()" class="flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors border border-slate-200" title="Ver guía de uso paso a paso">
+          <svg class="w-4 h-4 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          <span class="hidden sm:inline">Guía de Inicio</span>
+        </button>
               <span id="telemetry-badge-dot" class="w-2.5 h-2.5 rounded-full bg-slate-400"></span>
               <span id="telemetry-badge-text" class="text-xs font-bold text-slate-700 uppercase tracking-wider">Inactivo</span>
             </div>
@@ -1374,6 +1417,97 @@ _HTML_DASHBOARD = """<!DOCTYPE html>
       if (!isScanning) fetchCalidad();
     }, 3500);
   </script>
+
+  <!-- MODAL DE BIENVENIDA / ONBOARDING (PRIMER USO) -->
+  <div id="modal-bienvenida" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 hidden">
+    <div class="bg-white rounded-2xl max-w-xl w-full p-6 sm:p-7 shadow-2xl border border-slate-200 space-y-5 animate-in fade-in duration-200">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div class="flex items-center space-x-2.5">
+          <div class="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-bold">✨</div>
+          <h3 class="text-lg font-bold text-slate-900">Bienvenido a MejoraContactos</h3>
+        </div>
+        <button onclick="cerrarBienvenida()" class="text-slate-400 hover:text-slate-600 text-xl font-bold p-1">&times;</button>
+      </div>
+      
+      <p class="text-sm text-slate-600 leading-relaxed">
+        Este es el centro de control para transformar tu libreta de contactos desordenada en una base de datos única, limpia y confiable para todo tu ecosistema (MejoraCRM, MejoraWS).
+      </p>
+
+      <div class="space-y-3.5">
+        <div class="flex items-start space-x-3 bg-slate-50 p-3 rounded-xl border border-slate-200/60">
+          <span class="w-6 h-6 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">1</span>
+          <div>
+            <h4 class="text-xs font-bold text-slate-900">Cargá tus fuentes</h4>
+            <p class="text-[11px] text-slate-600">Conectá tus cuentas de Google Contacts o arrastrá archivos Excel, CSV o VCF desde tu PC.</p>
+          </div>
+        </div>
+
+        <div class="flex items-start space-x-3 bg-slate-50 p-3 rounded-xl border border-slate-200/60">
+          <span class="w-6 h-6 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">2</span>
+          <div>
+            <h4 class="text-xs font-bold text-slate-900">El motor limpia y consolida</h4>
+            <p class="text-[11px] text-slate-600">Detecta números móviles internacionales, descarta filas vacías o códigos SMS y une duplicados evidentes.</p>
+          </div>
+        </div>
+
+        <div class="flex items-start space-x-3 bg-slate-50 p-3 rounded-xl border border-slate-200/60">
+          <span class="w-6 h-6 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">3</span>
+          <div>
+            <h4 class="text-xs font-bold text-slate-900">Resolvé dudas con un clic</h4>
+            <p class="text-[11px] text-slate-600">Si hay dos contactos similares (zona gris), los comparás lado a lado y decidís con un botón si son la misma persona.</p>
+          </div>
+        </div>
+
+        <div class="flex items-start space-x-3 bg-slate-50 p-3 rounded-xl border border-slate-200/60">
+          <span class="w-6 h-6 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">4</span>
+          <div>
+            <h4 class="text-xs font-bold text-slate-900">Exportá y sincronizá con seguridad</h4>
+            <p class="text-[11px] text-slate-600">Descargá tus listas maestras para WhatsApp y sincronizá a Google Contacts con respaldo automático previo.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="pt-2 flex items-center justify-between border-t border-slate-100">
+        <label class="flex items-center space-x-2 text-xs text-slate-500 cursor-pointer">
+          <input type="checkbox" id="chk-no-mostrar-mas" class="rounded text-slate-900 focus:ring-slate-900">
+          <span>No volver a mostrar al iniciar</span>
+        </label>
+        <button onclick="cerrarBienvenida()" class="px-5 py-2 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-xl transition-colors shadow-sm">
+          ¡Comenzar ahora! &rarr;
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL DE REVISIÓN LADO A LADO DE CASOS DUDOSOS -->
+  <div id="modal-revisar-dudosos" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 hidden">
+    <div class="bg-white rounded-2xl max-w-3xl w-full p-6 sm:p-7 shadow-2xl border border-slate-200 space-y-5 animate-in fade-in duration-200">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div>
+          <h3 class="text-lg font-bold text-slate-900">Revisión de Caso Ambiguo</h3>
+          <p class="text-xs text-slate-500">¿Estos dos registros pertenecen a la misma persona o a personas distintas?</p>
+        </div>
+        <button onclick="cerrarRevisarDudosos()" class="text-slate-400 hover:text-slate-600 text-xl font-bold p-1">&times;</button>
+      </div>
+
+      <div id="contenedor-comparacion-dudosos" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- Renderizado dinámico de contacto A y B -->
+      </div>
+
+      <div class="pt-3 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">
+        <button onclick="resolverDudoso('separar')" class="w-full sm:w-auto px-4 py-2.5 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors border border-slate-200">
+          ❌ Son personas distintas
+        </button>
+        <button onclick="resolverDudoso('ignorar')" class="w-full sm:w-auto px-4 py-2.5 text-xs font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 rounded-xl transition-colors border border-amber-200">
+          ⏳ No estoy seguro (posponer)
+        </button>
+        <button onclick="resolverDudoso('fusionar')" class="w-full sm:w-auto px-5 py-2.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-colors shadow-sm">
+          ✅ Son la misma persona (Fusionar)
+        </button>
+      </div>
+    </div>
+  </div>
+
 </body>
 </html>
 """

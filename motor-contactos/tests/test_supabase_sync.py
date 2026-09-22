@@ -73,3 +73,87 @@ def test_pipeline_completo_no_rompe_sin_supabase_configurado(tmp_path):
     resultado = deduplicar_todo(config, conn)  # no debe lanzar
 
     assert resultado["regla"] >= 0
+
+
+
+from unittest.mock import MagicMock, patch
+
+def test_a_fila_supabase_formato_correcto():
+    from motor.supabase_sync import _a_fila_supabase
+    c = {
+        "persona_id": "11111111-2222-3333-4444-555555555555",
+        "cluster_id": "c1",
+        "nombre": "Juan",
+        "apellido": "Perez",
+        "cargo": "Gerente",
+        "organizacion": "Acme",
+        "whatsapp": ["+5491155551234"],
+        "telefono_fijo": [],
+        "emails": ["juan@acme.com"],
+        "tag": "cliente",
+        "domicilio": "Calle 123",
+        "ciudad": "Posadas",
+        "provincia": "Misiones",
+        "pais": "Argentina",
+        "cumpleanos": "1985-05-10",
+        "foto_url": "",
+        "nota_referencia": "VIP",
+        "flags": ["telefono_validado"],
+        "editado_manualmente": False,
+        "updated_at": "2026-09-20T12:00:00Z",
+    }
+    fila = _a_fila_supabase(c)
+    assert fila["persona_id"] == "11111111-2222-3333-4444-555555555555"
+    assert fila["whatsapp"] == ["+5491155551234"]
+    assert fila["emails"] == ["juan@acme.com"]
+    assert fila["foto_url"] is None
+    assert fila["updated_at"] == "2026-09-20T12:00:00Z"
+
+
+def test_sincronizar_contactos_con_credenciales_envia_upsert(monkeypatch, tmp_path):
+    monkeypatch.setenv("SUPABASE_URL", "https://xyz.supabase.co")
+    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "super-secret-service-key")
+
+    mock_resp = MagicMock()
+    mock_resp.status_code = 201
+    mock_resp.raise_for_status = MagicMock()
+
+    contacto_fake = {
+        "persona_id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+        "cluster_id": "c1",
+        "nombre": "Carlos",
+        "apellido": "Gomez",
+        "cargo": "",
+        "organizacion": "",
+        "whatsapp": ["+5491100001111"],
+        "telefono_fijo": [],
+        "emails": [],
+        "tag": "",
+        "domicilio": "",
+        "ciudad": "",
+        "provincia": "",
+        "pais": "",
+        "cumpleanos": None,
+        "foto_url": None,
+        "nota_referencia": "",
+        "flags": [],
+        "editado_manualmente": False,
+        "updated_at": "2026-09-20T10:00:00Z",
+    }
+
+    config = _config_prueba(tmp_path)
+    conn = conectar(config.rutas.base_sqlite)
+
+    with patch("motor.export.obtener_contactos_por_persona", return_value=[contacto_fake]):
+        with patch("requests.post", return_value=mock_resp) as mock_post:
+            res = supabase_sync.sincronizar_contactos(conn, {"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"})
+
+    assert res["sincronizado"] is True
+    assert res["enviados"] == 1
+    assert mock_post.call_count == 1
+    url_llamada = mock_post.call_args[0][0]
+    assert url_llamada == "https://xyz.supabase.co/rest/v1/contactos_finales"
+    headers = mock_post.call_args[1]["headers"]
+    assert headers["apikey"] == "super-secret-service-key"
+    assert headers["Authorization"] == "Bearer super-secret-service-key"
+    assert headers["Prefer"] == "resolution=merge-duplicates,return=minimal"

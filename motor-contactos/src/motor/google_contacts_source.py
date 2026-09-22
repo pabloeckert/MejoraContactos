@@ -124,7 +124,7 @@ def obtener_credenciales(cuenta: str, scopes: list[str] = _SCOPES, sufijo_token:
     return creds
 
 
-def importar_google_contactos(config: Config, conn: sqlite3.Connection, cuenta: str) -> int:
+def importar_google_contactos(config: Config, conn: sqlite3.Connection, cuenta: str, limite_maximo: int | None = None) -> int:
     """Trae todos los contactos de `cuenta` (paginado) y los inserta en
     raw_records -- salta los que ya se importaron con el mismo etag
     (sin cambios desde la última corrida). Devuelve raw_records nuevos."""
@@ -149,6 +149,8 @@ def importar_google_contactos(config: Config, conn: sqlite3.Connection, cuenta: 
         respuesta = peticion.execute()
 
         for persona in respuesta.get("connections", []):
+            if limite_maximo is not None and total_insertados >= limite_maximo:
+                break
             resource_name = persona.get("resourceName", "")
             etag = persona.get("etag", "")
             ruta_virtual = f"google:{cuenta}:{resource_name}"
@@ -166,7 +168,7 @@ def importar_google_contactos(config: Config, conn: sqlite3.Connection, cuenta: 
             total_insertados += 1
 
         token_pagina = respuesta.get("nextPageToken")
-        if not token_pagina:
+        if not token_pagina or (limite_maximo is not None and total_insertados >= limite_maximo):
             break
 
     conn.commit()
@@ -216,7 +218,7 @@ def importar_otros_contactos(config: Config, conn: sqlite3.Connection, cuenta: s
             total_insertados += 1
 
         token_pagina = respuesta.get("nextPageToken")
-        if not token_pagina:
+        if not token_pagina or (limite_maximo is not None and total_insertados >= limite_maximo):
             break
 
     conn.commit()

@@ -68,18 +68,19 @@ def _detectar_carpeta_drive() -> Path | None:
 def crear_snapshot_historico(
     config: Config,
     destino_drive_path: str | Path | None = None,
+    prefijo: str = "backup_contactos",
 ) -> dict[str, Any]:
     """Empaqueta el estado actual de staging.sqlite, los crudos y los XLSX en
-    'Data/Backups/backup_contactos_%Y%m%d_%H%M%S.zip'.
+    'Data/Backups/{prefijo}_%Y%m%d_%H%M%S.zip'.
     Si existe una ruta de Google Drive configurada o pasada, copia el snapshot allí.
     """
     carpeta_backups = _obtener_carpeta_backups(config)
     ahora = datetime.now(timezone.utc)
     estampa = ahora.strftime("%Y%m%d_%H%M%S")
-    nombre_archivo = f"backup_contactos_{estampa}.zip"
+    nombre_archivo = f"{prefijo}_{estampa}.zip"
     ruta_zip = carpeta_backups / nombre_archivo
     if ruta_zip.exists():
-        nombre_archivo = f"backup_contactos_{estampa}_{ahora.microsecond:06d}.zip"
+        nombre_archivo = f"{prefijo}_{estampa}_{ahora.microsecond:06d}.zip"
         ruta_zip = carpeta_backups / nombre_archivo
 
     archivos_incluidos: list[dict[str, Any]] = []
@@ -170,7 +171,7 @@ def crear_snapshot_historico(
 def listar_backups(config: Config) -> list[dict[str, Any]]:
     """Devuelve la lista cronológica de backups disponibles en Data/Backups."""
     carpeta_backups = _obtener_carpeta_backups(config)
-    zips = list(carpeta_backups.glob("backup_contactos_*.zip"))
+    zips = list(carpeta_backups.glob("backup_contactos*.zip"))
     zips.sort(key=lambda p: p.stat().st_mtime, reverse=True)
 
     resultado = []

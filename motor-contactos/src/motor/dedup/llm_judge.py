@@ -15,6 +15,7 @@ Casos de uso cubiertos con salida JSON estricta:
 from __future__ import annotations
 
 import json
+import re
 import logging
 import os
 import time
@@ -47,6 +48,84 @@ _TIMEOUT_GEMINI_SEGUNDOS = 30
 _THROTTLE_GEMINI_SEGUNDOS = 4
 
 
+
+# ----------------------------------------------------------------------
+# 0. PRIVACIDAD Y ENMASCARAMIENTO DE PII (Ley 25.326)
+# Ningún dato de teléfono o email viaja en texto claro a modelos LLM
+# ----------------------------------------------------------------------
+
+def enmascarar_telefono(tel: str) -> str:
+    """Enmascara un número telefónico preservando únicamente los últimos 4 dígitos."""
+    if not tel or not isinstance(tel, str):
+        return ""
+    tel_str = str(tel).strip()
+    if tel_str.startswith("****"):
+        return tel_str
+    digitos = re.sub(r"\D", "", tel_str)
+    if len(digitos) < 4:
+        return "****"
+    return f"****{digitos[-4:]}"
+
+
+def enmascarar_email(email: str) -> str:
+    """Enmascara la parte de usuario de un email preservando el dominio."""
+    if not email or not isinstance(email, str):
+        return ""
+    email_str = str(email).strip()
+    if "@" not in email_str:
+        return "****"
+    partes = email_str.split("@", 1)
+    dominio = partes[1].strip().lower()
+    return f"***@{dominio}"
+
+
+def enmascarar_texto_libre(texto: str) -> str:
+    """Enmascara emails y teléfonos que puedan estar dentro de notas o texto libre."""
+    if not texto or not isinstance(texto, str):
+        return ""
+    # Enmascarar correos
+    texto = re.sub(r"[\w\.-]+@([\w\.-]+)", r"***@\1", texto)
+    # Enmascarar teléfonos con secuencias de dígitos
+    def _reemplazar_tel(match: re.Match) -> str:
+        s = match.group(0)
+        digs = re.sub(r"\D", "", s)
+        if len(digs) >= 6:
+            return f"****{digs[-4:]}"
+        return s
+
+    return re.sub(r"\+?\d[\d\s\-\.]{5,}\d", _reemplazar_tel, texto)
+
+
+def enmascarar_contacto(contacto: dict[str, Any]) -> dict[str, Any]:
+    """Retorna una copia profunda sanitizada del contacto para enviar a modelos LLM:
+    - Teléfonos: sólo últimos 4 dígitos (****1234).
+    - Emails: sólo dominio (***@dominio.com).
+    - Notas: teléfonos y correos ofuscados.
+    """
+    if not isinstance(contacto, dict):
+        return {}
+
+    resultado = dict(contacto)
+
+    for k in ("telefonos", "telefonos_e164", "telefonos_fijo_e164", "whatsapp"):
+        val = resultado.get(k)
+        if isinstance(val, list):
+            resultado[k] = [enmascarar_telefono(t) for t in val if t]
+        elif isinstance(val, str) and val:
+            resultado[k] = enmascarar_telefono(val)
+
+    for k in ("emails", "email"):
+        val = resultado.get(k)
+        if isinstance(val, list):
+            resultado[k] = [enmascarar_email(e) for e in val if e]
+        elif isinstance(val, str) and val:
+            resultado[k] = enmascarar_email(val)
+
+    if "notas" in resultado and isinstance(resultado["notas"], str):
+        resultado["notas"] = enmascarar_texto_libre(resultado["notas"])
+
+    return resultado
+
 @dataclass(frozen=True)
 class VeredictoLlm:
     misma_persona: bool
@@ -62,6 +141,57 @@ class LlmJudge:
     def decidir(self, contacto_a: dict[str, Any], contacto_b: dict[str, Any]) -> VeredictoLlm | None:
         if self._config and not self._config.activar_para_dudosos:
             return None
+
+        # Enmascarar PII estrictamente antes de cualquier procesamiento LLM (Ley 25.326)
+        contacto_a_seguro = enmascarar_contacto(contacto_a)
+        contacto_b_seguro = enmascarar_contacto(contacto_b)
+
+        proveedor_config = self._config.primario.proveedor if self._config and self._config.primario else None
+
+        # Si el config solicita explícitamente Anthropic como primario
+        if proveedor_config in ("anthropic", "claude"):
+            _cargar_dotenv()
+            api_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+            if api_key:
+                modelo = getattr(self._config.primario, "modelo", "claude-3-5-sonnet-20241022") if self._config else "claude-3-5-sonnet-20241022"
+                veredicto_anthropic = _decidir_con_anthropic(api_key, contacto_a_seguro, contacto_b_seguro, modelo=modelo)
+                if veredicto_anthropic is not None:
+                    return veredicto_anthropic
+            return None
+
+        # Si el config solicita explícitamente Gemini como primario
+        if proveedor_config == "gemini":
+            _cargar_dotenv()
+            api_key = os.environ.get("GEMINI_API_KEY", "").strip()
+            if api_key:
+                veredicto_gemini = _decidir_con_gemini(api_key, contacto_a_seguro, contacto_b_seguro)
+                if veredicto_gemini is not None:
+                    return veredicto_gemini
+            return None
+
+        # 1. Proveedor prioritario por defecto: Ollama local
+        veredicto_ollama = _decidir_con_ollama(contacto_a_seguro, contacto_b_seguro)
+        if veredicto_ollama is not None:
+            return veredicto_ollama
+
+        # 2. Fallback seguro: Anthropic (si está configurada la API key)
+        _cargar_dotenv()
+        anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+        if anthropic_key:
+            veredicto_anthropic = _decidir_con_anthropic(anthropic_key, contacto_a_seguro, contacto_b_seguro)
+            if veredicto_anthropic is not None:
+                return veredicto_anthropic
+
+        # 3. Fallback secundario: Gemini Flash (si está configurada la API key)
+        api_key = os.environ.get("GEMINI_API_KEY", "").strip()
+        if api_key:
+            veredicto_gemini = _decidir_con_gemini(api_key, contacto_a_seguro, contacto_b_seguro)
+            if veredicto_gemini is not None:
+                return veredicto_gemini
+
+        # 4. Fallback a reglas locales (retorna None para resolución determinista / revisión en SQLite)
+        logger.info("Ollama/Anthropic/Gemini no disponibles. Fallback a resolución local determinista.")
+        return None
 
         proveedor_config = self._config.primario.proveedor if self._config and self._config.primario else None
 
@@ -105,9 +235,22 @@ def _obtener_ollama_config() -> tuple[str, str]:
     return host, model
 
 
-def _consultar_ollama(prompt_usuario: str, prompt_sistema: str, timeout: int = OLLAMA_TIMEOUT_DEFAULT) -> str | None:
+_ollama_fallos_consecutivos: int = 0
+_MAX_FALLOS_OLLAMA: int = 2
+
+
+def reset_ollama_status() -> None:
+    global _ollama_fallos_consecutivos
+    _ollama_fallos_consecutivos = 0
+
+
+def _consultar_ollama(prompt_usuario: str, prompt_sistema: str, timeout: int = 3) -> str | None:
     """Envía una petición a Ollama local exigiendo formato JSON estricto.
     Retorna el texto JSON generado o None si Ollama no está corriendo / falla."""
+    global _ollama_fallos_consecutivos
+    if _ollama_fallos_consecutivos >= _MAX_FALLOS_OLLAMA:
+        return None
+
     host, model = _obtener_ollama_config()
 
     # Intentar endpoint /api/chat con format='json'
@@ -125,6 +268,7 @@ def _consultar_ollama(prompt_usuario: str, prompt_sistema: str, timeout: int = O
     try:
         resp = requests.post(url_chat, json=payload_chat, timeout=timeout)
         if resp.status_code == 200:
+            _ollama_fallos_consecutivos = 0
             data = resp.json()
             contenido = data.get("message", {}).get("content", "")
             if contenido:
@@ -142,14 +286,17 @@ def _consultar_ollama(prompt_usuario: str, prompt_sistema: str, timeout: int = O
             }
             resp_gen = requests.post(url_gen, json=payload_gen, timeout=timeout)
             if resp_gen.status_code == 200:
+                _ollama_fallos_consecutivos = 0
                 data_gen = resp_gen.json()
                 contenido_gen = data_gen.get("response", "")
                 if contenido_gen:
                     return contenido_gen
     except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as exc:
+        _ollama_fallos_consecutivos += 1
         logger.debug("Ollama local no disponible en %s (%s): %s", host, model, exc)
         return None
     except requests.RequestException as exc:
+        _ollama_fallos_consecutivos += 1
         logger.warning("Error consultando Ollama local (%s): %s", model, exc)
         return None
 
@@ -251,7 +398,8 @@ def clasificar_calidad_cognitiva(contacto: dict[str, Any]) -> tuple[str, str]:
     2. Fallback: Reglas deterministas locales de clasificar_calidad_registro.
     Devuelve (calidad, motivo).
     """
-    prompt_usuario = f"Contacto a clasificar: {json.dumps(contacto, ensure_ascii=False)}"
+    contacto_seguro = enmascarar_contacto(contacto)
+    prompt_usuario = f"Contacto a clasificar: {json.dumps(contacto_seguro, ensure_ascii=False)}"
 
     # 1. Ollama local
     texto_ollama = _consultar_ollama(prompt_usuario, _PROMPT_SISTEMA_CALIDAD)
@@ -327,6 +475,69 @@ def _clasificar_calidad_local(contacto: dict[str, Any]) -> tuple[str, str]:
     except Exception:
         return "dudoso", "Fallback de reglas locales"
 
+
+
+# ----------------------------------------------------------------------
+# 2.5 IMPLEMENTACIÓN ANTHROPIC CLAUDE (PAGO / PRIVADO / SIN REENTRENAMIENTO)
+# ----------------------------------------------------------------------
+
+def _decidir_con_anthropic(
+    api_key: str,
+    contacto_a: dict[str, Any],
+    contacto_b: dict[str, Any],
+    modelo: str = "claude-3-5-sonnet-20241022",
+) -> VeredictoLlm | None:
+    """Consulta la API de Anthropic Claude garantizando privacidad de datos reales."""
+    contacto_a_seguro = enmascarar_contacto(contacto_a)
+    contacto_b_seguro = enmascarar_contacto(contacto_b)
+
+    prompt_usuario = (
+        f"Contacto A: {json.dumps(contacto_a_seguro, ensure_ascii=False)}\n"
+        f"Contacto B: {json.dumps(contacto_b_seguro, ensure_ascii=False)}"
+    )
+
+    url = "https://api.anthropic.com/v1/messages"
+    headers = {
+        "x-api-key": api_key,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+    }
+    modelo_real = modelo if "claude" in modelo else "claude-3-5-sonnet-20241022"
+    payload = {
+        "model": modelo_real,
+        "max_tokens": 300,
+        "system": _PROMPT_SISTEMA_DEDUP,
+        "messages": [
+            {"role": "user", "content": prompt_usuario}
+        ],
+        "temperature": 0.0,
+    }
+
+    try:
+        resp = requests.post(url, json=payload, headers=headers, timeout=30)
+        if resp.status_code == 200:
+            datos = resp.json()
+            bloques = datos.get("content", [])
+            if bloques:
+                texto = bloques[0].get("text", "")
+                parsed = json.loads(_extraer_json(texto))
+                misma_persona = bool(parsed.get("fusionar", parsed.get("misma_persona", False)))
+                confianza = float(parsed.get("confianza", 0.95))
+                justificacion = str(parsed.get("justificacion", parsed.get("razon", "Decisión Anthropic Claude")))
+                return VeredictoLlm(
+                    misma_persona=misma_persona,
+                    confianza=confianza,
+                    razon=justificacion,
+                    proveedor="anthropic",
+                )
+        else:
+            logger.warning("Anthropic respondió HTTP %d: %s", resp.status_code, resp.text[:200])
+            return None
+    except Exception as exc:
+        logger.warning("Error consultando Anthropic (%s): %s", modelo, exc)
+        return None
+
+    return None
 
 # ----------------------------------------------------------------------
 # 3. IMPLEMENTACIÓN GEMINI FLASH (FALLBACK SECUNDARIO)

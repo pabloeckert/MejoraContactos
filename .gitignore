@@ -66,3 +66,9 @@ token_*.json
 MejoraContactos.md
 
 .claude/settings.local.json
+
+# Python venv and test temps
+.venv/
+pytest_tmp/
+**/pytest_tmp/
+

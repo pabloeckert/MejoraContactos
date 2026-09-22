@@ -51,6 +51,28 @@ def cargar_registro(conn: sqlite3.Connection, normalized_id: int) -> RegistroPar
     )
 
 
+def _primeros_nombres_compatibles(nom_a: str | None, nom_b: str | None) -> bool:
+    """Verifica si los nombres de pila son compatibles (no contradictorios)."""
+    if not nom_a or not nom_b:
+        return True
+    a = nom_a.strip().lower()
+    b = nom_b.strip().lower()
+    if not a or not b or a == b:
+        return True
+    # Iniciales (ej. 'J' para 'Juan', 'M' para 'Maria')
+    if (len(a) == 1 and b.startswith(a)) or (len(b) == 1 and a.startswith(b)):
+        return True
+    # Prefijos o nombres compuestos
+    if a.startswith(b) or b.startswith(a):
+        return True
+    tokens_a = set(a.split())
+    tokens_b = set(b.split())
+    if tokens_a & tokens_b:
+        return True
+    # Diminutivos o typos cercanos
+    return fuzz.ratio(a, b) >= 65.0
+
+
 def calcular_score(
     a: RegistroParaScoring, b: RegistroParaScoring, config: DedupConfig
 ) -> tuple[float, str]:
@@ -69,23 +91,30 @@ def calcular_score(
         + config.pesos.organizacion * organizacion_sim
     )
 
-    # Una coincidencia exacta en un identificador único ya normalizado
-    # (mismo teléfono E.164 o mismo email) alcanza por sí sola la fusión
-    # automática — decisión explícita del usuario para el arranque
-    # ("criterio agresivo": mismo teléfono fusiona sin preguntar). No
-    # depende de los pesos de arriba, que solo importan en la banda media
-    # cuando NINGUNA señal exacta coincidió. dedup/learning.py puede matizar
-    # esto con evidencia real más adelante (ver config.dedup, comentario
-    # sobre la contradicción Pablo/Sindy).
-    #
-    # Resolución local determinista estricta:
-    # Coincidencia de teléfono exacto (+549...), email exacto o similitud de nombre >= 0.85
-    # debe fusionarse por regla estricta sin invocar al LLM (score = 1.0).
-    # Salvaguarda: si ambos registros traen nombre completo y son claramente distintos entre sí (< 0.5),
-    # un teléfono/email compartido (fijo/oficina) no fusiona en silencio.
-    nombres_claramente_distintos = _ambos_con_nombre(a, b) and nombre_sim < _UMBRAL_NOMBRE_CLARAMENTE_DISTINTO
-    if ((telefono_exacto or email_exacto) and not nombres_claramente_distintos) or nombre_sim >= 0.85:
-        score = 1.0
+    # Salvaguardas estrictas anti falsos positivos y anti over-clustering
+    nombres_compatibles = _primeros_nombres_compatibles(a.nombre, b.nombre)
+    nombres_claramente_distintos = (
+        (_ambos_con_nombre(a, b) and nombre_sim < _UMBRAL_NOMBRE_CLARAMENTE_DISTINTO)
+        or not nombres_compatibles
+    )
+
+    # Si NO tienen teléfono NI email en común:
+    if not telefono_exacto and not email_exacto:
+        # Si los nombres de pila chocan abiertamente (ej. 'Maitén Ayala' vs 'Mauricio Ayala')
+        if not nombres_compatibles:
+            score = 0.0
+        else:
+            # Solo permitir auto-fusión (1.0) si AMBOS tienen nombre y apellido completos y coinciden
+            ambos_completos = bool(a.nombre and a.apellido and b.nombre and b.apellido)
+            if ambos_completos and nombre_sim >= 0.85:
+                score = 1.0
+            elif not ambos_completos and nombre_sim >= 0.80:
+                # Nombre incompleto (solo apellido o solo nombre) sin teléfono/email NO puede auto-fusionar
+                score = min(score, 0.45)
+    else:
+        # Tienen teléfono o email en común
+        if not nombres_claramente_distintos:
+            score = 1.0
 
     patron = (
         f"tel={'si' if telefono_exacto else 'no'}"

@@ -32,3 +32,6 @@ Data/
 Data/Backups/
 Data/Salida/
 
+
+pytest_tmp/
+

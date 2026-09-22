@@ -1,4 +1,5 @@
-"""Extractor de VCF (vCard) resiliente y de alto rendimiento por streaming.
+"""Actualizador de vcard_extractor.py"""
+code = '''"""Extractor de VCF (vCard) resiliente y de alto rendimiento por streaming.
 Soporta vCard 2.1 (con QUOTED-PRINTABLE multilínea), 3.0 y 4.0.
 Omite bloques pesados de PHOTO para no saturar memoria.
 """
@@ -22,7 +23,7 @@ def extraer_vcf(path: Path) -> list[RawContactRecord]:
 
     with path.open("r", encoding="utf-8", errors="replace") as f:
         for line in f:
-            line_str = line.strip("\r\n")
+            line_str = line.strip("\\r\\n")
             if not in_vcard:
                 if line_str.upper() == "BEGIN:VCARD":
                     in_vcard = True
@@ -44,7 +45,7 @@ def extraer_vcf(path: Path) -> list[RawContactRecord]:
                 skip_binary = True
                 continue
             if skip_binary:
-                if line_str.startswith((" ", "\t")) or (len(line_str) > 40 and ":" not in line_str):
+                if line_str.startswith((" ", "\\t")) or (len(line_str) > 40 and ":" not in line_str):
                     continue
                 else:
                     skip_binary = False
@@ -61,7 +62,7 @@ def _procesar_lineas_vcard(lineas: list[str]) -> dict[str, str]:
     for line in lineas:
         if prev.endswith("="):
             prev = prev[:-1] + line
-        elif line.startswith((" ", "\t")):
+        elif line.startswith((" ", "\\t")):
             prev = prev + line[1:]
         else:
             if prev:
@@ -126,3 +127,8 @@ def _extraer_tipo(header: str) -> str | None:
         if p_up in ("CELL", "HOME", "WORK", "PREF", "VOICE", "FAX", "MAIN"):
             return p.strip()
     return None
+'''
+
+with open('c:/github/MejoraContactos/motor-contactos/src/motor/extractors/vcard_extractor.py', 'w', encoding='utf-8') as f:
+    f.write(code)
+print('vcard_extractor.py actualizado correctamente!')

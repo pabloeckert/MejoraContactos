@@ -46,6 +46,19 @@ _HONORIFICOS = {
 
 _CONECTORES_MINUSCULA = {"de", "del", "la", "las", "los", "y", "el", "en"}
 
+_TLD_DOMINIOS_DESCARTAR = {
+    "ar", "com", "net", "org", "edu", "gov", "mil", "io", "co", "app", "dev",
+    "me", "info", "biz", "tv", "online", "site", "xyz", "cloud", "ai", "tech",
+}
+
+_PALABRAS_GENERICAS_DESCARTAR = {
+    "admin", "administracion", "administrador", "administradora", "contacto", "contactos", "recepcion",
+    "ventas", "soporte", "cliente", "clientes", "general", "prueba", "test",
+    "sin nombre", "after office", "afteroffice", "desconocido", "null", "none",
+    "informacion", "atencion", "casa", "oficina", "trabajo",
+}
+
+
 _PALABRAS_EMPRESA = {
     "sa", "s.a", "s.a.", "srl", "s.r.l", "s.r.l.", "sas", "s.a.s", "ltda",
     "cia", "cía", "corp", "corporation", "company", "group", "grupo",
@@ -158,6 +171,12 @@ def limpiar_nombre_persona(valor: str | None) -> str:
         # adentro, no puede ser un nombre de persona.
         return ""
 
+    s_norm = s.lower().strip().rstrip(".")
+    if s_norm in _TLD_DOMINIOS_DESCARTAR or s_norm in _PALABRAS_GENERICAS_DESCARTAR:
+        return ""
+    if len(s.replace(".", "").strip()) <= 1:
+        return ""
+
     return _title_case(s)
 
 
@@ -249,6 +268,11 @@ def clasificar_identidad(
     if organizacion and not _TIENE_LETRA_RE.search(organizacion):
         organizacion = ""  # ej. "**" — sin una sola letra, no es un nombre de empresa
     cargo = normalizar_cargo(cargo_crudo)
+
+    if nombre.lower().strip().rstrip(".") in _TLD_DOMINIOS_DESCARTAR or nombre.lower().strip().rstrip(".") in _PALABRAS_GENERICAS_DESCARTAR:
+        nombre = ""
+    if apellido.lower().strip().rstrip(".") in _TLD_DOMINIOS_DESCARTAR or apellido.lower().strip().rstrip(".") in _PALABRAS_GENERICAS_DESCARTAR:
+        apellido = ""
 
     # "Empresa"/"Cargo" a secas como valor literal es el placeholder que
     # deja Google Contacts (o un merge field de Mailchimp sin completar) —

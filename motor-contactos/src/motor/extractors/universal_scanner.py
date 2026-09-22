@@ -347,7 +347,8 @@ def _extraer_delimitado(path: Path, separador: str = ",") -> list[RawContactReco
                 col_normalizada = encabezado.strip().lower()
                 dinamicos[col_normalizada] = valor
 
-        if campos or dinamicos:
+        tiene_senal_contacto = any(k in campos for k in ("nombre", "nombre_completo", "apellido", "telefono_1", "email_1", "organizacion"))
+        if tiene_senal_contacto:
             if dinamicos:
                 campos["atributos_dinamicos"] = json.dumps(dinamicos, ensure_ascii=False)
             registros.append(RawContactRecord(str(path), i, campos, confianza_extraccion="alta"))
@@ -376,6 +377,10 @@ def _extraer_planilla_elastica(path: Path) -> list[RawContactRecord]:
 
         encabezados = [str(c).strip() for c in df.columns]
         mapa = mapear_columnas(encabezados)
+        columnas_contacto = [c for c in df.columns if mapa.get(str(c).strip()) in ("nombre", "nombre_completo", "apellido", "telefono_1", "email_1", "organizacion")]
+        if not columnas_contacto:
+            # Hoja puramente contable/financiera o sin datos de contacto
+            continue
 
         for idx, fila in df.iterrows():
             campos: dict[str, str] = {}
@@ -395,7 +400,8 @@ def _extraer_planilla_elastica(path: Path) -> list[RawContactRecord]:
                 else:
                     dinamicos[str(col).strip().lower()] = v_str
 
-            if campos or dinamicos:
+            tiene_senal_contacto = any(k in campos for k in ("nombre", "nombre_completo", "apellido", "telefono_1", "email_1", "organizacion"))
+            if tiene_senal_contacto:
                 if dinamicos:
                     campos["atributos_dinamicos"] = json.dumps(dinamicos, ensure_ascii=False)
                 row_num = int(idx) + 2

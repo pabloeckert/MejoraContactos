@@ -90,33 +90,72 @@ _ANCHO_COLUMNA = {
 
 
 def exportar_lista_maestra(config: Config, conn: sqlite3.Connection) -> Path:
+    """Genera lista-maestra.xlsx con 3 hojas estructuradas y limpias:
+    - 'Útiles': identidades limpias y completas con móvil/WhatsApp o email válido.
+    - 'Dudosos': contactos observados que requieren revisión (nombres incompletos, banderas).
+    - 'Descartes': filas vacías, códigos 2FA/SMS, registros técnicos o sin canales de contacto.
+    """
+    from motor.normalize_pipeline import clasificar_calidad_registro
+
     clusters = _materializar_clusters(conn)
     _aplicar_ediciones_manuales(conn, clusters)
-    filas: list[dict] = []
+
+    grupos_calidad: dict[str, list[dict]] = {
+        "util": [],
+        "dudoso": [],
+        "inutil": [],
+    }
+
     for cluster in clusters:
-        filas.extend(_expandir_filas(cluster))
-    filas.sort(key=lambda f: (f["apellido"].lower(), f["nombre"].lower()))
+        cat, motivo = clasificar_calidad_registro(
+            nombre=cluster.get("nombre"),
+            apellido=cluster.get("apellido"),
+            organizacion=cluster.get("organizacion"),
+            cargo=cluster.get("cargo"),
+            telefonos_movil=sorted(cluster.get("whatsapp") or []),
+            telefonos_fijo=sorted(cluster.get("telefono_fijo") or []),
+            emails=sorted(cluster.get("emails") or []),
+            flags=sorted(cluster.get("flags") or []),
+            notas=cluster.get("nota_referencia"),
+        )
+        if cat not in grupos_calidad:
+            cat = "dudoso"
+        grupos_calidad[cat].append(cluster)
 
     destino = config.rutas.carpeta_salida / "lista-maestra.xlsx"
     destino.parent.mkdir(parents=True, exist_ok=True)
 
     wb = Workbook()
-    ws = wb.active
-    ws.title = "Lista maestra"
+    ws_util = wb.active
+    ws_util.title = "Útiles"
+    ws_dudoso = wb.create_sheet(title="Dudosos")
+    ws_descarte = wb.create_sheet(title="Descartes")
 
-    ws.append([_ENCABEZADOS[c] for c in _COLUMNAS])
-    for celda in ws[1]:
-        celda.font = Font(bold=True, color="FFFFFF")
-        celda.fill = PatternFill("solid", fgColor="1A3D84")
-        celda.alignment = Alignment(vertical="center")
-    ws.freeze_panes = "A2"
-    ws.auto_filter.ref = f"A1:{get_column_letter(len(_COLUMNAS))}1"
+    config_hojas = [
+        ("Útiles", ws_util, grupos_calidad["util"], "059669"),      # Verde esmeralda institucional
+        ("Dudosos", ws_dudoso, grupos_calidad["dudoso"], "D97706"),  # Ámbar
+        ("Descartes", ws_descarte, grupos_calidad["inutil"], "64748B"), # Gris pizarra
+    ]
 
-    for fila in filas:
-        ws.append([fila[c] for c in _COLUMNAS])
+    for titulo, ws, clusters_grupo, color_encabezado in config_hojas:
+        ws.append([_ENCABEZADOS[c] for c in _COLUMNAS])
+        for celda in ws[1]:
+            celda.font = Font(bold=True, color="FFFFFF")
+            celda.fill = PatternFill("solid", fgColor=color_encabezado)
+            celda.alignment = Alignment(vertical="center")
+        ws.freeze_panes = "A2"
+        ws.auto_filter.ref = f"A1:{get_column_letter(len(_COLUMNAS))}1"
 
-    for idx, columna in enumerate(_COLUMNAS, start=1):
-        ws.column_dimensions[get_column_letter(idx)].width = _ANCHO_COLUMNA[columna]
+        filas_grupo: list[dict] = []
+        for cl in clusters_grupo:
+            filas_grupo.extend(_expandir_filas(cl))
+        filas_grupo.sort(key=lambda f: (f["apellido"].lower(), f["nombre"].lower()))
+
+        for fila in filas_grupo:
+            ws.append([fila[c] for c in _COLUMNAS])
+
+        for idx, columna in enumerate(_COLUMNAS, start=1):
+            ws.column_dimensions[get_column_letter(idx)].width = _ANCHO_COLUMNA[columna]
 
     wb.save(destino)
     return destino
@@ -170,16 +209,12 @@ def listar_contactos(conn: sqlite3.Connection, pagina: int = 1, tamano: int = 10
     return clusters[inicio : inicio + tamano], total
 
 
-def exportar_whatsapp_csv(config: Config, conn: sqlite3.Connection) -> Path:
-    """CSV en el formato exacto que espera MejoraWS
-    (C:\\Github\\Herramientas\\MejoraWS, "Importar CSV/Excel"): columnas
-    nombre,telefono,variable -- teléfono en E.164 SIN el "+" ("código de
-    país, sin espacios ni signos", así lo pide su propio README). Un
-    contacto con más de un WhatsApp genera una fila por número, mismo
-    criterio que la lista maestra. La columna "variable" lleva el tag
-    (familiar/laboral/cliente/proveedor/personal) -- útil como variable de
-    personalización del mensaje ({variable}) si el usuario quiere, no es
-    obligatorio usarla."""
+def exportar_whatsapp_csv(config: Config, conn: sqlite3.Connection, con_prefijo_mas: bool = False) -> Path:
+    """CSV en el formato para difusión por WhatsApp (MejoraWS / Difusión directa):
+    columnas: nombre,telefono,variable.
+    Si con_prefijo_mas=True genera formato internacional estricto (+549...).
+    Si con_prefijo_mas=False genera formato sin signo + (549...) para retrocompatibilidad con MejoraWS.
+    """
     import csv
 
     clusters = _materializar_clusters(conn)
@@ -192,9 +227,18 @@ def exportar_whatsapp_csv(config: Config, conn: sqlite3.Connection) -> Path:
     for cluster in clusters:
         nombre_completo = f"{cluster['nombre']} {cluster['apellido']}".strip()
         if not nombre_completo:
+            nombre_completo = (cluster.get("organizacion") or "").strip()
+        if not nombre_completo:
             continue
         for whatsapp in sorted(cluster["whatsapp"]):
-            filas.append((nombre_completo, whatsapp.lstrip("+"), cluster["tag"] or ""))
+            numero = str(whatsapp).strip()
+            if not numero:
+                continue
+            if con_prefijo_mas:
+                telefono_fmt = f"+{numero.lstrip('+')}"
+            else:
+                telefono_fmt = numero.lstrip("+")
+            filas.append((nombre_completo, telefono_fmt, cluster["tag"] or ""))
 
     filas.sort(key=lambda f: f[0].lower())
 
@@ -202,6 +246,25 @@ def exportar_whatsapp_csv(config: Config, conn: sqlite3.Connection) -> Path:
         escritor = csv.writer(f)
         escritor.writerow(["nombre", "telefono", "variable"])
         escritor.writerows(filas)
+
+    return destino
+
+
+def exportar_contactos_finales_json(config: Config, conn: sqlite3.Connection) -> Path:
+    """Exporta todos los contactos canónicos consolidados en formato JSON estructurado
+    preparado para sincronización con la tabla contactos_finales de Supabase."""
+    from motor.supabase_sync import _a_fila_supabase
+
+    clusters = _materializar_clusters(conn)
+    _aplicar_ediciones_manuales(conn, clusters)
+    clusters.sort(key=lambda c: (c["apellido"].lower(), c["nombre"].lower()))
+
+    destino = config.rutas.carpeta_salida / "contactos_finales.json"
+    destino.parent.mkdir(parents=True, exist_ok=True)
+
+    filas = [_a_fila_supabase(c) for c in clusters]
+    with destino.open("w", encoding="utf-8") as f:
+        json.dump(filas, f, indent=2, ensure_ascii=False)
 
     return destino
 

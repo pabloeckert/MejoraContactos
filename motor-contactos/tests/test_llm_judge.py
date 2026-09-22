@@ -240,3 +240,127 @@ def test_fallback_local_clasificacion_calidad_si_no_hay_llm():
 
     assert calidad == "util"
 
+
+
+
+# ----------------------------------------------------------------------
+# TESTS DE ENMASCARAMIENTO Y PRIVACIDAD (Ley 25.326)
+# ----------------------------------------------------------------------
+
+import json
+from motor.dedup.llm_judge import (
+    enmascarar_telefono,
+    enmascarar_email,
+    enmascarar_texto_libre,
+    enmascarar_contacto,
+)
+
+
+def test_enmascarar_telefono():
+    assert enmascarar_telefono("+54 9 11 5555 1234") == "****1234"
+    assert enmascarar_telefono("1544443333") == "****3333"
+    assert enmascarar_telefono("123") == "****"
+    assert enmascarar_telefono("") == ""
+    assert enmascarar_telefono(None) == ""
+
+
+def test_enmascarar_email():
+    assert enmascarar_email("pablo.eckert@empresa.com") == "***@empresa.com"
+    assert enmascarar_email("contacto@gmail.com") == "***@gmail.com"
+    assert enmascarar_email("invalido") == "****"
+    assert enmascarar_email("") == ""
+    assert enmascarar_email(None) == ""
+
+
+def test_enmascarar_texto_libre():
+    texto = "Llamar al +54 9 376 412-3456 o escribir a juan@dominio.com urgente."
+    enmascarado = enmascarar_texto_libre(texto)
+    assert "412-3456" not in enmascarado
+    assert "juan@dominio.com" not in enmascarado
+    assert "***@dominio.com" in enmascarado
+    assert "****3456" in enmascarado
+
+
+def test_enmascarar_contacto_completo():
+    contacto = {
+        "nombre": "Juan",
+        "apellido": "Perez",
+        "telefonos": ["+5491155551234", "+541144445678"],
+        "emails": ["juan.perez@empresa.com"],
+        "notas": "Enviar propuesta a juan.perez@empresa.com",
+    }
+    seguro = enmascarar_contacto(contacto)
+    assert seguro["telefonos"] == ["****1234", "****5678"]
+    assert seguro["emails"] == ["***@empresa.com"]
+    assert "juan.perez@" not in seguro["notas"]
+    assert "***@empresa.com" in seguro["notas"]
+    assert seguro["nombre"] == "Juan"
+    assert seguro["apellido"] == "Perez"
+
+
+def test_decidir_con_gemini_nunca_envia_pii_en_texto_claro():
+    judge = LlmJudge(_config(activar=True))
+    contacto_a = {
+        "nombre": "Carlos",
+        "telefonos": ["+5491155554444"],
+        "emails": ["carlos.privado@secreto.com"],
+    }
+    contacto_b = {
+        "nombre": "Carlos",
+        "telefonos": ["+5491155554444"],
+        "emails": ["carlos.laboral@secreto.com"],
+    }
+    respuesta = '{"misma_persona": true, "confianza": 0.95, "razon": "Mismo nombre"}'
+
+    with patch("requests.post", return_value=_RespuestaGeminiFalsa(respuesta)) as post:
+        veredicto = judge.decidir(contacto_a, contacto_b)
+
+    assert veredicto is not None
+    assert post.call_count == 1
+    cuerpo_enviado = json.dumps(post.call_args[1].get("json", {}))
+
+    # VERIFICACIÓN CRÍTICA DE SEGURIDAD: Ningún teléfono ni usuario de email viaja en texto claro
+    assert "55554444" not in cuerpo_enviado
+    assert "carlos.privado" not in cuerpo_enviado
+    assert "carlos.laboral" not in cuerpo_enviado
+    assert "****4444" in cuerpo_enviado
+    assert "***@secreto.com" in cuerpo_enviado
+
+
+class _RespuestaAnthropicFalsa:
+    def __init__(self, contenido="{}", status=200):
+        self.status_code = status
+        self.text = contenido
+
+    def json(self):
+        return {
+            "content": [
+                {
+                    "type": "text",
+                    "text": self.text,
+                }
+            ]
+        }
+
+
+def test_anthropic_decidir_exito(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test-key")
+    from motor.config import LlmConfig, LlmProveedorConfig
+    config = LlmConfig(activar_para_dudosos=True, primario=LlmProveedorConfig(proveedor="anthropic"))
+    judge = LlmJudge(config)
+
+    contacto_a = {"nombre": "Maria", "telefonos": ["+5491122223333"]}
+    contacto_b = {"nombre": "Maria", "telefonos": ["+5491122223333"]}
+    respuesta = '{"fusionar": true, "confianza": 0.98, "justificacion": "Misma persona validada por Claude"}'
+
+    with patch("requests.post", return_value=_RespuestaAnthropicFalsa(respuesta)) as post:
+        veredicto = judge.decidir(contacto_a, contacto_b)
+
+    assert veredicto is not None
+    assert veredicto.misma_persona is True
+    assert veredicto.confianza == 0.98
+    assert veredicto.proveedor == "anthropic"
+    assert "api.anthropic.com" in post.call_args[0][0]
+    cuerpo_enviado = json.dumps(post.call_args[1].get("json", {}))
+    assert "22223333" not in cuerpo_enviado
+    assert "****3333" in cuerpo_enviado

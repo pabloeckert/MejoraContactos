@@ -2,57 +2,86 @@
 @tailwind components;
 @tailwind utilities;
 
+@font-face {
+  font-family: 'Bw Modelica';
+  src: url('/fonts/BwModelica-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Bw Modelica';
+  src: url('/fonts/BwModelica-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Bw Modelica';
+  src: url('/fonts/BwModelica-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'League Spartan';
+  src: url('/fonts/LeagueSpartan-Bold.otf') format('opentype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 @layer base {
   :root {
     /* Clean white background */
     --background: 0 0% 100%;
-    --foreground: 0 0% 5%;
+    --foreground: 0 0% 17%;
 
-    --card: 220 20% 97%;
-    --card-foreground: 0 0% 5%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 17%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 5%;
+    --popover-foreground: 0 0% 17%;
 
-    /* Navy blue primary — #020659 */
-    --primary: 238 96% 18%;
+    /* Primary: Azul MC 2026 #1A3D84 */
+    --primary: 220 67% 31%;
     --primary-foreground: 0 0% 100%;
 
-    /* Blue accent — #1C4D8C */
-    --secondary: 214 67% 33%;
-    --secondary-foreground: 0 0% 100%;
+    /* Secondary: Superficie clara corporativa */
+    --secondary: 214 30% 94%;
+    --secondary-foreground: 220 67% 31%;
 
-    --muted: 220 14% 94%;
-    --muted-foreground: 220 9% 46%;
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 10% 40%;
 
-    /* Gold accent — #F2BB16 */
-    --accent: 45 90% 52%;
-    --accent-foreground: 0 0% 5%;
+    /* Accent: Amarillo MC 2026 #F7CC13 */
+    --accent: 49 93% 52%;
+    --accent-foreground: 0 0% 17%;
 
-    /* Red — #D9072D */
-    --destructive: 350 95% 44%;
+    /* Destructive: Rojo MC 2026 #E1061E */
+    --destructive: 353 95% 45%;
     --destructive-foreground: 0 0% 100%;
 
     --success: 142 76% 36%;
     --success-foreground: 0 0% 100%;
 
-    --warning: 45 90% 52%;
-    --warning-foreground: 0 0% 5%;
+    --warning: 49 93% 52%;
+    --warning-foreground: 0 0% 17%;
 
-    --border: 220 13% 88%;
-    --input: 220 13% 88%;
-    --ring: 238 96% 18%;
+    --border: 220 13% 90%;
+    --input: 220 13% 90%;
+    --ring: 220 67% 31%;
 
     --radius: 0.5rem;
 
-    --sidebar-background: 238 96% 18%;
+    --sidebar-background: 220 67% 31%;
     --sidebar-foreground: 0 0% 100%;
-    --sidebar-primary: 45 90% 52%;
-    --sidebar-primary-foreground: 0 0% 5%;
-    --sidebar-accent: 214 67% 33%;
+    --sidebar-primary: 49 93% 52%;
+    --sidebar-primary-foreground: 0 0% 17%;
+    --sidebar-accent: 220 65% 26%;
     --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 238 80% 25%;
-    --sidebar-ring: 45 90% 52%;
+    --sidebar-border: 220 60% 25%;
+    --sidebar-ring: 49 93% 52%;
   }
 
   .dark {
@@ -65,39 +94,39 @@
     --popover: 222 47% 12%;
     --popover-foreground: 210 40% 95%;
 
-    --primary: 238 96% 60%;
+    --primary: 220 75% 65%;
     --primary-foreground: 0 0% 5%;
 
-    --secondary: 214 67% 45%;
-    --secondary-foreground: 0 0% 5%;
+    --secondary: 222 47% 18%;
+    --secondary-foreground: 210 40% 95%;
 
     --muted: 222 47% 18%;
     --muted-foreground: 215 20% 60%;
 
-    --accent: 45 90% 55%;
+    --accent: 49 93% 52%;
     --accent-foreground: 0 0% 5%;
 
-    --destructive: 350 95% 55%;
+    --destructive: 353 95% 55%;
     --destructive-foreground: 0 0% 100%;
 
     --success: 142 76% 45%;
     --success-foreground: 0 0% 100%;
 
-    --warning: 45 90% 55%;
+    --warning: 49 93% 52%;
     --warning-foreground: 0 0% 5%;
 
     --border: 222 47% 20%;
     --input: 222 47% 20%;
-    --ring: 238 96% 60%;
+    --ring: 220 75% 65%;
 
     --sidebar-background: 222 47% 10%;
     --sidebar-foreground: 210 40% 95%;
-    --sidebar-primary: 45 90% 55%;
+    --sidebar-primary: 49 93% 52%;
     --sidebar-primary-foreground: 0 0% 5%;
-    --sidebar-accent: 214 67% 35%;
+    --sidebar-accent: 222 47% 18%;
     --sidebar-accent-foreground: 210 40% 95%;
     --sidebar-border: 222 47% 18%;
-    --sidebar-ring: 45 90% 55%;
+    --sidebar-ring: 49 93% 52%;
   }
 }
 
@@ -108,6 +137,16 @@
 
   body {
     @apply bg-background text-foreground;
+    font-family: 'Bw Modelica', -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+
+  h1, h2, h3 {
+    font-family: 'Bw Modelica', sans-serif;
+    font-weight: 700;
+  }
+
+  h4, h5, h6 {
+    font-family: 'League Spartan', 'Bw Modelica', sans-serif;
   }
 }
 

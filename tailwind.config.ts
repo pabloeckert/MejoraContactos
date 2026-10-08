@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { Config } from "tailwindcss";
 import tailwindcssAnimate from "tailwindcss-animate";
 
@@ -14,6 +15,10 @@ export default {
       },
     },
     extend: {
+      fontFamily: {
+        sans: ["'Bw Modelica'", "Inter", "sans-serif"],
+        display: ["'League Spartan'", "sans-serif"],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",

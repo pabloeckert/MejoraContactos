@@ -44,7 +44,6 @@ export interface MaskableContact {
   company?: string;
   jobTitle?: string;
   notes?: string;
-  [key: string]: unknown;
 }
 
 export function maskContactForAI<T extends MaskableContact>(contact: T): T {

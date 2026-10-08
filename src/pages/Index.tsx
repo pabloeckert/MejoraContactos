@@ -33,6 +33,7 @@ import { PricingSection } from "@/components/PricingSection";
 import { DemoModeToggle } from "@/components/DemoModeToggle";
 import { useDemoMode } from "@/lib/demoMode";
 import { DEMO_CONTACTS } from "@/lib/demoContacts";
+import { toast } from "sonner";
 
 // Track page views
 analytics.pageView();

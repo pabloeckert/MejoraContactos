@@ -271,7 +271,7 @@ function SegmentedExportCard({
           <Badge className="text-[10px] bg-green-100 text-green-800 border-green-300">
             A: {summary.segmentA.count} contactos (score ≥70)
           </Badge>
-          <Badge className="text-[10px] bg-yellow-100 text-yellow-800 border-yellow-300">
+          <Badge className="text-[10px] bg-[#F7CC13] text-[#2B2B2B] font-semibold border-transparent">
             B: {summary.segmentB.count} contactos (40–69)
           </Badge>
           <Badge className="text-[10px] bg-gray-100 text-gray-700 border-gray-300">
@@ -296,14 +296,14 @@ function SegmentedExportCard({
         </Button>
         <Button
           variant="outline"
-          className="h-auto py-3 flex-col gap-1 border-yellow-300 hover:bg-yellow-50"
+          className="h-auto py-3 flex-col gap-1 border-amber-300 hover:bg-amber-50"
           onClick={() => onExport("B")}
           disabled={summary.segmentB.count === 0}
           aria-label="Exportar Segmento B"
         >
-          <span className="text-sm font-bold text-yellow-700">Segmento B</span>
+          <span className="text-sm font-bold text-amber-900">Segmento B</span>
           <span className="text-[10px] text-muted-foreground">Score 40-69</span>
-          <span className="text-xs font-semibold text-yellow-600">{summary.segmentB.count} contactos</span>
+          <span className="text-xs font-semibold text-amber-900">{summary.segmentB.count} contactos</span>
         </Button>
         <Button
           variant="outline"

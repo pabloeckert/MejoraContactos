@@ -92,7 +92,7 @@ export const DashboardPanel = memo(function DashboardPanel({ contacts }: Dashboa
         </Card>
         <Card>
           <CardContent className="p-4 text-center">
-            <div className="text-3xl font-bold text-yellow-600">
+            <div className="text-3xl font-bold text-[#2B2B2B]">
               {stats.unique - stats.excellent - stats.needsReview}
             </div>
             <div className="text-[10px] text-muted-foreground mt-1">🟡 Con observaciones</div>

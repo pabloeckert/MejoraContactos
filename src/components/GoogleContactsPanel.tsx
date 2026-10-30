@@ -585,8 +585,8 @@ export function GoogleContactsPanel({ onContactsImported }: GoogleContactsPanelP
             <>
               <div className="space-y-3 text-sm">
                 {deleteResult.errors && deleteResult.errors.length > 0 ? (
-                  <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-3">
-                    <p className="font-semibold text-yellow-600">Resultado parcial</p>
+                  <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3">
+                    <p className="font-semibold text-amber-900">Resultado parcial</p>
                     <p>{deleteResult.deleted} de {deleteResult.total} contactos eliminados</p>
                     <div className="mt-2 max-h-32 overflow-auto text-xs text-muted-foreground">
                       {deleteResult.errors.slice(0, 5).map((err, i) => (

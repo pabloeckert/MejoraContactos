@@ -101,7 +101,7 @@ export const ContactsTable = memo(function ContactsTable({ contacts, onUpdateCon
           <CardTitle className="text-sm flex items-center gap-2">
             <span>{filtered.length.toLocaleString()} contactos</span>
             {reviewCount > 0 && (
-              <Badge variant="outline" className="text-[10px] text-yellow-600 border-yellow-300">
+              <Badge className="text-[10px] bg-[#F7CC13] text-[#2B2B2B] font-semibold border-transparent">
                 {reviewCount} requieren revisión
               </Badge>
             )}

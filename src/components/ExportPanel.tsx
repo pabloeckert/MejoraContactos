@@ -181,6 +181,42 @@ export const ExportPanel = memo(function ExportPanel({ contacts }: ExportPanelPr
             <span className="text-xs font-semibold">Airtable</span>
             <span className="text-[10px] text-muted-foreground">Listo para importar ahí</span>
           </Button>
+          <Button
+            variant="default"
+            className="h-auto py-4 flex-col gap-2 bg-mc-azul hover:bg-blue-900 text-white"
+            onClick={async () => {
+              if (clean.length === 0) {
+                toast.error("No hay contactos limpios para inyectar a MejoraNucleo");
+                return;
+              }
+              toast.info(`Inyectando ${clean.length} contactos a MejoraNucleo/CRM...`);
+              let exitosos = 0;
+              for (const c of clean.slice(0, 100)) {
+                try {
+                  const res = await fetch("http://127.0.0.1:4002/api/prospectos", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      nombre: `${c.firstName || ""} ${c.lastName || ""}`.trim() || "Contacto Depurado",
+                      email: c.email || `contacto-${c.id || Math.random().toString(36).slice(2, 8)}@sin-email.com`,
+                      telefono: c.whatsapp || c.phone || "",
+                      canalOrigen: "base_propia_contactos",
+                      mensaje: `Importado y depurado desde MejoraContactos. Score IA: ${c.aiRelevanceScore || "N/A"}. Segmento: ${c.segment || "B"}.`,
+                    }),
+                  });
+                  if (res.ok) exitosos++;
+                } catch {
+                  // fail-soft
+                }
+              }
+              toast.success(`Inyección completada: ${exitosos} prospectos ingresados a MejoraNucleo.`);
+            }}
+            aria-label="Inyectar contactos limpios a MejoraNucleo"
+          >
+            <span className="text-lg">🏢</span>
+            <span className="text-xs font-bold text-white">MejoraNucleo / CRM</span>
+            <span className="text-[10px] text-blue-100">Inyectar base limpia al motor SLA</span>
+          </Button>
         </CardContent>
       </Card>
 

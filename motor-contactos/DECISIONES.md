@@ -1051,7 +1051,7 @@ del reporte).
 
 ---
 
-## 2026-08-15 (cont.) — Meta-auditoría + dos propuestas de rediseño de Lovable: qué se aplicó y qué se descartó
+## 2026-08-15 (cont.) — Meta-auditoría + dos propuestas de rediseño de propuesta externa: qué se aplicó y qué se descartó
 
 - El usuario pidió una "meta-auditoría": criticar la auditoría .docx del
   2026-08-14 (verificar qué estaba bien sustentado, qué no, y qué le
@@ -1071,12 +1071,12 @@ del reporte).
   quedaron en el prompt de mejoras entregado, no implementados todavía
   (el usuario no pidió ejecutar el prompt, solo tenerlo listo).
 - El usuario pegó DOS propuestas de rediseño de interfaz generadas por
-  "Lovable" (una acotada centrada en debilidades puntuales, otra un
+  "propuesta externa" (una acotada centrada en debilidades puntuales, otra un
   "rediseño integral" completo: tema oscuro por default, command palette
   Ctrl+K, layout maestro-detalle reemplazando la tabla+modal actual,
   rail de iconos en vez de sidebar, cola de revisión rediseñada
   par-por-par con atajos J/K/F/S/Z) con la instrucción explícita de que
-  la decisión final es de esta sesión, Lovable es solo una opinión.
+  la decisión final es de esta sesión, propuesta externa es solo una opinión.
 - **Se rechazó el rediseño integral completo**, con criterio explícito:
   (1) es una reescritura de días, no algo para meter en una sesión sobre
   una UI que ya funciona y está testeada con 221 tests en verde; (2) gran

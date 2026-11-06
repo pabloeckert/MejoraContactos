@@ -15,7 +15,7 @@ Reglas de trabajo (no son negociables, ya las acordé con el usuario en sesiones
 - Nunca escribas ni borres nada en Data/Crudos/. Nada se fusiona destructivamente en el motor de dedup.
 - Los fixtures de test son SIEMPRE sintéticos, nunca datos reales de pablo.csv/Sindy.csv.
 - Las API keys (GROQ_API_KEY, ANTHROPIC_API_KEY) van solo en motor-contactos/.env — nunca las pidas pegadas en el chat, nunca las escribas en config.yaml.
-- Sin identidad de marca de Mejora Continua en nada de motor-contactos — es un proyecto privado, separado del negocio, con criterio de diseño propio de Claude. La SPA principal del repo (hecha en Lovable) es solo una referencia de bajo nivel, no una spec a copiar.
+- Sin identidad de marca de Mejora Continua en nada de motor-contactos — es un proyecto privado, separado del negocio, con criterio de diseño propio de Claude. La SPA principal del repo (hecha en prototipo externo) es solo una referencia de bajo nivel, no una spec a copiar.
 - Cuando termines una sesión de trabajo (o notes que te estás por quedar sin cuota), corré motor-contactos/scripts/handoff.ps1 — genera el reporte de traspaso, commitea el código en el repo git local, y respalda Data/. Antes de eso, actualizá PENDIENTES.md (tachá lo que hiciste, agregá lo nuevo) y agregá una entrada nueva al final de DECISIONES.md con lo que decidiste/encontraste y por qué.
 - motor-contactos/ y Data/ tienen sus propios repos git LOCALES SIN REMOTO (nunca a GitHub) — no intentes agregarles un remote ni pushearlos a ningún lado. Son puro backup/historial local.
 

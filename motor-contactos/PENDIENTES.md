@@ -340,7 +340,7 @@ línea operativos. Lo único que sigue vivo en este archivo es Fase 4
   importar desde Google (tokens ya autorizados, no requiere login) o
   esperar instrucción del usuario sobre cuándo hacerlo.
 
-## Meta-auditoría + evaluación de propuestas de rediseño de Lovable (2026-08-15, cont.)
+## Meta-auditoría + evaluación de propuestas de rediseño de propuesta externa (2026-08-15, cont.)
 
 - [x] ~~Meta-auditoría de la auditoría .docx del 2026-08-14~~ — entregada
       en el chat (crítica + prompt de mejoras enfocado en riesgos/
@@ -351,7 +351,7 @@ línea operativos. Lo único que sigue vivo en este archivo es Fase 4
       en cada caso de dedup "zona gris" — ver DECISIONES.md para el
       detalle y el prompt de mejoras completo (no ejecutado todavía, el
       usuario no lo pidió).
-- [x] ~~Evaluar 2 propuestas de rediseño de interfaz de Lovable~~ — se
+- [x] ~~Evaluar 2 propuestas de rediseño de interfaz de propuesta externa~~ — se
       rechazó el "rediseño integral" (tema oscuro, command palette,
       layout maestro-detalle, cola de revisión par-a-par con atajos)
       por alcance/riesgo y porque parte describía debilidades ya

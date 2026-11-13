@@ -230,13 +230,10 @@ def main(argv: list[str] | None = None) -> int:
                 threading.Timer(1.0, lambda: webbrowser.open(url)).start()
                 print(f"Abriendo {url} en el navegador...")
 
-            # threaded=False a propósito: la conexión sqlite se crea una
-            # sola vez acá arriba y se comparte entre requests — sqlite3
-            # no es thread-safe por default (check_same_thread=True), así
-            # que un request en otro hilo tira "SQLite objects created in
-            # a thread can only be used in that same thread". Un solo
-            # usuario en localhost no necesita concurrencia real.
-            crear_app(config, conn).run(port=config.revisor.puerto, threaded=False)
+            # threaded=True permite que el monitor de progreso (/api/progreso-estado)
+            # responda en vivo mientras una acción de escaneo/normalización está en curso.
+            # La conexión SQLite usa check_same_thread=False + WAL + busy_timeout=30000.
+            crear_app(config, conn).run(port=config.revisor.puerto, threaded=True)
         elif comando == "escritorio":
             # No usa la conexión `conn` de más abajo -- desktop_app.py crea
             # la suya propia dentro del hilo que sirve Flask (ver

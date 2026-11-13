@@ -16,10 +16,14 @@ import json
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Callable
 
 import motor.extractors  # noqa: F401 — importa y registra todos los extractores
+import motor.extractors.image_ocr_extractor as _img_ocr
 from motor.config import Config
 from motor.extractors.base import extractor_para
+
+_EXTS_IMAGEN = frozenset({"png", "jpg", "jpeg"})
 
 
 def extraer_todo(
@@ -27,6 +31,7 @@ def extraer_todo(
     conn: sqlite3.Connection,
     raiz: Path | None = None,
     todas_las_extensiones: bool = False,
+    callback_progreso: Callable[[int, int, Path, int, int], None] | None = None,
 ) -> int:
     """Devuelve la cantidad de raw_records nuevos insertados.
 
@@ -40,14 +45,27 @@ def extraer_todo(
     botón "Importar de carpeta" pasa `True` -- si el usuario eligió esa
     carpeta a mano, se procesa cualquier archivo con extractor
     disponible, no solo los formatos habilitados por default."""
-    total_insertados = 0
+    candidatos: list[tuple[Path, str]] = []
     for path in sorted((raiz or config.rutas.carpeta_raiz).rglob("*")):
         if not path.is_file():
             continue
         extension = path.suffix.lstrip(".").lower()
         if not todas_las_extensiones and extension not in config.extensiones_permitidas:
             continue
-        total_insertados += _procesar_un_archivo(conn, path, extension)
+        if extractor_para(extension) is None:
+            continue
+        candidatos.append((path, extension))
+
+    total_archivos = len(candidatos)
+    total_insertados = 0
+    for idx, (path, extension) in enumerate(candidatos, start=1):
+        if extension in _EXTS_IMAGEN and _img_ocr._avisado_tesseract_faltante:
+            nuevos = 0
+        else:
+            nuevos = _procesar_un_archivo(conn, path, extension)
+            total_insertados += nuevos
+        if callback_progreso is not None:
+            callback_progreso(idx, total_archivos, path, nuevos, total_insertados)
     return total_insertados
 
 
@@ -70,13 +88,20 @@ def _procesar_un_archivo(conn: sqlite3.Connection, path: Path, extension: str) -
     extractor = extractor_para(extension)
     if extractor is None:
         return 0
-    if _ya_procesado(conn, path):
+    if extension in _EXTS_IMAGEN and _img_ocr._avisado_tesseract_faltante:
+        return 0
+
+    hash_actual = _hash_archivo(path)
+    if _ya_procesado(conn, path, hash_actual):
         return 0
 
     try:
         registros = extractor(path)
     except Exception as exc:  # noqa: BLE001 — un archivo problemático no debe frenar el resto
         print(f"aviso: no se pudo extraer {path} ({exc}); se sigue con el resto")
+        return 0
+
+    if extension in _EXTS_IMAGEN and _img_ocr._avisado_tesseract_faltante:
         return 0
 
     for r in registros:
@@ -92,21 +117,21 @@ def _procesar_un_archivo(conn: sqlite3.Connection, path: Path, extension: str) -
                 _ahora(),
             ),
         )
-    _marcar_procesado(conn, path)
+    _marcar_procesado(conn, path, hash_actual)
     conn.commit()
     return len(registros)
 
 
-def _ya_procesado(conn: sqlite3.Connection, path: Path) -> bool:
+def _ya_procesado(conn: sqlite3.Connection, path: Path, hash_actual: str) -> bool:
     fila = conn.execute(
         "SELECT hash_sha256 FROM fuentes_procesadas WHERE ruta = ?", (str(path),)
     ).fetchone()
     if fila is None:
         return False
-    return fila["hash_sha256"] == _hash_archivo(path)
+    return fila["hash_sha256"] == hash_actual
 
 
-def _marcar_procesado(conn: sqlite3.Connection, path: Path) -> None:
+def _marcar_procesado(conn: sqlite3.Connection, path: Path, hash_actual: str) -> None:
     stat = path.stat()
     conn.execute(
         "INSERT INTO fuentes_procesadas (ruta, hash_sha256, mtime, tamano_bytes, procesado_en) "
@@ -114,7 +139,7 @@ def _marcar_procesado(conn: sqlite3.Connection, path: Path) -> None:
         "ON CONFLICT(ruta) DO UPDATE SET "
         "hash_sha256=excluded.hash_sha256, mtime=excluded.mtime, "
         "tamano_bytes=excluded.tamano_bytes, procesado_en=excluded.procesado_en",
-        (str(path), _hash_archivo(path), stat.st_mtime, stat.st_size, _ahora()),
+        (str(path), hash_actual, stat.st_mtime, stat.st_size, _ahora()),
     )
 
 

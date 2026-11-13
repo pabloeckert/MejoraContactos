@@ -97,3 +97,46 @@ def test_extraer_archivo_no_duplica_si_se_llama_dos_veces_sin_cambios(tmp_path):
 
     assert primera == 1
     assert segunda == 0  # mismo hash, ya procesado -- mismo criterio incremental que extraer_todo
+
+
+def test_extraer_todo_reporta_progreso_y_omite_imagenes_sin_tesseract(tmp_path, monkeypatch):
+    import motor.extractors.image_ocr_extractor as image_ocr_extractor
+    import pytesseract
+    from PIL import Image
+
+    monkeypatch.setattr(image_ocr_extractor, "_avisado_tesseract_faltante", False)
+
+    def _sin_tesseract(*args, **kwargs):
+        raise pytesseract.TesseractNotFoundError()
+
+    monkeypatch.setattr(pytesseract, "image_to_string", _sin_tesseract)
+
+    config = _config_prueba(tmp_path)
+    conn = conectar(config.rutas.base_sqlite)
+
+    carpeta = tmp_path / "MixConFotos"
+    carpeta.mkdir()
+    (carpeta / "datos.csv").write_text("Nombre,Telefono\nLucas,3764112233\n", encoding="utf-8")
+    Image.new("RGB", (20, 20), color="white").save(carpeta / "foto1.jpg")
+    Image.new("RGB", (20, 20), color="white").save(carpeta / "foto2.jpg")
+
+    eventos = []
+    nuevos = extraer_todo(
+        config,
+        conn,
+        raiz=carpeta,
+        todas_las_extensiones=True,
+        callback_progreso=lambda actual, total, arch, n_arch, total_ins: eventos.append(
+            (actual, total, arch.name, n_arch, total_ins)
+        ),
+    )
+
+    assert nuevos == 1
+    assert len(eventos) == 3
+    assert eventos[-1][0] == 3 and eventos[-1][1] == 3
+    assert eventos[-1][4] == 1
+    rutas_proc = {r[0] for r in conn.execute("SELECT ruta FROM fuentes_procesadas").fetchall()}
+    assert str(carpeta / "datos.csv") in rutas_proc
+    assert str(carpeta / "foto1.jpg") not in rutas_proc
+    assert str(carpeta / "foto2.jpg") not in rutas_proc
+

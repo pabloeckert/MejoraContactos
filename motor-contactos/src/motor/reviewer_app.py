@@ -2282,8 +2282,26 @@ def _ejecutar_accion(config: Config, conn: sqlite3.Connection, nombre: str) -> s
         if nombre == "run":
             tracker.actualizar(paso=1, pct=5, etapa_nombre="Respaldo Previo", mensaje="Guardando copia de seguridad...")
             hacer_backup_previo(config, motivo="antes_de_run")
-            tracker.actualizar(paso=1, pct=15, etapa_nombre="Extracción", mensaje="Extrayendo registros...")
-            extraer_todo(config, conn)
+            tracker.actualizar(paso=1, pct=12, etapa_nombre="Extracción", mensaje="Buscando archivos de contactos...")
+            ultimo_ts = [0.0]
+
+            def _cb_ext_run(actual: int, total_arch: int, arch: Path, nuevos_arch: int, acum_carp: int) -> None:
+                ahora = time.monotonic()
+                if nuevos_arch > 0:
+                    tracker.log(f"📄 +{nuevos_arch} contactos extraídos de '{arch.name}'")
+                if ahora - ultimo_ts[0] < 0.25 and nuevos_arch == 0 and actual < total_arch:
+                    return
+                ultimo_ts[0] = ahora
+                pct_ext = 12 + int((actual / total_arch) * 18) if total_arch else 30
+                tracker.actualizar(
+                    paso=1,
+                    pct=pct_ext,
+                    etapa_nombre="Extracción",
+                    mensaje=f"Escaneando archivo {actual:,}/{total_arch:,} — {acum_carp:,} contactos extraídos",
+                    detalle=f"Leyendo: {arch.name}",
+                )
+
+            extraer_todo(config, conn, callback_progreso=_cb_ext_run)
             tracker.actualizar(paso=2, pct=30, etapa_nombre="Normalización E.164", mensaje="Normalizando teléfonos...")
             normalizar_todo(config, conn, callback_progreso=_cb_norm)
             tracker.actualizar(paso=3, pct=55, etapa_nombre="Deduplicación & IA", mensaje="Deduplicando registros...")
@@ -2427,14 +2445,55 @@ def _ejecutar_accion(config: Config, conn: sqlite3.Connection, nombre: str) -> s
                 nombres_carpetas: list[str] = []
                 total_carpetas = len(carpetas_validas)
                 for i, carp in enumerate(carpetas_validas, start=1):
-                    pct_ext = 15 + int((i / total_carpetas) * 15)
+                    pct_inicio = 12 + int(((i - 1) / total_carpetas) * 20)
+                    pct_fin = 12 + int((i / total_carpetas) * 20)
                     tracker.actualizar(
                         paso=1,
-                        pct=pct_ext,
+                        pct=pct_inicio,
                         etapa_nombre="Extracción",
-                        mensaje=f"Escaneando carpeta {i}/{total_carpetas}: '{carp.name}'...",
+                        mensaje=f"Indexando carpeta {i}/{total_carpetas}: '{carp.name}'...",
                     )
-                    sub_crudos = extraer_todo(config, conn, raiz=carp, todas_las_extensiones=True)
+                    ultimo_ts = [0.0]
+
+                    def _cb_ext(
+                        actual: int,
+                        total_arch: int,
+                        arch: Path,
+                        nuevos_arch: int,
+                        acum_carp: int,
+                        _i: int = i,
+                        _carp_nombre: str = carp.name,
+                        _base_crudos: int = nuevos_crudos,
+                        _p0: int = pct_inicio,
+                        _p1: int = pct_fin,
+                        _ts: list[float] = ultimo_ts,
+                    ) -> None:
+                        ahora = time.monotonic()
+                        if nuevos_arch > 0:
+                            tracker.log(f"📄 +{nuevos_arch} contactos extraídos de '{arch.name}'")
+                        if ahora - _ts[0] < 0.25 and nuevos_arch == 0 and actual < total_arch:
+                            return
+                        _ts[0] = ahora
+                        frac = (actual / total_arch) if total_arch else 1.0
+                        pct_ext = _p0 + int(frac * (_p1 - _p0))
+                        tracker.actualizar(
+                            paso=1,
+                            pct=pct_ext,
+                            etapa_nombre="Extracción",
+                            mensaje=(
+                                f"Carpeta {_i}/{total_carpetas} ('{_carp_nombre}'): "
+                                f"archivo {actual:,}/{total_arch:,} — {_base_crudos + acum_carp:,} contactos extraídos"
+                            ),
+                            detalle=f"Leyendo: {arch.name}",
+                        )
+
+                    sub_crudos = extraer_todo(
+                        config,
+                        conn,
+                        raiz=carp,
+                        todas_las_extensiones=True,
+                        callback_progreso=_cb_ext,
+                    )
                     nuevos_crudos += sub_crudos
                     nombres_carpetas.append(carp.name)
                     tracker.log(f"✓ [{i}/{total_carpetas}] Extraídos {sub_crudos} registros crudos de '{carp.name}'")

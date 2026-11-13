@@ -35,6 +35,8 @@ _avisado_tesseract_faltante = False
 @registrar("png", "jpg", "jpeg")
 def extraer_imagen(path: Path) -> list[RawContactRecord]:
     global _avisado_tesseract_faltante
+    if _avisado_tesseract_faltante:
+        return []
     try:
         texto = pytesseract.image_to_string(Image.open(path), lang="spa+eng")
     except pytesseract.TesseractNotFoundError:

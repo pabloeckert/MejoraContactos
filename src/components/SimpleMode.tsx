@@ -6,7 +6,6 @@ import { Badge } from "@/components/ui/badge";
 import { FileDropzone } from "@/components/FileDropzone";
 import { PreviewPanel } from "@/components/PreviewPanel";
 import { ProcessingPanel } from "@/components/ProcessingPanel";
-import { UsageBanner } from "@/components/UsageBanner";
 import { analytics } from "@/lib/analytics";
 import type { ParsedFile, UnifiedContact } from "@/types/contact";
 
@@ -44,9 +43,6 @@ export function SimpleMode({
 
   return (
     <div className="space-y-4">
-      {/* Usage banner for free tier */}
-      <UsageBanner />
-
       {/* Mode switcher */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">

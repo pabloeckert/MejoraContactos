@@ -18,21 +18,12 @@ import { handleError } from "@/lib/error-handler";
 import type { ParsedFile, UnifiedContact } from "@/types/contact";
 import { Upload, Zap, Users, Download, BarChart3, Settings, Moon, Sun, Activity, History, Sparkles, Settings2, Globe, FolderSearch } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
-import { GoogleContactsPanel } from "@/components/GoogleContactsPanel";
 import { DirectorioScannerPanel } from "@/components/DirectorioScannerPanel";
-import { ApiKeysPanel } from "@/components/ApiKeysPanel";
-import { MejoraWsPanel } from "@/components/MejoraWsPanel";
 import { HealthCheckPanel } from "@/components/HealthCheckPanel";
 import { HistoryPanel } from "@/components/HistoryPanel";
 import { Button } from "@/components/ui/button";
 import { CookieConsent } from "@/components/CookieConsent";
 import { usePWAInstall } from "@/hooks/usePWAInstall";
-import { getUsageStats } from "@/lib/usage-limits";
-import { UsageBanner } from "@/components/UsageBanner";
-import { PricingSection } from "@/components/PricingSection";
-import { DemoModeToggle } from "@/components/DemoModeToggle";
-import { useDemoMode } from "@/lib/demoMode";
-import { DEMO_CONTACTS } from "@/lib/demoContacts";
 import { toast } from "sonner";
 
 // Track page views
@@ -52,31 +43,6 @@ const Index = () => {
   const { theme, setTheme } = useTheme();
   const { isInstallable, isStandalone, install } = usePWAInstall();
   const { locale, setLocale } = useI18n();
-  const demoMode = useDemoMode();
-
-  // Modo demostración (Fase 7 de MejoraSuite): precarga un lote ficticio en
-  // memoria (nunca se persiste a IndexedDB, ver saveContacts más abajo) para
-  // poder recorrer dedup/limpieza/exportación sin subir un archivo real. Al
-  // apagarlo, si lo que hay cargado es justamente ese lote demo, se vuelve
-  // a blanco — pero no toca un archivo real que el usuario haya subido.
-  useEffect(() => {
-    if (demoMode && contacts.length === 0 && files.length === 0) {
-      setContacts(DEMO_CONTACTS);
-      setFiles([{
-        id: "demo-file",
-        name: "contactos-de-ejemplo.csv",
-        size: 1024,
-        type: "text/csv",
-        rows: [],
-        columns: ["firstName", "lastName", "whatsapp", "company", "jobTitle", "email"],
-        addedAt: new Date(),
-      }]);
-    } else if (!demoMode && files.some((f) => f.id === "demo-file")) {
-      setContacts([]);
-      setFiles([]);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [demoMode]);
 
   // Onboarding state
   const [showOnboarding, setShowOnboarding] = useState(() => {
@@ -245,7 +211,7 @@ const Index = () => {
             </div>
             <h1 className="text-sm font-bold tracking-tight text-primary-foreground">MejoraContactos</h1>
             <Badge className="text-[10px] hidden sm:inline-flex bg-accent text-accent-foreground border-0 font-semibold">
-              AI Pro
+              Autónomo
             </Badge>
           </div>
           <div className="flex items-center gap-2">
@@ -266,7 +232,6 @@ const Index = () => {
                 <span className="hidden sm:inline">Instalar</span>
               </button>
             )}
-            <DemoModeToggle />
             {/* Simple/Advanced mode toggle */}
             <button
               onClick={() => {
@@ -366,11 +331,9 @@ const Index = () => {
               </TabsTrigger>
               <TabsTrigger value="settings" className="text-xs gap-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 <Settings className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Config</span>
+                <span className="hidden sm:inline">Mantenimiento</span>
               </TabsTrigger>
             </TabsList>
-
-            <UsageBanner />
 
             <TabsContent value="import">
               <div className="space-y-4">
@@ -378,7 +341,7 @@ const Index = () => {
                   <div className="flex items-center gap-2.5">
                     <FolderSearch className="h-4 w-4 text-primary shrink-0" />
                     <div className="text-xs">
-                      <span className="font-semibold text-foreground">¿Querés escanear carpetas enteras de la PC o Google Drive?</span>
+                      <span className="font-semibold text-foreground">¿Querés escanear directorios y subcarpetas en todos los niveles?</span>
                       <span className="text-muted-foreground hidden sm:inline"> — El Escáner Universal procesa recursivamente .xlsx, .docx, .pdf y más.</span>
                     </div>
                   </div>
@@ -387,7 +350,6 @@ const Index = () => {
                     <span aria-hidden="true">→</span>
                   </Button>
                 </div>
-                <GoogleContactsPanel onContactsImported={(file) => handleFilesAdded([file])} />
                 <FileDropzone files={files} onFilesAdded={handleFilesAdded} onRemoveFile={handleRemoveFile} />
                 {files.length > 0 && <PreviewPanel files={files} />}
               </div>
@@ -464,55 +426,21 @@ const Index = () => {
             </TabsContent>
 
             <TabsContent value="settings">
-              <div className="space-y-4">
-                {/* Usage Stats */}
-                <div className="flex items-center justify-between p-4 rounded-lg border bg-muted/30">
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium">Plan: {getUsageStats().tier === "free" ? "Free" : "Pro"}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {getUsageStats().tier === "free"
-                        ? `${getUsageStats().batchesUsedToday}/${getUsageStats().maxBatchesPerDay} lotes hoy · ${getUsageStats().maxContactsPerBatch.toLocaleString()} contactos/lote`
-                        : "Lotes ilimitados · 10,000 contactos/lote"}
-                    </p>
-                  </div>
-                  {getUsageStats().tier === "free" && (
-                    <a href={`${import.meta.env.BASE_URL}pricing`} className="text-xs text-violet-500 hover:text-violet-600 font-medium">
-                      Ver Pro →
-                    </a>
-                  )}
-                </div>
-                <ApiKeysPanel />
-                <MejoraWsPanel />
-                <div className="grid gap-4 lg:grid-cols-2">
-                  <HealthCheckPanel />
-                  <HistoryPanel onRestore={handleRestoreFromHistory} />
-                </div>
+              <div className="grid gap-4 lg:grid-cols-2">
+                <HealthCheckPanel />
+                <HistoryPanel onRestore={handleRestoreFromHistory} />
               </div>
             </TabsContent>
           </Tabs>
         )}
       </main>
 
-      {/* Pricing section */}
-      <section className="container px-4 py-10">
-        <PricingSection />
-      </section>
-
       {/* Cookie Consent Banner */}
       <CookieConsent />
 
       {/* Footer */}
       <footer className="py-3 px-4 text-center text-xs text-muted-foreground/60 border-t border-border/30">
-        <span>© 2026 MejoraContactos · </span>
-        <a href={`${import.meta.env.BASE_URL}pricing`} className="hover:text-foreground underline underline-offset-2">Precios</a>
-        <span> · </span>
-        <a href={`${import.meta.env.BASE_URL}privacy`} className="hover:text-foreground underline underline-offset-2">Privacidad</a>
-        <span> · </span>
-        <a href={`${import.meta.env.BASE_URL}terms`} className="hover:text-foreground underline underline-offset-2">Términos</a>
-        <span> · </span>
-        <a href={`${import.meta.env.BASE_URL}faq`} className="hover:text-foreground underline underline-offset-2">FAQ</a>
-        <span> · </span>
-        <a href={`${import.meta.env.BASE_URL}blog`} className="hover:text-foreground underline underline-offset-2">Blog</a>
+        <span>MejoraContactos · Sistema Autónomo de Escaneo, Limpieza y Mantenimiento de Contactos</span>
       </footer>
     </div>
   );

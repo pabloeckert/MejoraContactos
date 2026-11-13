@@ -1,27 +1,18 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
-import { correrAccion, obtenerCuentasGoogle } from "../api";
-import { IconDownload, IconFolder, IconSync } from "./icons";
+import { correrAccion } from "../api";
+import { IconDownload, IconFolder } from "./icons";
 
-type Origen = "google" | "carpeta" | "archivo";
+type Origen = "carpeta" | "archivo";
 
-// Tres formas de traer contactos nuevos: Google Contacts (por cuenta ya
-// autorizada), una carpeta elegida a mano (recorre subcarpetas, cualquier
-// formato con extractor disponible) o un único archivo puntual. Carpeta y
-// archivo abren un diálogo NATIVO de Windows (no un <input type="file">
-// del navegador) porque el backend corre en la misma máquina y necesita
-// la ruta real en disco, no los bytes subidos -- ver file_dialogs.py.
+// Dos formas de traer contactos nuevos de manera autónoma: una carpeta elegida a
+// mano (recorre subcarpetas, cualquier formato con extractor disponible) o un
+// único archivo puntual. Carpeta y archivo abren un diálogo NATIVO de Windows
+// porque el backend corre en la misma máquina y necesita la ruta real en disco.
 export default function ImportPanel() {
-  const [cuentasGoogle, setCuentasGoogle] = useState<string[]>([]);
   const [corriendo, setCorriendo] = useState<Origen | string | null>(null);
   const [mensaje, setMensaje] = useState<string | null>(null);
   const [esError, setEsError] = useState(false);
-
-  useEffect(() => {
-    obtenerCuentasGoogle()
-      .then((r) => setCuentasGoogle(r.cuentas))
-      .catch(() => setCuentasGoogle([]));
-  }, []);
 
   async function ejecutar(clave: string, accion: string) {
     setCorriendo(clave);
@@ -43,7 +34,7 @@ export default function ImportPanel() {
     <div className="mx-auto max-w-2xl space-y-6 overflow-y-auto p-1">
       <div>
         <h2 className="font-marca text-lg font-medium text-marca-azul">Importar contactos</h2>
-        <p className="mt-1 text-sm text-neutral-500">Tres formas de traer contactos nuevos a la base.</p>
+        <p className="mt-1 text-sm text-neutral-500">Escaneo autónomo de carpetas (todos los niveles) y archivos individuales.</p>
       </div>
 
       {mensaje && (
@@ -56,26 +47,6 @@ export default function ImportPanel() {
         >
           {mensaje}
         </p>
-      )}
-
-      {cuentasGoogle.length > 0 && (
-        <Bloque icono={<IconSync className="h-4 w-4" />} titulo="Google Contacts" descripcion="Trae los contactos nuevos o modificados de una cuenta ya autorizada — sin tocar nada más si el login ya se hizo antes.">
-          <div className="flex flex-wrap gap-2">
-            {cuentasGoogle.map((cuenta) => {
-              const clave = `google-${cuenta}`;
-              return (
-                <button
-                  key={cuenta}
-                  onClick={() => ejecutar(clave, `importar-google-${cuenta}`)}
-                  disabled={corriendo === clave}
-                  className="rounded-lg border border-neutral-200 px-3 py-2 text-sm font-medium text-neutral-700 transition hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {corriendo === clave ? "Importando..." : `Importar de ${capitalizar(cuenta)}`}
-                </button>
-              );
-            })}
-          </div>
-        </Bloque>
       )}
 
       <Bloque
@@ -132,8 +103,4 @@ function Bloque({
       {children}
     </div>
   );
-}
-
-function capitalizar(s: string): string {
-  return s.charAt(0).toUpperCase() + s.slice(1);
 }

@@ -7,23 +7,19 @@ import ContactsTable from "./components/ContactsTable";
 import {
   IconActivity,
   IconAlert,
-  IconChat,
   IconCheck,
   IconClock,
   IconDatabase,
   IconDownload,
   IconPlay,
-  IconSync,
   IconUsers,
 } from "./components/icons";
 import ImportPanel from "./components/ImportPanel";
 import ReviewQueue from "./components/ReviewQueue";
 import StatCard from "./components/StatCard";
-import SyncPanel from "./components/SyncPanel";
-import WhatsAppPanel from "./components/WhatsAppPanel";
 import type { Stats } from "./types";
 
-type Vista = "contactos" | "revisar" | "importar" | "whatsapp" | "anomalias" | "sync";
+type Vista = "contactos" | "revisar" | "importar" | "anomalias";
 
 export default function App() {
   const [vista, setVista] = useState<Vista>("contactos");
@@ -63,11 +59,18 @@ export default function App() {
 
         <nav className="flex flex-col gap-1 px-3">
           <NavItem
+            activo={vista === "importar"}
+            onClick={() => setVista("importar")}
+            icono={<IconDownload className="h-4 w-4" />}
+          >
+            1. Escanear e Importar
+          </NavItem>
+          <NavItem
             activo={vista === "contactos"}
             onClick={() => setVista("contactos")}
             icono={<IconUsers className="h-4 w-4" />}
           >
-            Contactos
+            2. Buscar y Exportar
           </NavItem>
           <NavItem
             activo={vista === "revisar"}
@@ -75,27 +78,14 @@ export default function App() {
             icono={<IconAlert className="h-4 w-4" />}
             contador={stats?.pendientes}
           >
-            Revisión pendiente
-          </NavItem>
-          <NavItem
-            activo={vista === "importar"}
-            onClick={() => setVista("importar")}
-            icono={<IconDownload className="h-4 w-4" />}
-          >
-            Importar
-          </NavItem>
-          <NavItem activo={vista === "whatsapp"} onClick={() => setVista("whatsapp")} icono={<IconChat className="h-4 w-4" />}>
-            WhatsApp
+            3. Revisar Dudosos
           </NavItem>
           <NavItem
             activo={vista === "anomalias"}
             onClick={() => setVista("anomalias")}
             icono={<IconActivity className="h-4 w-4" />}
           >
-            Anomalías
-          </NavItem>
-          <NavItem activo={vista === "sync"} onClick={() => setVista("sync")} icono={<IconSync className="h-4 w-4" />}>
-            Sync a Google
+            Mantenimiento y Calidad
           </NavItem>
         </nav>
 
@@ -145,9 +135,7 @@ export default function App() {
           {vista === "contactos" && <ContactsTable />}
           {vista === "revisar" && <ReviewQueue onCambio={recargarStats} />}
           {vista === "importar" && <ImportPanel />}
-          {vista === "whatsapp" && <WhatsAppPanel />}
           {vista === "anomalias" && <AnomaliasPanel />}
-          {vista === "sync" && <SyncPanel />}
         </div>
       </main>
     </div>

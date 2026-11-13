@@ -111,12 +111,17 @@ def test_dashboard_sin_boton_de_importar_si_no_hay_cuentas_configuradas(tmp_path
 
 
 def test_dashboard_muestra_boton_de_importar_por_cada_cuenta_configurada(tmp_path):
+    # Interfaz autónoma: los conectores de ecosistema externo (Google / MejoraWS)
+    # permanecen disponibles en el backend para integración futura, pero no se
+    # exponen en la interfaz visual principal.
     config = replace(_config_prueba(tmp_path), google=GoogleConfig(cuentas=("sindy",)))
     conn = conectar(config.rutas.base_sqlite)
 
     respuesta = crear_app(config, conn).test_client().get("/")
 
-    assert "Importar de Google (Sindy)".encode() in respuesta.data
+    assert respuesta.status_code == 200
+    assert "Importar de Google (Sindy)".encode() not in respuesta.data
+    assert "Abrir MejoraWS".encode() not in respuesta.data
 
 
 def test_accion_importar_carpeta_recorre_subcarpetas_y_cualquier_formato(tmp_path):
@@ -370,9 +375,14 @@ def test_dashboard_contiene_monitor_y_tarjeta_impacto(tmp_path):
     assert resp.status_code == 200
     html = resp.data.decode("utf-8")
     assert "id=\"progreso-modal\"" in html
-    assert "Impacto y Calidad Comercial" in html
+    assert "id=\"explorador-modal\"" in html
+    assert "1. Escanear Directorios y Archivos (Todos los niveles)" in html
+    assert "2. Buscar y Exportar Base Limpia" in html
+    assert "3. Mantenimiento y Respaldo de la Base" in html
+    assert "action=\"/buscar\"" in html
     assert "Escanear, Respaldar y Actualizar" in html
-    assert "color: #FFFFFF !important;" in html
+    assert "~140 Hs" not in html
+    assert "Abrir MejoraWS" not in html
 
 
 def test_revisar_contiene_atajos_teclado(tmp_path):

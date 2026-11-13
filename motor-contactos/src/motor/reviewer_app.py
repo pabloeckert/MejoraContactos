@@ -674,16 +674,16 @@ _PLANTILLA_DASHBOARD = _ESTILO + """
   <title>motor-contactos</title>
 </head>
 <body>
-  <!-- HEADER CON LOGO, NAVEGACIÓN Y TOGGLE DE TEMA -->
+  <!-- HEADER CON LOGO, NAVEGACIÓN AUTÓNOMA Y TOGGLE DE TEMA -->
   <header class="app-header">
     <div class="header-brand">
       <span class="brand-pill">⚡ motor-contactos</span>
-      <span class="status-dot-pulse" title="Servidor local activo"></span>
+      <span class="status-dot-pulse" title="Motor autónomo local activo"></span>
     </div>
     <nav>
-      <a href="/" class="active">Panel</a>
-      <a href="/revisar">Revisión pendiente ({{ stats.pendientes }})</a>
-      <a href="/buscar">Buscar / editar contacto</a>
+      <a href="/" class="active">Panel Principal</a>
+      <a href="/buscar">Buscar / Editar Contactos ({{ stats.contactos_finales_fmt }})</a>
+      <a href="/revisar">Revisión de Dudosos ({{ stats.pendientes }})</a>
     </nav>
     <div>
       <button class="btn-icon" id="btn-tema" title="Cambiar tema claro/oscuro" onclick="cambiarTema()">🌓</button>
@@ -693,84 +693,101 @@ _PLANTILLA_DASHBOARD = _ESTILO + """
   <h1>Panel de motor-contactos</h1>
   {% if mensaje %}<div class="mensaje{{ ' error' if es_error else '' }}">{{ mensaje }}</div>{% endif %}
 
-  <!-- COPILOTO CONTEXTUAL IA (Interfaces Nativas de IA y Asistente Contextual) -->
+  <!-- ESTADO OPERATIVO DE LA BASE (Sin ruido comercial ni dependencias externas) -->
   <div class="copiloto-banner">
     {% if stats.raw_records == 0 %}
       <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:14px;">
         <div>
-          <span class="copiloto-badge">✨ Copiloto IA · Base en Blanco Lista</span>
+          <span class="copiloto-badge">🟢 Estado · Base en Blanco Lista</span>
           <div class="copiloto-text">
-            La base de datos está limpia (<strong>0 contactos</strong>). Explorá y encolá tus carpetas o elegí un archivo suelto abajo para comenzar una prueba real desde cero.
-          </div>
-          <div class="copiloto-pills">
-            <span class="copiloto-pill">🟢 Listo para primera carga</span>
-            <span class="copiloto-pill">🛡️ Respaldo automático antes de cada corrida</span>
+            La base de datos está limpia (<strong>0 contactos</strong>). Explorá y encolá tus carpetas (se escanean todos los subniveles) o elegí un archivo suelto abajo para construir tu base ordenada.
           </div>
         </div>
-        <span class="badge badge-ok" style="font-size:0.9rem; padding:6px 14px;">✨ Base Vacía</span>
+        <span class="badge badge-ok" style="font-size:0.9rem; padding:6px 14px;">Base Vacía</span>
       </div>
     {% elif not stats.al_dia %}
-      <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:14px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:14px;">
         <div style="flex:1; min-width:280px;">
-          <span class="copiloto-badge">✨ Copiloto IA · Alerta de Sincronización</span>
+          <span class="copiloto-badge">🟡 Estado · Pendientes de Consolidar</span>
           <div class="copiloto-text">
-            Detecté <strong>{{ stats.pendientes_normalizar_fmt }} contactos nuevos</strong> en la base cruda que todavía no fueron normalizados ni volcados a tu <code>lista-maestra.xlsx</code>. Tu planilla actual no incluye estos nuevos registros.
-          </div>
-          <div class="copiloto-pills">
-            <span class="copiloto-pill">⚡ Acción recomendada: Unificar en 1 clic</span>
-            <span class="copiloto-pill">🛡️ Respaldo previo garantizado</span>
+            Hay <strong>{{ stats.pendientes_normalizar_fmt }} registros crudos</strong> sin normalizar o volcar a las planillas de salida.
           </div>
         </div>
         <form method="post" action="/accion/completar-pendientes" style="margin:0;">
           <button type="submit" class="btn-destacado-pulsante">
-            ⚡ COMPLETAR Y ACTUALIZAR LISTA MAESTRA (Procesar {{ stats.pendientes_normalizar_fmt }} nuevos)
+            ⚡ Procesar Pendientes y Actualizar Salidas ({{ stats.pendientes_normalizar_fmt }})
           </button>
         </form>
       </div>
     {% else %}
       <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:14px;">
         <div>
-          <span class="copiloto-badge">✨ Copiloto IA · Base Optimizada</span>
+          <span class="copiloto-badge">🟢 Estado · Base Limpia y Consolidada</span>
           <div class="copiloto-text">
-            Tu base de contactos está <strong>100% al día</strong>. Todos los <strong>{{ stats.raw_records_fmt }}</strong> registros están limpios, deduplicados y reflejados en tu <code>lista-maestra.xlsx</code> (<strong>{{ stats.contactos_finales_fmt }}</strong> contactos únicos consolidados con 0% riesgo de baneo en WhatsApp).
-          </div>
-          <div class="copiloto-pills">
-            <a href="/descargar/lista-maestra" class="copiloto-pill">📊 Descargar Excel Maestro</a>
-            <a href="/descargar/contactos-whatsapp" class="copiloto-pill">📱 Descargar CSV WhatsApp</a>
-            <a href="/buscar" class="copiloto-pill">🔍 Buscar / Editar</a>
+            Base al día: <strong>{{ stats.raw_records_fmt }}</strong> registros crudos procesados en <strong>{{ stats.contactos_finales_fmt }}</strong> contactos únicos ordenados.
           </div>
         </div>
-        <span class="badge badge-ok" style="font-size:0.9rem; padding:6px 14px;">🟢 100% Protegido</span>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <a href="/buscar" class="btn secundario" style="padding:6px 12px; font-size:0.84rem;">🔍 Buscar / Editar</a>
+          <a href="/descargar/lista-maestra" class="btn" style="padding:6px 12px; font-size:0.84rem;">📊 Descargar Excel</a>
+        </div>
       </div>
     {% endif %}
   </div>
 
-  <!-- GRILLA BENTO PRINCIPAL (Bento Grid + Zero UI + Micro-Interacciones) -->
+  <!-- GRILLA PRINCIPAL: 3 PILARES REALES (1. ESCANEAR, 2. BUSCAR Y DESCARGAR BASE, 3. MANTENIMIENTO) -->
   <div class="bento-grid">
 
-    <!-- BENTO HERO CARD (8 COLUMNAS): CENTRO DE CARGA INTELIGENTE & COLA DE CARPETAS -->
-    <div class="bento-col-8 glass-panel tilt-3d">
-      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:0.75rem;">
-        <h3 style="margin:0; color:var(--text-primary); font-size:1.15rem; font-weight:800;">
-          ⭐ Flujo Recomendado: ACTUALIZAR Y RESPALDAR (Caso 1 y Caso 2 juntos)
+    <!-- 4 INDICADORES REALES DE LA BASE DE DATOS -->
+    <div class="bento-col-3 stat-card">
+      <span class="stat-pill stat-pill-ok">Consolidados</span>
+      <div class="stat-label">💎 Contactos Únicos</div>
+      <div class="stat-val">{{ stats.contactos_finales_fmt }}</div>
+      <div class="stat-sub">En base limpia y ordenada</div>
+    </div>
+
+    <div class="bento-col-3 stat-card">
+      <span class="stat-pill stat-pill-ai">Multinivel</span>
+      <div class="stat-label">📥 Registros Crudos</div>
+      <div class="stat-val">{{ stats.raw_records_fmt }}</div>
+      <div class="stat-sub">Leídos de carpetas y archivos</div>
+    </div>
+
+    <div class="bento-col-3 stat-card">
+      <span class="stat-pill stat-pill-ok">E.164 + Email</span>
+      <div class="stat-label">🔗 Duplicados Unificados</div>
+      <div class="stat-val">{{ stats.duplicados_unificados_fmt }}</div>
+      <div class="stat-sub">Registros repetidos fusionados</div>
+    </div>
+
+    <div class="bento-col-3 stat-card">
+      <span class="stat-pill {{ 'stat-pill-ok' if stats.pendientes == 0 else 'stat-pill-ai' }}">Calidad</span>
+      <div class="stat-label">🔍 Revisión Pendiente</div>
+      <div class="stat-val">{{ stats.pendientes }}</div>
+      <div class="stat-sub"><a href="/revisar" style="color:var(--brand-accent); font-weight:700; text-decoration:none;">Revisar casos dudosos →</a></div>
+    </div>
+
+    <!-- PILAR 1 (8 COLUMNAS): ESCANEAR DIRECTORIOS Y ARCHIVOS EN TODOS LOS NIVELES -->
+    <div class="bento-col-8 glass-panel">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:0.65rem;">
+        <h3 style="margin:0; color:var(--text-primary); font-size:1.12rem; font-weight:800;">
+          1. Escanear Directorios y Archivos (Todos los niveles)
         </h3>
-        <span style="background:var(--brand-primary); color:#FFFFFF !important; font-size:0.75rem; padding:3px 10px; border-radius:12px; font-weight:bold;">
-          TODO EN 1 CLIC
-        </span>
+        <span class="badge badge-ok" style="font-size:0.75rem;">Recursivo · Autónomo</span>
       </div>
 
-      <p style="color:var(--text-secondary); font-size:0.88rem; margin:0 0 1rem 0; line-height:1.45;">
-        <strong>¿Qué hace?</strong> En cada proceso hace un <strong>backup de lo anterior</strong> guardándolo en <code>Data/Backups/ultimo_backup/</code> (que se pisa/actualiza con la versión previa) y en <code>Data/Backups/historico/</code> (con fecha y hora). Luego escanea el nuevo directorio, lo <strong>fusiona</strong> con la base existente deduplicando inteligentemente, y <strong>actualiza</strong> <code>lista-maestra.xlsx</code> y <code>contactos-whatsapp.csv</code> de inmediato.
+      <p style="color:var(--text-secondary); font-size:0.86rem; margin:0 0 0.9rem 0; line-height:1.45;">
+        Anexá una o varias carpetas a la cola: el motor recorre automáticamente <strong>todas las subcarpetas en todos los niveles</strong> (Excel, CSV, VCF, JSON, Word, PDF, TXT), normaliza teléfonos a formato internacional E.164, unifica duplicados y genera la base limpia con respaldo previo en <code>Data/Backups/</code>.
       </p>
 
-      <!-- ZERO UI DRAG & DROP ZONE -->
+      <!-- ZONA DRAG & DROP / EXPLORADOR -->
       <div id="drop-zone" class="drop-zone" onclick="explorarYEncolar()">
         <div class="drop-icon">📁</div>
-        <div class="drop-title">Arrastrá acá tus carpetas o archivos de contactos para encolar</div>
-        <div class="drop-subtitle">Soporta VCF, CSV, XLSX, JSON, TXT · O hacé clic acá para explorar y encolar</div>
+        <div class="drop-title">Hacé clic acá para explorar carpetas o arrastrá directorios/archivos</div>
+        <div class="drop-subtitle">Escaneo profundo multinivel · CSV, XLSX, XLS, VCF, JSON, DOCX, PDF, TXT</div>
       </div>
 
-      <!-- SECCIÓN: COLA DE CARPETAS (ANEXAR DE A UNA Y PROCESAR EN LOTE) -->
+      <!-- COLA DE CARPETAS -->
       <div style="background:var(--surface-elevated); border:1px solid var(--border-subtle); border-radius:10px; padding:1rem; margin-bottom:1rem;">
         <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
           <div style="display:flex; align-items:center; gap:8px;">
@@ -782,7 +799,7 @@ _PLANTILLA_DASHBOARD = _ESTILO + """
           </button>
         </div>
 
-        <!-- CONTROLES PARA AGREGAR A LA COLA -->
+        <!-- CONTROLES PARA AGREGAR A LA COLA O SUBIR ARCHIVO SUELTO -->
         <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:10px;">
           <button type="button" id="btn-explorar-encolar" onclick="abrirExploradorModal('carpeta')" style="background:#2563EB !important; border-color:#2563EB !important; color:#FFFFFF !important; font-size:0.86rem; padding:7px 14px;">
             📁 Explorar y Encolar Carpeta...
@@ -797,7 +814,7 @@ _PLANTILLA_DASHBOARD = _ESTILO + """
         </div>
 
         <div style="display:flex; gap:8px; margin-bottom:10px;">
-          <input type="text" id="input-ruta-cola" placeholder="O pegá la ruta: C:/Ruta/A/Tu/Carpeta" style="flex:1; min-width:240px; padding:7px 12px; font-size:0.86rem; border:1px solid var(--border-subtle); border-radius:6px; background:var(--surface-card); color:var(--text-primary);" onkeydown="if(event.key==='Enter'){event.preventDefault(); encolarDesdeInput();}">
+          <input type="text" id="input-ruta-cola" placeholder="O pegá la ruta de una carpeta: C:/Ruta/A/Tu/Carpeta" style="flex:1; min-width:240px; padding:7px 12px; font-size:0.86rem; border:1px solid var(--border-subtle); border-radius:6px; background:var(--surface-card); color:var(--text-primary);" onkeydown="if(event.key==='Enter'){event.preventDefault(); encolarDesdeInput();}">
           <button type="button" onclick="encolarDesdeInput()" class="btn secundario" style="font-size:0.86rem; padding:7px 14px; white-space:nowrap;">
             + Encolar
           </button>
@@ -806,12 +823,12 @@ _PLANTILLA_DASHBOARD = _ESTILO + """
         <!-- LISTA VISUAL DE CARPETAS ENCOLADAS -->
         <div id="lista-cola" style="background:var(--surface-card); border:1px solid var(--border-subtle); border-radius:8px; padding:8px 10px; min-height:48px; max-height:160px; overflow-y:auto;">
           <div id="cola-vacia-msg" style="color:var(--text-tertiary); font-size:0.82rem; font-style:italic; padding:6px 0;">
-            No hay carpetas encoladas todavía. Podés explorar, pegar rutas o arrastrar carpetas para anexar de a una.
+            No hay carpetas encoladas todavía. Agregá una o varias carpetas y luego presioná el botón de escaneo.
           </div>
         </div>
       </div>
 
-      <!-- FORMULARIO DE ACCIÓN / ESCANEO DE LA COLA -->
+      <!-- FORMULARIO PRINCIPAL DE ESCANEO -->
       <form id="form-cola-principal" method="post" action="/accion/actualizar-y-respaldar" style="margin:0;">
         <input type="hidden" name="cola_carpetas" id="input-cola-json" value="[]">
         <input type="hidden" name="ruta_carpeta" id="input-ruta-fallback" value="">
@@ -821,18 +838,32 @@ _PLANTILLA_DASHBOARD = _ESTILO + """
       </form>
     </div>
 
-    <!-- BENTO CARD LATERAL (4 COLUMNAS): SALIDAS, DESCARGAS & COPIAS -->
-    <div class="bento-col-4 glass-panel tilt-3d" style="display:flex; flex-direction:column; justify-content:space-between;">
+    <!-- PILAR 2 (4 COLUMNAS): BUSCAR Y DESCARGAR BASE DE CONTACTOS LIMPIA -->
+    <div class="bento-col-4 glass-panel" style="display:flex; flex-direction:column; justify-content:space-between; gap:1rem;">
       <div>
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
-          <h3 style="margin:0; font-size:1.05rem; font-weight:800; color:var(--text-primary);">⚡ Salidas & Descargas</h3>
-          <span style="font-size:0.75rem; color:var(--text-tertiary); font-weight:bold;">K.I.S.S.</span>
+        <h3 style="margin:0 0 0.75rem 0; font-size:1.05rem; font-weight:800; color:var(--text-primary);">
+          2. Buscar y Exportar Base Limpia
+        </h3>
+
+        <!-- BUSCADOR RÁPIDO INTEGRADO -->
+        <div style="background:var(--surface-card); border:1px solid var(--border-subtle); border-radius:8px; padding:0.85rem; margin-bottom:0.85rem;">
+          <strong style="display:block; font-size:0.88rem; color:var(--text-primary); margin-bottom:6px;">
+            🔍 Buscar o Editar Contactos
+          </strong>
+          <form method="get" action="/buscar" data-no-progress="1" style="display:flex; gap:6px; margin-bottom:6px;">
+            <input type="text" name="q" placeholder="Nombre, teléfono, email, empresa..." style="flex:1; min-width:0; padding:6px 10px; font-size:0.83rem; border:1px solid var(--border-subtle); border-radius:6px; background:var(--surface-elevated); color:var(--text-primary);">
+            <button type="submit" style="padding:6px 12px; font-size:0.82rem;">Buscar</button>
+          </form>
+          <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.78rem;">
+            <a href="/buscar" style="color:var(--brand-accent); font-weight:600; text-decoration:none;">Ver listado de contactos →</a>
+            <a href="/revisar" style="color:var(--text-secondary); text-decoration:none;">Dudosos ({{ stats.pendientes }})</a>
+          </div>
         </div>
 
-        <!-- EXCEL MAESTRO -->
-        <div style="background:var(--surface-card); border:1px solid var(--border-subtle); border-radius:8px; padding:0.8rem; margin-bottom:0.75rem;">
+        <!-- PLANILLA EXCEL MAESTRA -->
+        <div style="background:var(--surface-card); border:1px solid var(--border-subtle); border-radius:8px; padding:0.85rem; margin-bottom:0.75rem;">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-            <strong style="font-size:0.88rem; color:var(--text-primary);">📊 Excel Maestro</strong>
+            <strong style="font-size:0.88rem; color:var(--text-primary);">📊 Planilla Maestra Ordenada</strong>
             <span style="font-size:0.72rem; color:var(--success); font-weight:bold;">
               {% if xlsx_existe %}✓ {{ xlsx_tamano_mb }} MB{% else %}Sin generar{% endif %}
             </span>
@@ -841,294 +872,104 @@ _PLANTILLA_DASHBOARD = _ESTILO + """
             <code>lista-maestra.xlsx</code> {% if xlsx_fecha %}· {{ xlsx_fecha }}{% endif %}
           </div>
           {% if xlsx_existe %}
-            <a href="/descargar/lista-maestra" class="btn" style="width:100%; font-size:0.82rem; padding:6px 10px; background:#10B981 !important; border-color:#10B981 !important;">
+            <a href="/descargar/lista-maestra" class="btn" style="width:100%; font-size:0.82rem; padding:6px 10px; background:#059669 !important; border-color:#059669 !important;">
               ⬇️ Descargar Planilla Excel
             </a>
           {% else %}
-            <span style="font-size:0.78rem; color:var(--warning);">Pendiente de exportar</span>
+            <span style="font-size:0.78rem; color:var(--text-tertiary);">Se genera automáticamente al escanear</span>
           {% endif %}
         </div>
 
-        <!-- CSV WHATSAPP -->
-        <div style="background:var(--surface-card); border:1px solid var(--border-subtle); border-radius:8px; padding:0.8rem; margin-bottom:0.75rem;">
+        <!-- CSV TELÉFONOS MÓVILES E.164 -->
+        <div style="background:var(--surface-card); border:1px solid var(--border-subtle); border-radius:8px; padding:0.85rem;">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-            <strong style="font-size:0.88rem; color:var(--text-primary);">📱 Envíos WhatsApp</strong>
+            <strong style="font-size:0.88rem; color:var(--text-primary);">📱 CSV Móviles Depurados</strong>
             <span style="font-size:0.72rem; color:var(--brand-accent); font-weight:bold;">
               {% if wa_existe %}✓ {{ wa_tamano_kb }} KB{% else %}Sin generar{% endif %}
             </span>
           </div>
           <div style="font-size:0.75rem; color:var(--text-secondary); margin-bottom:8px;">
-            <code>contactos-whatsapp.csv</code> (listo para MejoraWS)
+            <code>contactos-whatsapp.csv</code> {% if wa_fecha %}· {{ wa_fecha }}{% endif %}
           </div>
-          <div style="display:flex; gap:6px;">
-            {% if wa_existe %}
-              <a href="/descargar/contactos-whatsapp" class="btn secundario" style="flex:1; font-size:0.78rem; padding:5px 8px;">
-                ⬇️ CSV
-              </a>
-            {% endif %}
-            <form method="post" action="/accion/abrir-mejoraws" style="flex:1; margin:0;">
-              <button type="submit" style="width:100%; font-size:0.78rem; padding:5px 8px;">
-                Abrir MejoraWS
-              </button>
-            </form>
-          </div>
+          {% if wa_existe %}
+            <a href="/descargar/contactos-whatsapp" class="btn secundario" style="width:100%; font-size:0.82rem; padding:6px 10px;">
+              ⬇️ Descargar CSV Móviles
+            </a>
+          {% else %}
+            <span style="font-size:0.78rem; color:var(--text-tertiary);">Se genera automáticamente al escanear</span>
+          {% endif %}
         </div>
       </div>
+    </div>
 
-      <!-- COPIAS DE SEGURIDAD -->
-      <div style="border-top:1px solid var(--border-subtle); padding-top:0.75rem;">
-        <div style="font-size:0.78rem; font-weight:700; color:var(--text-secondary); margin-bottom:6px;">
-          Copias de Seguridad (Backups)
+    <!-- PILAR 3 (12 COLUMNAS): MANTENIMIENTO Y RESPALDO DE LA BASE -->
+    <div class="bento-col-12 glass-panel">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:0.8rem;">
+        <div>
+          <h3 style="margin:0; font-size:1.05rem; font-weight:800; color:var(--text-primary);">
+            3. Mantenimiento y Respaldo de la Base
+          </h3>
+          <div style="font-size:0.82rem; color:var(--text-secondary); margin-top:2px;">
+            Herramientas reales para depurar casos dudosos, crear o restaurar copias de seguridad y reiniciar la base de datos.
+          </div>
         </div>
-        <div style="display:flex; gap:6px; flex-wrap:wrap;">
-          <form method="post" action="/accion/hacer-backup-manual" style="flex:1; margin:0;">
-            <button class="secundario" style="width:100%; font-size:0.75rem; padding:5px 6px;" type="submit">
-              💾 Copia ahora
-            </button>
-          </form>
-          <form method="post" action="/accion/restaurar-ultimo-backup" style="flex:1; margin:0;" onsubmit="return confirm('¿Restaurar los archivos de la copia inmediatamente anterior (ultimo_backup)?');">
-            <button class="secundario" style="width:100%; font-size:0.75rem; padding:5px 6px; color:#D97706 !important; border-color:#D97706 !important;" type="submit">
-              ⏪ Deshacer
-            </button>
-          </form>
-        </div>
-        <form method="post" action="/accion/resetear-base" style="margin:0; width:100%; margin-top:6px;" onsubmit="return confirm('⚠️ ATENCIÓN: ¿Seguro que querés vaciar la base de datos y comenzar completamente de cero? Se guardará una copia previa de seguridad en Data/Backups/ antes de vaciar.');">
-          <button class="secundario" style="width:100%; font-size:0.75rem; padding:5px 6px; color:#DC2626 !important; border-color:#DC2626 !important;" type="submit">
-            🗑️ Resetear Base (Dejar en blanco)
+        <span class="badge {{ 'badge-ok' if stats.al_dia else 'badge-warn' }}">
+          {{ '🟢 Base Consolidada' if stats.al_dia else ('⚪ Base en Blanco' if stats.raw_records == 0 else '🟡 ' ~ stats.pendientes_normalizar_fmt ~ ' pendientes') }}
+        </span>
+      </div>
+
+      <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
+        <a href="/revisar" class="btn secundario" style="font-size:0.84rem; padding:8px 14px;">
+          🔍 Revisar Duplicados Dudosos ({{ stats.pendientes }})
+        </a>
+
+        <a href="/buscar" class="btn secundario" style="font-size:0.84rem; padding:8px 14px;">
+          ✏️ Buscar y Editar Contactos ({{ stats.contactos_finales_fmt }})
+        </a>
+
+        <form method="post" action="/accion/hacer-backup-manual" style="margin:0;">
+          <button class="secundario" style="font-size:0.84rem; padding:8px 14px;" type="submit">
+            💾 Crear Backup Ahora
+          </button>
+        </form>
+
+        <form method="post" action="/accion/restaurar-ultimo-backup" style="margin:0;" onsubmit="return confirm('¿Restaurar los archivos de la copia inmediatamente anterior (ultimo_backup)?');">
+          <button class="secundario" style="font-size:0.84rem; padding:8px 14px; color:#D97706 !important; border-color:#D97706 !important;" type="submit">
+            ⏪ Restaurar Último Backup
+          </button>
+        </form>
+
+        <form method="post" action="/accion/deshacer-ultima-corrida" style="margin:0;" onsubmit="return confirm('¿Revertir la última corrida de deduplicación?');">
+          <button class="secundario" style="font-size:0.84rem; padding:8px 14px;" type="submit">
+            ↩️ Deshacer Última Fusión
+          </button>
+        </form>
+
+        <form method="post" action="/accion/resetear-base" style="margin:0; margin-left:auto;" onsubmit="return confirm('⚠️ ATENCIÓN: ¿Seguro que querés vaciar la base de datos y comenzar completamente de cero? Se guardará una copia previa de seguridad en Data/Backups/ antes de vaciar.');">
+          <button class="secundario" style="font-size:0.84rem; padding:8px 14px; color:#DC2626 !important; border-color:#DC2626 !important;" type="submit">
+            🗑️ Resetear Base a Cero
           </button>
         </form>
       </div>
-    </div>
 
-    <!-- BENTO STAT CARDS (4 TARJETAS DE 3 COLUMNAS CADA UNA) -->
-    <div class="bento-col-3 stat-card tilt-3d">
-      <span class="stat-pill stat-pill-ok">100% E.164</span>
-      <div class="stat-label">💎 Contactos Únicos</div>
-      <div class="stat-val">{{ stats.contactos_finales_fmt }}</div>
-      <div class="stat-sub">En lista-maestra.xlsx consolidada</div>
-    </div>
-
-    <div class="bento-col-3 stat-card tilt-3d">
-      <span class="stat-pill stat-pill-ok">0% Riesgo Ban</span>
-      <div class="stat-label">🛡️ Duplicados Unificados</div>
-      <div class="stat-val">{{ stats.duplicados_unificados_fmt }}</div>
-      <div class="stat-sub">Evita bloqueos de WhatsApp</div>
-    </div>
-
-    <div class="bento-col-3 stat-card tilt-3d">
-      <span class="stat-pill stat-pill-ai">Trazable</span>
-      <div class="stat-label">📥 Registros Crudos</div>
-      <div class="stat-val">{{ stats.raw_records_fmt }}</div>
-      <div class="stat-sub">De todas las fuentes combinadas</div>
-    </div>
-
-    <div class="bento-col-3 stat-card tilt-3d">
-      <span class="stat-pill stat-pill-ai">IA + Reglas</span>
-      <div class="stat-label">⏱️ Ahorro Operativo</div>
-      <div class="stat-val">~140 Hs</div>
-      <div class="stat-sub">Automatización humana directa</div>
-    </div>
-
-    <!-- TARJETA DE IMPACTO Y CALIDAD ("Aha! Moment") (12 COLUMNAS) -->
-    <div class="bento-col-12 impacto-card tilt-3d">
-      <div style="display:flex; align-items:center; gap:10px;">
-        <span style="font-size:1.4rem;">💎</span>
-        <div>
-          <strong style="color:var(--text-primary); font-size:1.05rem;">Impacto y Calidad Comercial de tu Base</strong>
-          <div style="font-size:0.83rem; color:var(--text-secondary);">Garantía de alta conversión para WhatsApp y ahorro operativo</div>
-        </div>
-      </div>
-      <div class="impacto-grid">
-        <div class="impacto-item">
-          <div class="impacto-num">🛡️ 0% Riesgo de Baneo</div>
-          <div class="impacto-desc">{{ stats.duplicados_unificados_fmt }} contactos duplicados eliminados para cuidar tus chips y evitar bloqueos en WhatsApp.</div>
-        </div>
-        <div class="impacto-item">
-          <div class="impacto-num">⏱️ ~140 Horas Ahorradas</div>
-          <div class="impacto-desc">Tiempo de trabajo humano manual que se automatizó de inmediato con reglas locales e inteligencia artificial.</div>
-        </div>
-        <div class="impacto-item">
-          <div class="impacto-num">📱 {{ stats.contactos_finales_fmt }} Listos</div>
-          <div class="impacto-desc">100% números limpios en formato internacional E.164 (+549...) reflejados en tu <code>lista-maestra.xlsx</code>.</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- PIPELINE STEPPER: SEGUIMIENTO VISUAL DE AVANCE (12 COLUMNAS) -->
-    <div class="bento-col-12 pipeline-card">
-      <div class="pipeline-header">
-        <div class="pipeline-title">
-          <h2>Avance del Proceso (Etapa por Etapa)</h2>
-          <p class="pipeline-sub">Seguimiento visual del estado de tus datos desde los archivos crudos hasta la planilla final.</p>
-        </div>
-        <div>
-          <span class="badge {{ 'badge-ok' if stats.al_dia else 'badge-warn' }}">
-            {{ '🟢 Base 100% Al día' if stats.al_dia else '🟡 ' ~ stats.pendientes_normalizar_fmt ~ ' pendientes' }}
-          </span>
-        </div>
-      </div>
-
-      <div class="stepper-grid">
-        <!-- PASO 1 -->
-        <div class="step-card step-done">
-          <div class="step-num">Paso 1</div>
-          <div class="step-name">📥 Extracción de Archivos</div>
-          <div class="step-value">{{ stats.raw_records_fmt }}</div>
-          <div class="step-label">registros crudos extraídos</div>
-          <div class="step-status status-ok">✓ Archivos leídos con éxito</div>
-        </div>
-
-        <!-- PASO 2 -->
-        <div class="step-card {{ 'step-done' if stats.pendientes_normalizar == 0 else 'step-pending' }}">
-          <div class="step-num">Paso 2</div>
-          <div class="step-name">⚙️ Normalización & Limpieza</div>
-          <div class="step-value">{{ stats.normalized_records_fmt }}</div>
-          <div class="step-label">teléfonos E.164 y nombres limpios</div>
-          <div class="step-progress-bar">
-            <div class="step-progress-fill" style="width: {{ stats.porcentaje_normalizado }}%;"></div>
-          </div>
-          <div class="step-status {{ 'status-ok' if stats.pendientes_normalizar == 0 else 'status-warn' }}">
-            {% if stats.pendientes_normalizar == 0 %}
-              ✓ 100% normalizado
-            {% else %}
-              ⚠️ Faltan {{ stats.pendientes_normalizar_fmt }} por normalizar
-            {% endif %}
-          </div>
-        </div>
-
-        <!-- PASO 3 -->
-        <div class="step-card {{ 'step-done' if stats.al_dia else 'step-pending' }}">
-          <div class="step-num">Paso 3</div>
-          <div class="step-name">🧠 Deduplicación con IA</div>
-          <div class="step-value">{{ stats.contactos_finales_fmt }}</div>
-          <div class="step-label">contactos únicos consolidados</div>
-          <div class="step-status {{ 'status-ok' if stats.al_dia else 'status-warn' }}">
-            {% if stats.al_dia %}
-              ✓ Duplicados unidos (¡{{ stats.duplicados_unificados_fmt }} unificados!)
-            {% else %}
-              ⚠️ Falta cruzar los {{ stats.pendientes_normalizar_fmt }} nuevos
-            {% endif %}
-          </div>
-        </div>
-
-        <!-- PASO 4 -->
-        <div class="step-card {{ 'step-done' if (stats.al_dia and xlsx_existe) else 'step-pending' }}">
-          <div class="step-num">Paso 4</div>
-          <div class="step-name">📊 Planilla Excel & WhatsApp</div>
-          <div class="step-value" style="font-size:1.35rem;">{{ 'Al día' if (stats.al_dia and xlsx_existe) else 'Desactualizada' }}</div>
-          <div class="step-label">
-            {% if xlsx_existe %}
-              Última exportación: {{ xlsx_fecha }}
-            {% else %}
-              Sin exportar todavía
-            {% endif %}
-          </div>
-          <div class="step-status {{ 'status-ok' if (stats.al_dia and xlsx_existe) else 'status-warn' }}">
-            {% if stats.al_dia and xlsx_existe %}
-              ✓ Planilla 100% al día
-            {% else %}
-              ⚠️ Pendiente de regenerar con los nuevos
-            {% endif %}
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- SECCIÓN AVANZADA COLAPSABLE (12 COLUMNAS) -->
-    <div class="bento-col-12">
-      <details style="background:var(--surface-glass); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 1.1rem 1.4rem; box-shadow:var(--shadow-bento);">
-        <summary style="font-weight: 700; color: var(--text-secondary); cursor: pointer; font-size: 0.95rem; user-select:none;">
-          ⚙️ Herramientas avanzadas, pasos individuales y bases archivadas (clic para ver)
-        </summary>
-
-        <div style="margin-top: 1.2rem;">
-          <!-- CASO 1 Y CASO 2 POR SEPARADO -->
-          <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:1rem; margin-bottom:1.2rem;">
-            <div class="card-modo" style="border-left: 4px solid #3B82F6; background: rgba(59, 130, 246, 0.05); margin:0;">
-              <strong style="color: #1D4ED8; font-size: 0.92rem;">🔵 Caso 1 por separado: Solo agregar a la base</strong>
-              <p style="color: var(--text-secondary); font-size: 0.82rem; margin: 0.3rem 0 0.7rem;">
-                Extrae los contactos a la base de datos cruda sin regenerar el Excel aún.
-              </p>
-              <form method="post" action="/accion/importar-carpeta" style="display:inline">
-                <button class="secundario" style="padding: 6px 12px; font-size: 0.82rem;" type="submit">📁 Elegir carpeta y solo agregar</button>
+      {% if bases_archivadas %}
+        <details style="margin-top:0.9rem; padding-top:0.75rem; border-top:1px solid var(--border-subtle);">
+          <summary style="cursor:pointer; font-size:0.84rem; font-weight:700; color:var(--text-secondary);">
+            📦 Bases históricas archivadas en Data/Backups/historico/ ({{ bases_archivadas|length }})
+          </summary>
+          <ul style="margin:0.6rem 0 0; padding-left:1.2rem; color:var(--text-secondary); font-size:0.83rem;">
+            {% for b in bases_archivadas %}
+            <li style="margin-bottom:6px;">
+              <strong>{{ b.etiqueta }}</strong> ({{ b.fecha }}) —
+              <form method="post" action="/accion/restaurar-base" style="display:inline" onsubmit="return confirm('¿Restaurar esta base archivada como la activa? Se hará backup previo de la actual.');">
+                <input type="hidden" name="nombre_carpeta" value="{{ b.nombre }}">
+                <button class="secundario" style="padding:3px 8px; font-size:0.75rem;" type="submit">Restaurar esta base</button>
               </form>
-            </div>
-
-            <div class="card-modo" style="border-left: 4px solid #059669; background: rgba(5, 150, 105, 0.05); margin:0;">
-              <strong style="color: #059669; font-size: 0.92rem;">🟢 Caso 2 por separado: Nueva Base Independiente</strong>
-              <p style="color: var(--text-secondary); font-size: 0.82rem; margin: 0.3rem 0 0.7rem;">
-                Archiva la base actual e inicia un lote limpio e independiente para este directorio.
-              </p>
-              <form method="post" action="/accion/nueva-base-independiente" style="display:inline">
-                <button style="background: #059669; border-color: #059669; padding: 6px 12px; font-size: 0.82rem;" type="submit">🆕 Elegir carpeta como Nueva Base...</button>
-              </form>
-            </div>
-          </div>
-
-          <!-- PASOS INDIVIDUALES -->
-          <h4 style="margin: 0.8rem 0 0.4rem; color: var(--text-primary); font-size:0.92rem;">Pasos individuales manuales:</h4>
-          <div class="acciones" style="margin-bottom:1rem;">
-            <form method="post" action="/accion/extraer"><button class="secundario" type="submit">1. Extraer</button></form>
-            <form method="post" action="/accion/normalizar"><button class="secundario" type="submit">2. Normalizar</button></form>
-            <form method="post" action="/accion/deduplicar"><button class="secundario" type="submit">3. Deduplicar</button></form>
-            <form method="post" action="/accion/exportar"><button class="secundario" type="submit">4. Exportar a Excel</button></form>
-            <form method="post" action="/accion/exportar-whatsapp"><button class="secundario" type="submit">Exportar CSV WhatsApp</button></form>
-            <form method="post" action="/accion/deshacer-ultima-corrida" onsubmit="return confirm('¿Revertir TODA la última corrida de deduplicación?');">
-              <button class="secundario" style="color:#DC2626 !important;" type="submit">Deshacer última corrida completa</button>
-            </form>
-          </div>
-
-          <!-- GOOGLE CONTACTS -->
-          {% if cuentas_google %}
-            <h4 style="margin: 0.8rem 0 0.4rem; color: var(--text-primary); font-size:0.92rem;">Google Contacts:</h4>
-            <div class="acciones" style="margin-bottom:0.5rem;">
-              {% for cuenta in cuentas_google %}
-              <form method="post" action="/accion/importar-google-{{ cuenta }}">
-                <button class="secundario" type="submit">Importar de Google ({{ cuenta|capitalize }})</button>
-              </form>
-              {% endfor %}
-            </div>
-            <p style="color:var(--text-tertiary); font-size:0.82rem; margin-top:0;">Requiere configurar <code>credentials.json</code> en Google Cloud Console.</p>
-          {% endif %}
-
-          <!-- BASES ARCHIVADAS -->
-          {% if bases_archivadas %}
-            <h4 style="margin: 0.8rem 0 0.4rem; color: var(--text-primary); font-size:0.92rem;">Bases archivadas disponibles:</h4>
-            <ul style="padding-left:1.2rem; color:var(--text-secondary);">
-              {% for b in bases_archivadas %}
-              <li style="margin-bottom: 6px;">
-                <strong>{{ b.etiqueta }}</strong> ({{ b.fecha }}) —
-                <form method="post" action="/accion/restaurar-base" style="display:inline" onsubmit="return confirm('¿Restaurar esta base archivada como la activa? Se hará backup de la actual.');">
-                  <input type="hidden" name="nombre_carpeta" value="{{ b.nombre }}">
-                  <button class="secundario" style="padding: 3px 8px; font-size: 0.75rem;" type="submit">Restaurar esta base</button>
-                </form>
-              </li>
-              {% endfor %}
-            </ul>
-          {% endif %}
-
-          <!-- FASE 4 — GOOGLE APPS SCRIPT SYNC -->
-          <div style="border-top:1px solid var(--border-subtle); padding-top:0.8rem; margin-top:0.8rem;">
-            <h4 style="margin: 0 0 0.4rem; color: var(--text-primary); font-size:0.92rem;">Fase 4 — Sync a Google Contacts</h4>
-            <ol style="font-size:0.85rem; color:var(--text-secondary); line-height:1.5; padding-left:1.2rem;">
-              <li>Abrí <a href="https://sheets.google.com/create" target="_blank" rel="noopener">un Google Sheet nuevo</a> y subí <code>lista-maestra.xlsx</code> (Archivo → Importar).</li>
-              <li>En cada cuenta: Extensiones → Apps Script → pegar código de <code>google-apps-script/Sync.gs</code> → correr <code>sincronizarContactos</code>.</li>
-            </ol>
-          </div>
-          <!-- RESETEAR BASE A CERO -->
-          <div class="card-modo" style="border-left: 4px solid #DC2626; background: rgba(220, 38, 38, 0.05); margin-top:1.2rem;">
-            <strong style="color: #DC2626; font-size: 0.92rem;">🗑️ Resetear Base de Datos y Salidas a Cero</strong>
-            <p style="color: var(--text-secondary); font-size: 0.82rem; margin: 0.3rem 0 0.7rem;">
-              Vacía todas las tablas de contactos, elimina las planillas exportadas y deja el sistema completamente limpio para pruebas desde cero. Guarda un respaldo previo automático para resguardar tus datos.
-            </p>
-            <form method="post" action="/accion/resetear-base" onsubmit="return confirm('⚠️ ATENCIÓN: ¿Seguro que querés vaciar la base de datos y comenzar completamente de cero? Se guardará una copia previa de seguridad en Data/Backups/ antes de vaciar.');">
-              <button style="background: #DC2626 !important; border-color: #DC2626 !important; font-size: 0.82rem; padding: 6px 12px; color:#FFFFFF !important;" type="submit">
-                🗑️ Resetear y Dejar en Blanco
-              </button>
-            </form>
-          </div>
-        </div>
-      </details>
+            </li>
+            {% endfor %}
+          </ul>
+        </details>
+      {% endif %}
     </div>
 
   </div> <!-- FIN BENTO GRID -->
@@ -1735,39 +1576,79 @@ _PLANTILLA_DASHBOARD = _ESTILO + """
 </html>
 """
 
+_HEADER_COMUN_TEMA = """
+<header class="app-header">
+  <div class="header-brand">
+    <span class="brand-pill">⚡ motor-contactos</span>
+    <span class="status-dot-pulse" title="Motor autónomo local activo"></span>
+  </div>
+  <nav>
+    <a href="/">Panel Principal</a>
+    <a href="/buscar">Buscar / Editar Contactos</a>
+    <a href="/revisar">Revisión de Dudosos</a>
+  </nav>
+  <div>
+    <button class="btn-icon" id="btn-tema" title="Cambiar tema claro/oscuro" onclick="cambiarTema()">🌓</button>
+  </div>
+</header>
+<script>
+  function aplicarTema(tema) {
+    document.documentElement.setAttribute('data-theme', tema);
+    localStorage.setItem('mc-theme', tema);
+    const btn = document.getElementById('btn-tema');
+    if (btn) btn.innerText = tema === 'dark' ? '☀️' : '🌓';
+  }
+  function cambiarTema() {
+    const actual = document.documentElement.getAttribute('data-theme') || 'light';
+    aplicarTema(actual === 'dark' ? 'light' : 'dark');
+  }
+  (function() {
+    const guardado = localStorage.getItem('mc-theme');
+    if (guardado) aplicarTema(guardado);
+    else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) aplicarTema('dark');
+  })();
+</script>
+"""
+
 _PLANTILLA_REVISOR = _ESTILO + """
 <!doctype html>
-<title>Revisor de contactos dudosos</title>
-<nav><a href="/">Panel</a><a href="/revisar">Revisión pendiente</a><a href="/buscar">Buscar / editar contacto</a></nav>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Revisor de contactos dudosos</title>
+</head>
+<body>
+""" + _HEADER_COMUN_TEMA + """
 <h1>Casos pendientes de revisión ({{ total }})</h1>
 
-<div style="background:#EFF6FF; border:1px solid #BFDBFE; border-radius:8px; padding:0.75rem 1rem; margin-bottom:1.2rem; font-size:0.88rem; color:#1E40AF; display:flex; align-items:center; gap:8px;">
+<div style="background:var(--surface-elevated); border:1px solid var(--border-subtle); border-radius:8px; padding:0.75rem 1rem; margin-bottom:1.2rem; font-size:0.88rem; color:var(--text-primary); display:flex; align-items:center; gap:8px;">
   <span>⌨️</span>
-  <span><strong>Atajos de teclado rápidos:</strong> Presioná <kbd style="background:#FFF; padding:2px 7px; border-radius:4px; border:1px solid #93C5FD; font-weight:bold; box-shadow:0 1px 2px rgba(0,0,0,0.05);">U</kbd> para <strong>Aprobar (Unir)</strong> el primer lote | <kbd style="background:#FFF; padding:2px 7px; border-radius:4px; border:1px solid #93C5FD; font-weight:bold; box-shadow:0 1px 2px rgba(0,0,0,0.05);">S</kbd> para <strong>Rechazar (Separar)</strong></span>
+  <span><strong>Atajos de teclado rápidos:</strong> Presioná <kbd style="background:var(--surface-card); padding:2px 7px; border-radius:4px; border:1px solid var(--border-subtle); font-weight:bold;">U</kbd> para <strong>Aprobar (Unir)</strong> el primer lote | <kbd style="background:var(--surface-card); padding:2px 7px; border-radius:4px; border:1px solid var(--border-subtle); font-weight:bold;">S</kbd> para <strong>Rechazar (Separar)</strong></span>
 </div>
 
 {% for grupo in grupos %}
-  <fieldset style="border:1px solid #CBD5E1; border-radius:8px; padding:1.1rem; margin-bottom:1.2rem; background:#FFFFFF;">
-    <legend style="font-weight:700; color:#0F2A66; padding:0 6px;">{{ grupo.patron }} ({{ grupo.pares|length }} casos)</legend>
+  <fieldset style="border:1px solid var(--border-subtle); border-radius:8px; padding:1.1rem; margin-bottom:1.2rem; background:var(--surface-card);">
+    <legend style="font-weight:700; color:var(--text-primary); padding:0 6px;">{{ grupo.patron }} ({{ grupo.pares|length }} casos)</legend>
     <div style="margin-bottom:0.8rem; display:flex; gap:8px;">
       <button data-action="unir" data-patron="{{ grupo.patron }}" onclick="decidir('{{ grupo.patron }}', true)" style="background:#059669 !important; border-color:#059669 !important; padding:6px 14px; font-size:0.85rem;">✓ Aprobar fusión de todo el lote (U)</button>
       <button data-action="separar" data-patron="{{ grupo.patron }}" class="secundario" onclick="decidir('{{ grupo.patron }}', false)" style="padding:6px 14px; font-size:0.85rem;">✕ Rechazar fusión de todo el lote (S)</button>
     </div>
     <ul style="list-style:none; padding:0;">
     {% for par in grupo.pares %}
-      <li style="border:1px solid #E2E8F0; border-radius:6px; padding:0.7rem 0.9rem; margin-bottom:0.5rem; display:flex; gap:1.5rem; align-items:center; background:#F8FAFC;">
-        <span style="color:#475569; font-weight:700; font-size:0.85rem; min-width:3.5rem; background:#E2E8F0; padding:2px 6px; border-radius:4px; text-align:center;">{{ '%.2f'|format(par.score) }}</span>
+      <li style="border:1px solid var(--border-subtle); border-radius:6px; padding:0.7rem 0.9rem; margin-bottom:0.5rem; display:flex; gap:1.5rem; align-items:center; background:var(--surface-elevated);">
+        <span style="color:var(--text-secondary); font-weight:700; font-size:0.85rem; min-width:3.5rem; background:var(--surface-card); padding:2px 6px; border-radius:4px; text-align:center;">{{ '%.2f'|format(par.score) }}</span>
         {% for c in (par.contacto_a, par.contacto_b) %}
           {% if c %}
             <span style="flex:1;">
-              <strong style="color:#0F2A66;">{{ c.nombre }}</strong>{% if c.organizacion %} — <span style="color:#475569;">{{ c.organizacion }}</span>{% endif %}<br>
-              <span style="color:#64748B; font-size:0.82rem;">
+              <strong style="color:var(--text-primary);">{{ c.nombre }}</strong>{% if c.organizacion %} — <span style="color:var(--text-secondary);">{{ c.organizacion }}</span>{% endif %}<br>
+              <span style="color:var(--text-tertiary); font-size:0.82rem;">
                 <strong>{{ c.telefono }}</strong>{% if c.email %} · {{ c.email }}{% endif %} · <em>{{ c.fuente }}</em>
                 {% if c.foto_url %} · <a href="{{ c.foto_url }}" target="_blank" rel="noopener">foto</a>{% endif %}
               </span>
             </span>
           {% else %}
-            <span style="flex:1; color:#94A3B8;">(registro no encontrado)</span>
+            <span style="flex:1; color:var(--text-tertiary);">(registro no encontrado)</span>
           {% endif %}
         {% endfor %}
       </li>
@@ -1775,7 +1656,7 @@ _PLANTILLA_REVISOR = _ESTILO + """
     </ul>
   </fieldset>
 {% else %}
-  <p style="color:#166534; font-weight:600; font-size:1.05rem;">🎉 No hay casos pendientes de revisión. ¡Todos los contactos están clasificados!</p>
+  <p style="color:var(--success); font-weight:600; font-size:1.05rem;">🎉 No hay casos pendientes de revisión. ¡Todos los contactos están clasificados!</p>
 {% endfor %}
 <script>
 function decidir(patron, aceptar) {
@@ -1797,65 +1678,109 @@ document.addEventListener('keydown', function(e) {
   }
 });
 </script>
+</body>
+</html>
 """
 
 
 _PLANTILLA_BUSCAR = _ESTILO + """
 <!doctype html>
-<title>Buscar / editar contacto</title>
-<nav><a href="/">Panel</a><a href="/revisar">Revisión pendiente</a><a href="/buscar">Buscar / editar contacto</a></nav>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Buscar / editar contacto</title>
+</head>
+<body>
+""" + _HEADER_COMUN_TEMA + """
 <h1>Buscar contacto</h1>
-<form method="get" action="/buscar" style="margin-bottom:1.5rem;">
-  <input name="q" value="{{ consulta }}" placeholder="Nombre, apellido, teléfono o email..." style="width:60%; padding:0.5rem; border:1px solid #E4E6EA; border-radius:5px;">
-  <button type="submit">Buscar</button>
+<form method="get" action="/buscar" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:1.2rem;">
+  <input name="q" value="{{ consulta }}" placeholder="Nombre, apellido, teléfono, email o empresa..." style="flex:1; min-width:260px; padding:0.65rem 0.9rem; border:1px solid var(--border-subtle); border-radius:8px; background:var(--surface-card); color:var(--text-primary); font-size:0.92rem;">
+  <button type="submit">🔍 Buscar</button>
+  {% if consulta %}
+    <a href="/buscar" class="btn secundario">Limpiar filtro</a>
+  {% endif %}
 </form>
-{% if consulta and not resultados %}<p>Sin resultados para "{{ consulta }}".</p>{% endif %}
-<ul style="list-style:none; padding:0;">
-{% for c in resultados %}
-  <li style="border:1px solid #E4E6EA; border-radius:6px; padding:0.7rem 1rem; margin-bottom:0.5rem;">
-    <a href="/editar/{{ c.cluster_id }}" style="font-weight:600; text-decoration:none; color:#1A3D84;">
-      {{ c.nombre }} {{ c.apellido }}{% if c.organizacion %} — {{ c.organizacion }}{% endif %}
-    </a>
-    <div style="font-size:0.85rem; color:#6B7280;">
-      {% if c.whatsapp %}{{ c.whatsapp|join(', ') }}{% endif %}
-      {% if c.emails %} · {{ c.emails|join(', ') }}{% endif %}
-    </div>
-  </li>
-{% endfor %}
-</ul>
+
+{% if consulta and not resultados %}
+  <p style="color:var(--text-secondary);">Sin resultados para "{{ consulta }}".</p>
+{% elif not consulta and not resultados %}
+  <p style="color:var(--text-secondary);">La base está vacía todavía. Escaneá una carpeta o archivo desde el <a href="/">Panel Principal</a>.</p>
+{% else %}
+  <div style="font-size:0.83rem; color:var(--text-tertiary); margin-bottom:0.75rem;">
+    {% if consulta %}
+      Mostrando {{ resultados|length }} resultado(s) para <strong>"{{ consulta }}"</strong>:
+    {% else %}
+      Mostrando {{ resultados|length }} contacto(s) de la base limpia ordenada (escribí arriba para filtrar):
+    {% endif %}
+  </div>
+  <ul style="list-style:none; padding:0;">
+  {% for c in resultados %}
+    <li style="border:1px solid var(--border-subtle); background:var(--surface-card); border-radius:8px; padding:0.85rem 1.1rem; margin-bottom:0.55rem; display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
+      <div>
+        <a href="/editar/{{ c.cluster_id }}" style="font-weight:700; font-size:0.96rem; text-decoration:none; color:var(--brand-primary);">
+          {{ c.nombre }} {{ c.apellido }}{% if not c.nombre and not c.apellido %}(Sin nombre){% endif %}
+        </a>
+        {% if c.organizacion or c.cargo %}
+          <span style="color:var(--text-secondary); font-size:0.86rem;"> — {{ c.cargo }}{% if c.cargo and c.organizacion %} en {% endif %}{{ c.organizacion }}</span>
+        {% endif %}
+        {% if c.tag %}
+          <span class="badge" style="font-size:0.72rem; margin-left:6px;">{{ c.tag }}</span>
+        {% endif %}
+        <div style="font-size:0.84rem; color:var(--text-secondary); margin-top:3px;">
+          {% if c.whatsapp %}📱 {{ c.whatsapp|join(', ') }}{% endif %}
+          {% if c.telefono_fijo %}{% if c.whatsapp %} · {% endif %}☎️ {{ c.telefono_fijo|join(', ') }}{% endif %}
+          {% if c.emails %}{% if c.whatsapp or c.telefono_fijo %} · {% endif %}✉️ {{ c.emails|join(', ') }}{% endif %}
+        </div>
+      </div>
+      <a href="/editar/{{ c.cluster_id }}" class="btn secundario" style="padding:5px 12px; font-size:0.8rem;">✏️ Editar</a>
+    </li>
+  {% endfor %}
+  </ul>
+{% endif %}
+</body>
+</html>
 """
 
 _PLANTILLA_EDITAR = _ESTILO + """
 <!doctype html>
-<title>Editar contacto</title>
-<nav><a href="/">Panel</a><a href="/revisar">Revisión pendiente</a><a href="/buscar">Buscar / editar contacto</a></nav>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Editar contacto</title>
+</head>
+<body>
+""" + _HEADER_COMUN_TEMA + """
 <h1>Editar contacto</h1>
-<p style="color:#6B7280; font-size:0.85rem;">Estos cambios se guardan aparte y pisan lo que calculó la limpieza automática solo para este contacto — no tocan los archivos originales. Dejar un campo vacío borra la corrección manual y vuelve a mostrar el valor calculado.</p>
-<form method="post" action="/editar/{{ cluster_id }}">
-  <p><label>Nombre<br><input name="nombre" value="{{ c.nombre }}" style="width:100%; padding:0.4rem;"></label></p>
-  <p><label>Apellido<br><input name="apellido" value="{{ c.apellido }}" style="width:100%; padding:0.4rem;"></label></p>
-  <p><label>Cargo<br><input name="cargo" value="{{ c.cargo }}" style="width:100%; padding:0.4rem;"></label></p>
-  <p><label>Empresa<br><input name="organizacion" value="{{ c.organizacion }}" style="width:100%; padding:0.4rem;"></label></p>
-  <p><label>Tag<br>
-    <select name="tag" style="padding:0.4rem;">
+<p style="color:var(--text-secondary); font-size:0.86rem;">Estos cambios se guardan en una capa de edición manual y tienen prioridad sobre el cálculo automático sin alterar los archivos originales. Dejar un campo vacío restaura el valor calculado.</p>
+<form method="post" action="/editar/{{ cluster_id }}" class="glass-panel" style="max-width:680px;">
+  <p><label><strong>Nombre</strong><br><input name="nombre" value="{{ c.nombre }}" style="width:100%; padding:0.45rem; border:1px solid var(--border-subtle); border-radius:6px; background:var(--surface-card); color:var(--text-primary);"></label></p>
+  <p><label><strong>Apellido</strong><br><input name="apellido" value="{{ c.apellido }}" style="width:100%; padding:0.45rem; border:1px solid var(--border-subtle); border-radius:6px; background:var(--surface-card); color:var(--text-primary);"></label></p>
+  <p><label><strong>Cargo</strong><br><input name="cargo" value="{{ c.cargo }}" style="width:100%; padding:0.45rem; border:1px solid var(--border-subtle); border-radius:6px; background:var(--surface-card); color:var(--text-primary);"></label></p>
+  <p><label><strong>Empresa</strong><br><input name="organizacion" value="{{ c.organizacion }}" style="width:100%; padding:0.45rem; border:1px solid var(--border-subtle); border-radius:6px; background:var(--surface-card); color:var(--text-primary);"></label></p>
+  <p><label><strong>Tag</strong><br>
+    <select name="tag" style="padding:0.45rem; border:1px solid var(--border-subtle); border-radius:6px; background:var(--surface-card); color:var(--text-primary);">
       <option value="">(sin definir)</option>
       {% for opcion in tags_validos %}
         <option value="{{ opcion }}" {{ 'selected' if c.tag == opcion else '' }}>{{ opcion }}</option>
       {% endfor %}
     </select>
   </label></p>
-  <p><label>Domicilio<br><input name="domicilio" value="{{ c.domicilio }}" style="width:100%; padding:0.4rem;"></label></p>
-  <p><label>Ciudad<br><input name="ciudad" value="{{ c.ciudad }}" style="width:100%; padding:0.4rem;"></label></p>
-  <p><label>Provincia<br><input name="provincia" value="{{ c.provincia }}" style="width:100%; padding:0.4rem;"></label></p>
-  <p><label>País<br><input name="pais" value="{{ c.pais }}" style="width:100%; padding:0.4rem;"></label></p>
-  <p><label>Nota de referencia<br><textarea name="notas" style="width:100%; padding:0.4rem;">{{ c.nota_referencia }}</textarea></label></p>
-  <p><label>WhatsApp (uno por línea)<br><textarea name="whatsapp" rows="3" style="width:100%; padding:0.4rem;">{{ c.whatsapp|join('\n') }}</textarea></label></p>
-  <p><label>Teléfono fijo (uno por línea)<br><textarea name="telefono_fijo" rows="2" style="width:100%; padding:0.4rem;">{{ c.telefono_fijo|join('\n') }}</textarea></label></p>
-  <p><label>Email (uno por línea)<br><textarea name="email" rows="2" style="width:100%; padding:0.4rem;">{{ c.emails|join('\n') }}</textarea></label></p>
-  <p style="color:#6B7280; font-size:0.85rem;">Cada línea se normaliza igual que en la limpieza automática (formato E.164 para teléfonos). Una línea que no da un valor válido se descarta sin borrar lo que ya estaba guardado. Dejar el campo entero vacío borra la corrección manual y vuelve a mostrar el valor calculado.</p>
-  <button type="submit">Guardar</button>
+  <p><label><strong>Domicilio</strong><br><input name="domicilio" value="{{ c.domicilio }}" style="width:100%; padding:0.45rem; border:1px solid var(--border-subtle); border-radius:6px; background:var(--surface-card); color:var(--text-primary);"></label></p>
+  <p><label><strong>Ciudad</strong><br><input name="ciudad" value="{{ c.ciudad }}" style="width:100%; padding:0.45rem; border:1px solid var(--border-subtle); border-radius:6px; background:var(--surface-card); color:var(--text-primary);"></label></p>
+  <p><label><strong>Provincia</strong><br><input name="provincia" value="{{ c.provincia }}" style="width:100%; padding:0.45rem; border:1px solid var(--border-subtle); border-radius:6px; background:var(--surface-card); color:var(--text-primary);"></label></p>
+  <p><label><strong>País</strong><br><input name="pais" value="{{ c.pais }}" style="width:100%; padding:0.45rem; border:1px solid var(--border-subtle); border-radius:6px; background:var(--surface-card); color:var(--text-primary);"></label></p>
+  <p><label><strong>Nota de referencia</strong><br><textarea name="notas" style="width:100%; padding:0.45rem; border:1px solid var(--border-subtle); border-radius:6px; background:var(--surface-card); color:var(--text-primary);">{{ c.nota_referencia }}</textarea></label></p>
+  <p><label><strong>WhatsApp (uno por línea)</strong><br><textarea name="whatsapp" rows="3" style="width:100%; padding:0.45rem; border:1px solid var(--border-subtle); border-radius:6px; background:var(--surface-card); color:var(--text-primary);">{{ c.whatsapp|join('\n') }}</textarea></label></p>
+  <p><label><strong>Teléfono fijo (uno por línea)</strong><br><textarea name="telefono_fijo" rows="2" style="width:100%; padding:0.45rem; border:1px solid var(--border-subtle); border-radius:6px; background:var(--surface-card); color:var(--text-primary);">{{ c.telefono_fijo|join('\n') }}</textarea></label></p>
+  <p><label><strong>Email (uno por línea)</strong><br><textarea name="email" rows="2" style="width:100%; padding:0.45rem; border:1px solid var(--border-subtle); border-radius:6px; background:var(--surface-card); color:var(--text-primary);">{{ c.emails|join('\n') }}</textarea></label></p>
+  <p style="color:var(--text-tertiary); font-size:0.83rem;">Cada línea se normaliza a formato internacional E.164. Dejar el campo vacío restaura el valor calculado automáticamente.</p>
+  <button type="submit">💾 Guardar cambios</button>
   <a href="/buscar" class="btn secundario" style="margin-left:0.5rem;">Cancelar</a>
 </form>
+</body>
+</html>
 """
 
 
@@ -2094,7 +2019,15 @@ def crear_app(config: Config, conn: sqlite3.Connection) -> Flask:
     def buscar():
         c = get_conn()
         consulta = request.args.get("q", "").strip()
-        resultados = buscar_contactos(c, consulta) if consulta else []
+        if consulta:
+            resultados = buscar_contactos(c, consulta)
+        else:
+            from motor.export import _aplicar_ediciones_manuales, _materializar_clusters
+
+            clusters = _materializar_clusters(c)
+            _aplicar_ediciones_manuales(c, clusters)
+            clusters.sort(key=lambda item: (item["apellido"].lower(), item["nombre"].lower()))
+            resultados = clusters[:50]
         return render_template_string(_PLANTILLA_BUSCAR, consulta=consulta, resultados=resultados)
 
     @app.get("/editar/<cluster_id>")
@@ -2523,7 +2456,7 @@ def _ejecutar_accion(config: Config, conn: sqlite3.Connection, nombre: str) -> s
 
             archivos_resp = ", ".join(res_b.get("archivos_respaldados", [])) or "sin archivos previos"
             resultado_msg = (
-                f"✓ Proceso completado con éxito (Caso 1 y 2 juntos): "
+                f"✓ Proceso completado con éxito: "
                 f"1. Se guardó respaldo previo en 'Data/Backups/ultimo_backup/' ({archivos_resp}). "
                 f"2. Se incorporó {origen_desc} ({nuevos_crudos} crudos, {nuevos_norm} normalizados). "
                 f"3. Se actualizaron '{dest_excel.name}' y '{dest_wa.name}' con todo el consolidado unificado."

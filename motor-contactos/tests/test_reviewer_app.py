@@ -1,3 +1,4 @@
+import json
 from dataclasses import replace
 from unittest.mock import patch
 
@@ -308,3 +309,137 @@ def test_editar_contacto_inexistente_redirige_a_buscar(tmp_path):
 
     assert respuesta.status_code == 200
     assert "Buscar contacto".encode() in respuesta.data
+
+
+def test_actualizar_y_respaldar_flujo_combinado(tmp_path):
+    config = _config_prueba(tmp_path)
+    # Lote 1
+    (config.rutas.carpeta_raiz / "lote1.csv").write_text(
+        "Nombre,Apellido,Telefono\nCarlos,Gomez,3743504517\n", encoding="utf-8"
+    )
+    conn = conectar(config.rutas.base_sqlite)
+    cliente = crear_app(config, conn).test_client()
+    cliente.post("/accion/run")
+    assert (config.rutas.carpeta_salida / "lista-maestra.xlsx").exists()
+
+    # Carpeta 2 para actualizar y respaldar
+    dir2 = tmp_path / "nuevo_lote"
+    dir2.mkdir()
+    (dir2 / "lote2.csv").write_text(
+        "Nombre,Apellido,Telefono\nMaria,Lopez,3764368724\n", encoding="utf-8"
+    )
+
+    resp = cliente.post(
+        "/accion/actualizar-y-respaldar",
+        data={"ruta_carpeta": str(dir2)},
+        follow_redirects=True,
+    )
+    assert resp.status_code == 200
+    assert "Proceso completado con".encode() in resp.data
+    # Verificar que el backup previo se generó
+    carpeta_ultimo = config.rutas.carpeta_salida.parent / "Backups" / "ultimo_backup"
+    assert (carpeta_ultimo / "lista-maestra.xlsx").exists()
+
+    # Test restaurar ultimo backup
+    resp_rest = cliente.post("/accion/restaurar-ultimo-backup", follow_redirects=True)
+    assert resp_rest.status_code == 200
+    assert "Último backup previo restaurado".encode() in resp_rest.data
+
+
+def test_progreso_estado_endpoint(tmp_path):
+    config = _config_prueba(tmp_path)
+    conn = conectar(config.rutas.base_sqlite)
+    cliente = crear_app(config, conn).test_client()
+
+    resp = cliente.get("/api/progreso-estado")
+    assert resp.status_code == 200
+    datos = resp.get_json()
+    assert "activo" in datos
+    assert "progreso_pct" in datos
+    assert "logs" in datos
+    assert "mensaje" in datos
+
+
+def test_dashboard_contiene_monitor_y_tarjeta_impacto(tmp_path):
+    config = _config_prueba(tmp_path)
+    conn = conectar(config.rutas.base_sqlite)
+    cliente = crear_app(config, conn).test_client()
+
+    resp = cliente.get("/")
+    assert resp.status_code == 200
+    html = resp.data.decode("utf-8")
+    assert "id=\"progreso-modal\"" in html
+    assert "Impacto y Calidad Comercial" in html
+    assert "Escanear, Respaldar y Actualizar" in html
+    assert "color: #FFFFFF !important;" in html
+
+
+def test_revisar_contiene_atajos_teclado(tmp_path):
+    config = _config_prueba(tmp_path)
+    conn = conectar(config.rutas.base_sqlite)
+    cliente = crear_app(config, conn).test_client()
+
+    resp = cliente.get("/revisar")
+    assert resp.status_code == 200
+    html = resp.data.decode("utf-8")
+    assert "Atajos de teclado rápidos" in html
+    assert "Presioná" in html
+
+
+def test_actualizar_y_respaldar_cola_de_carpetas(tmp_path):
+    config = _config_prueba(tmp_path)
+    # Lote base existente
+    (config.rutas.carpeta_raiz / "base.csv").write_text(
+        "Nombre,Telefono\nAdmin,3743504517\n", encoding="utf-8"
+    )
+    conn = conectar(config.rutas.base_sqlite)
+    cliente = crear_app(config, conn).test_client()
+    cliente.post("/accion/run")
+
+    # Dos carpetas distintas para encolar
+    dir1 = tmp_path / "carpeta_uno"
+    dir1.mkdir()
+    (dir1 / "c1.csv").write_text("Nombre,Telefono\nLucas Silva,3764112233\n", encoding="utf-8")
+
+    dir2 = tmp_path / "carpeta_dos"
+    dir2.mkdir()
+    (dir2 / "c2.csv").write_text("Nombre,Telefono\nValeria Diaz,3764445566\n", encoding="utf-8")
+
+    cola = [str(dir1), str(dir2)]
+    resp = cliente.post(
+        "/accion/actualizar-y-respaldar",
+        data={"cola_carpetas": json.dumps(cola)},
+        follow_redirects=True,
+    )
+    assert resp.status_code == 200
+    assert "Proceso completado con éxito".encode() in resp.data
+    assert "carpeta_uno" in resp.data.decode("utf-8")
+    assert "carpeta_dos" in resp.data.decode("utf-8")
+
+    # Verificar que existen las salidas maestras
+    assert (config.rutas.carpeta_salida / "lista-maestra.xlsx").exists()
+    assert (config.rutas.carpeta_salida / "contactos-whatsapp.csv").exists()
+
+    # Verificar que el backup previo existe
+    carpeta_backup = config.rutas.carpeta_salida.parent / "Backups" / "ultimo_backup"
+    assert (carpeta_backup / "lista-maestra.xlsx").exists()
+
+
+def test_api_dialogo_elegir_carpeta(tmp_path):
+    config = _config_prueba(tmp_path)
+    conn = conectar(config.rutas.base_sqlite)
+    cliente = crear_app(config, conn).test_client()
+
+    directorio_falso = tmp_path / "mi_carpeta_elegida"
+    directorio_falso.mkdir()
+
+    with patch("motor.file_dialogs.elegir_carpeta", return_value=directorio_falso):
+        resp = cliente.post("/api/dialogo/elegir-carpeta")
+        assert resp.status_code == 200
+        datos = resp.get_json()
+        assert datos["ok"] is True
+        assert datos["ruta"] == str(directorio_falso.resolve())
+        assert datos["nombre"] == "mi_carpeta_elegida"
+
+
+

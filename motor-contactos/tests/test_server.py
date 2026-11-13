@@ -205,3 +205,69 @@ def test_universal_scanner_recursivo_subcarpetas(tmp_path):
     assert any("Archivos encontrados" in m for m in telemetria_logs)
 
 
+def test_universal_scanner_ignora_carpetas_tecnicas(tmp_path):
+    root = tmp_path / "EscanerFiltros"
+    sub_valido = root / "ContactosReales"
+    sub_node = root / "node_modules"
+    sub_git = root / ".git"
+    sub_valido.mkdir(parents=True)
+    sub_node.mkdir(parents=True)
+    sub_git.mkdir(parents=True)
+
+    # Archivo legítimo
+    (sub_valido / "real.csv").write_text("nombre,telefono\nMariana,1199887766\n", encoding="utf-8")
+    # Archivos dentro de carpetas técnicas que deben ser ignorados
+    (sub_node / "package_dummy.csv").write_text("nombre,telefono\nIgnoradoNode,1100000000\n", encoding="utf-8")
+    (sub_git / "commit_dummy.csv").write_text("nombre,telefono\nIgnoradoGit,1111111111\n", encoding="utf-8")
+
+    db = tmp_path / "test_filtros.sqlite"
+    from motor.staging_db import conectar
+    conn = conectar(db)
+
+    import dataclasses
+    from motor.config import RutasConfig
+    config_base = cargar_config("config.yaml")
+    config = dataclasses.replace(
+        config_base,
+        rutas=RutasConfig(carpeta_raiz=root, carpeta_salida=tmp_path, base_sqlite=db)
+    )
+
+    from motor.extractors.universal_scanner import UniversalScanner
+    resultado = UniversalScanner.escanear_directorio(root, config, conn)
+    conn.close()
+
+    # Solo el archivo legítimo debió ser analizado
+    assert resultado["archivos_analizados"] == 1
+    assert resultado["total_personas_unificadas"] == 1
+
+
+def test_universal_scanner_dry_run_no_modifica_base(tmp_path):
+    root = tmp_path / "EscanerDryRun"
+    root.mkdir(parents=True)
+    (root / "contactos.csv").write_text("nombre,apellido,telefono\nEsteban,Quito,1144332211\n", encoding="utf-8")
+
+    db = tmp_path / "test_dryrun.sqlite"
+    from motor.staging_db import conectar
+    conn = conectar(db)
+
+    import dataclasses
+    from motor.config import RutasConfig
+    config_base = cargar_config("config.yaml")
+    config = dataclasses.replace(
+        config_base,
+        rutas=RutasConfig(carpeta_raiz=root, carpeta_salida=tmp_path, base_sqlite=db)
+    )
+
+    from motor.extractors.universal_scanner import UniversalScanner
+    resultado = UniversalScanner.escanear_directorio(root, config, conn, dry_run=True)
+
+    assert resultado["dry_run"] is True
+    assert resultado["raw_records_nuevos"] == 1
+    assert resultado["archivos_analizados"] == 1
+
+    # Verificar que NINGÚN registro se insertó en raw_records
+    total_raw = conn.execute("SELECT COUNT(*) FROM raw_records").fetchone()[0]
+    conn.close()
+    assert total_raw == 0
+
+

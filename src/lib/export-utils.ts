@@ -306,6 +306,23 @@ export function exportAirtableCSV(contacts: UnifiedContact[]): string {
   return buildCRMCSV(columns, contacts);
 }
 
+/**
+ * Base de datos limpia optimizada para prospección comercial directa B2B/B2C.
+ * Estructura solicitada: Nombre, Apellido, Empresa, Cargo, WhatsApp y Referencia.
+ */
+export function exportProspeccionCSV(contacts: UnifiedContact[]): string {
+  const BOM = "\uFEFF";
+  const columns: CRMColumnDef[] = [
+    { header: "Nombre", getValue: c => c.firstName || "" },
+    { header: "Apellido", getValue: c => c.lastName || "" },
+    { header: "Empresa", getValue: c => c.company || "" },
+    { header: "Cargo", getValue: c => c.jobTitle || "" },
+    { header: "WhatsApp", getValue: c => c.whatsapp || "" },
+    { header: "Referencia", getValue: c => c.notes || c.origin || "" },
+  ];
+  return BOM + buildCRMCSV(columns, contacts.filter(c => !c.isDuplicate));
+}
+
 // ── Segmented Export ────────────────────────────────────────────
 
 const SEGMENT_HEADERS = ["nombre", "apellido", "empresa", "cargo", "email", "teléfono", "ciudad", "origen", "score", "notas"];

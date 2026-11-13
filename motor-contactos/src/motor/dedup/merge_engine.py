@@ -34,7 +34,9 @@ from motor.dedup.union_find import UnionFind
 from motor.llm_judge import LlmJudge
 
 
-def deduplicar_todo(config: Config, conn: sqlite3.Connection, continuar: bool = True) -> dict[str, int]:
+def deduplicar_todo(
+    config: Config, conn: sqlite3.Connection, continuar: bool = True, callback_progreso: Any = None
+) -> dict[str, int]:
     """continuar=True (default): si la corrida anterior se cortó a mitad de
     camino (proceso matado/máquina reiniciada antes de llegar a
     _materializar_clusters), retoma el mismo corrida_id y NO vuelve a
@@ -61,7 +63,8 @@ def deduplicar_todo(config: Config, conn: sqlite3.Connection, continuar: bool = 
     llamadas_llm = 0
     sin_commitear = 0
 
-    for id_a, id_b in sorted(candidatos):
+    total_candidatos = len(candidatos)
+    for idx, (id_a, id_b) in enumerate(sorted(candidatos), start=1):
         previo = decididos_previos.get((id_a, id_b))
         if previo is not None:
             # Ya estaba decidido de una corrida anterior interrumpida --
@@ -121,11 +124,18 @@ def deduplicar_todo(config: Config, conn: sqlite3.Connection, continuar: bool = 
                 contadores[clave] = contadores.get(clave, 0) + 1
                 llamadas_llm += 1
                 if llamadas_llm % 10 == 0:
-                    print(f"  ...LLM-judge: {llamadas_llm} casos ambiguos procesados", flush=True)
+                    pct = int((idx / total_candidatos) * 100) if total_candidatos else 0
+                    msg = f"  ...LLM-judge: {llamadas_llm} casos ambiguos procesados (par {idx}/{total_candidatos} - {pct}%)"
+                    print(msg, flush=True)
+                    if callback_progreso:
+                        callback_progreso(idx, total_candidatos, llamadas_llm, msg)
             else:
                 # Casos ambiguos fuera de la ventana estricta de LLM (ej. 0.55 < score < 0.60): directo a revisión pendiente
                 _loguear(conn, id_a, id_b, "revision_pendiente", "pendiente", score_ajustado, corrida_id, patron)
                 contadores["revision_pendiente"] += 1
+
+        if callback_progreso and idx % 200 == 0:
+            callback_progreso(idx, total_candidatos, llamadas_llm, None)
 
         sin_commitear += 1
         if sin_commitear >= COMMIT_CADA_N:

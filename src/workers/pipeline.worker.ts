@@ -142,6 +142,7 @@ class DedupIndex {
   private emailIndex = new Map<string, string>();
   private phoneIndex = new Map<string, string>();
   private nameIndex = new Map<string, string>();
+  private bucketIndex = new Map<string, Array<{ id: string; firstName: string; lastName: string; email: string; whatsapp: string }>>();
   private records: Array<{ id: string; firstName: string; lastName: string; email: string; whatsapp: string }> = [];
 
   add(contact: { id: string; firstName: string; lastName: string; email: string; whatsapp: string }): { isDuplicate: boolean; duplicateOf?: string; confidence: number } {
@@ -159,9 +160,11 @@ class DedupIndex {
       return { isDuplicate: true, duplicateOf: this.nameIndex.get(fullName), confidence: 80 };
     }
 
-    // Fuzzy name check
-    if (fullName.length > 3) {
-      for (const existing of this.records) {
+    // Fuzzy name check optimizado con buckets de prefijo (O(k) en lugar de O(n^2))
+    if (fullName.length >= 3) {
+      const bucket = fullName.slice(0, 3);
+      const candidates = this.bucketIndex.get(bucket) || [];
+      for (const existing of candidates) {
         const existingFull = normalize(`${existing.firstName} ${existing.lastName}`);
         if (jaroWinkler(fullName, existingFull) > 0.92) {
           return { isDuplicate: true, duplicateOf: existing.id, confidence: 75 };
@@ -169,10 +172,19 @@ class DedupIndex {
       }
     }
 
-    this.records.push({ id: contact.id, firstName: contact.firstName, lastName: contact.lastName, email: contact.email, whatsapp: contact.whatsapp });
+    const record = { id: contact.id, firstName: contact.firstName, lastName: contact.lastName, email: contact.email, whatsapp: contact.whatsapp };
+    this.records.push(record);
     if (emailNorm) this.emailIndex.set(emailNorm, contact.id);
     if (phoneDigits) this.phoneIndex.set(phoneDigits, contact.id);
-    if (fullName) this.nameIndex.set(fullName, contact.id);
+    if (fullName) {
+      this.nameIndex.set(fullName, contact.id);
+      if (fullName.length >= 3) {
+        const bucket = fullName.slice(0, 3);
+        const list = this.bucketIndex.get(bucket) || [];
+        list.push(record);
+        this.bucketIndex.set(bucket, list);
+      }
+    }
 
     return { isDuplicate: false, confidence: 100 };
   }

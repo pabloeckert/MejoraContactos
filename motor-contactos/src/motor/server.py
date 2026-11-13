@@ -105,7 +105,7 @@ class ScanManager:
             if len(s.actividad_reciente) > 80:
                 s.actividad_reciente = s.actividad_reciente[-80:]
 
-    def iniciar_escaneo(self, ruta: str, config: Config) -> tuple[bool, str]:
+    def iniciar_escaneo(self, ruta: str, config: Config, dry_run: bool = False) -> tuple[bool, str]:
         with self._lock:
             if self._state.estado == "running" and self._thread and self._thread.is_alive():
                 return False, "Ya hay un proceso en ejecución."
@@ -137,23 +137,25 @@ class ScanManager:
                     self._state.actividad_reciente = self._state.actividad_reciente[-80:]
                 return False, msg_error
 
+            msg_inicio = f"Explorando subcarpetas (Modo Simulación / Dry-Run) en: {ruta_norm}" if dry_run else f"Explorando subcarpetas en: {ruta_norm}"
             self._state = ScanState(
                 estado="running",
                 ruta=ruta_norm,
                 tiempo_inicio=time.time(),
-                ultimo_mensaje=f"Explorando subcarpetas en: {ruta_norm}",
-                actividad_reciente=[{"hora": datetime.now().strftime("%H:%M:%S"), "mensaje": f"Explorando subcarpetas en: {ruta_norm}"}],
+                ultimo_mensaje=msg_inicio,
+                actividad_reciente=[{"hora": datetime.now().strftime("%H:%M:%S"), "mensaje": msg_inicio}],
             )
 
         self._thread = threading.Thread(
             target=self._ejecutar_escaneo_background,
-            args=(p, config),
+            args=(p, config, dry_run),
             daemon=True,
         )
         self._thread.start()
-        return True, f"Escaneo universal iniciado en '{p.name}'"
+        prefijo = "Simulación de escaneo" if dry_run else "Escaneo universal"
+        return True, f"{prefijo} iniciado en '{p.name}'"
 
-    def _ejecutar_escaneo_background(self, carpeta: Path, config: Config) -> None:
+    def _ejecutar_escaneo_background(self, carpeta: Path, config: Config, dry_run: bool = False) -> None:
         from motor.extractors.universal_scanner import escanear_directorio
 
         conn = None
@@ -169,14 +171,17 @@ class ScanManager:
                     registros=info.get("total_raw", -1),
                 )
 
-            resultado = escanear_directorio(carpeta, config, conn, callback_progreso=callback_progreso)
+            resultado = escanear_directorio(carpeta, config, conn, callback_progreso=callback_progreso, dry_run=dry_run)
 
             with self._lock:
                 self._state.estado = "completed"
                 self._state.tiempo_fin = time.time()
                 self._state.resultado = resultado
                 self._state.archivo_actual = "Escaneo completado"
-                self.agregar_log(f"Completado exitoso: {resultado.get('total_personas_unificadas', 0)} personas unificadas")
+                if dry_run:
+                    self.agregar_log(f"Simulación finalizada: {resultado.get('raw_records_nuevos', 0)} contactos potenciales identificados")
+                else:
+                    self.agregar_log(f"Completado exitoso: {resultado.get('total_personas_unificadas', 0)} personas unificadas")
 
         except Exception as exc:
             logger.exception("Error en escaneo background: %s", exc)
@@ -1577,6 +1582,7 @@ def registrar_rutas_scanner(app: Flask, config: Config) -> None:
     def api_scan_folder():
         datos = request.get_json(silent=True) or {}
         ruta_raw = datos.get("ruta") or datos.get("folder") or datos.get("path")
+        dry_run = bool(datos.get("dry_run", False))
         if not ruta_raw or not str(ruta_raw).strip():
             ruta_raw = str(config.rutas.carpeta_raiz)
 
@@ -1584,7 +1590,7 @@ def registrar_rutas_scanner(app: Flask, config: Config) -> None:
         ruta_limpia = str(ruta_raw).strip("\"' ")
         ruta_norm = os.path.normpath(os.path.expanduser(ruta_limpia)).replace("\\", "/")
 
-        exito, mensaje = scan_manager.iniciar_escaneo(ruta_norm, config)
+        exito, mensaje = scan_manager.iniciar_escaneo(ruta_norm, config, dry_run=dry_run)
         if not exito:
             return jsonify({"ok": False, "error": mensaje}), 400
 
@@ -1592,6 +1598,7 @@ def registrar_rutas_scanner(app: Flask, config: Config) -> None:
             "ok": True,
             "mensaje": mensaje,
             "ruta": ruta_norm,
+            "dry_run": dry_run,
         })
 
     # 3. Subir Archivos a Data/Crudos

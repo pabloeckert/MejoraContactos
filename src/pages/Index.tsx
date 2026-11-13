@@ -229,6 +229,13 @@ const Index = () => {
         />
       )}
 
+      {/* Barra tricolor institucional Mejora Continua */}
+      <div className="h-1 w-full flex shrink-0" aria-hidden="true">
+        <div className="h-full bg-[#1A3D84] flex-[2]" />
+        <div className="h-full bg-[#E1061E] flex-1" />
+        <div className="h-full bg-[#F7CC13] flex-1" />
+      </div>
+
       {/* Header */}
       <header className="sticky top-0 z-50 border-b bg-primary shadow-sm">
         <div className="container flex h-14 items-center justify-between px-4">
@@ -251,7 +258,7 @@ const Index = () => {
             {isInstallable && !isStandalone && (
               <button
                 onClick={() => install()}
-                className="h-7 px-2 rounded-full flex items-center gap-1 text-[10px] font-medium text-primary-foreground/50 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-all"
+                className="h-7 px-2 rounded-full flex items-center gap-1 text-[10px] font-medium text-primary-foreground/75 hover:text-primary-foreground hover:bg-primary-foreground/10 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 transition-all"
                 title="Instalar aplicación"
                 aria-label="Instalar aplicación"
               >
@@ -267,7 +274,7 @@ const Index = () => {
                 setSimpleMode(next);
                 analytics.simpleModeToggled(next);
               }}
-              className="h-7 px-2 rounded-full flex items-center gap-1 text-[10px] font-medium text-primary-foreground/50 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-all"
+              className="h-7 px-2 rounded-full flex items-center gap-1 text-[10px] font-medium text-primary-foreground/75 hover:text-primary-foreground hover:bg-primary-foreground/10 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 transition-all"
               title={simpleMode ? "Cambiar a modo avanzado" : "Cambiar a modo simple"}
               aria-label={simpleMode ? "Cambiar a modo avanzado" : "Cambiar a modo simple"}
             >
@@ -286,7 +293,7 @@ const Index = () => {
             {/* Dark mode toggle */}
             <button
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              className="h-7 w-7 rounded-full flex items-center justify-center text-primary-foreground/50 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-all"
+              className="h-7 w-7 rounded-full flex items-center justify-center text-primary-foreground/75 hover:text-primary-foreground hover:bg-primary-foreground/10 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 transition-all"
               title="Cambiar tema"
               aria-label="Cambiar tema"
             >
@@ -295,7 +302,7 @@ const Index = () => {
             {/* Language toggle */}
             <button
               onClick={() => setLocale(locale === "es" ? "en" : "es")}
-              className="h-7 px-2 rounded-full flex items-center gap-1 text-[10px] font-medium text-primary-foreground/50 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-all"
+              className="h-7 px-2 rounded-full flex items-center gap-1 text-[10px] font-medium text-primary-foreground/75 hover:text-primary-foreground hover:bg-primary-foreground/10 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 transition-all"
               title={locale === "es" ? "Switch to English" : "Cambiar a español"}
               aria-label={locale === "es" ? "Switch to English" : "Cambiar a español"}
             >
@@ -305,7 +312,7 @@ const Index = () => {
             {/* Admin icon */}
             <button
               onClick={() => setActiveTab("settings")}
-              className="h-7 w-7 rounded-full flex items-center justify-center text-primary-foreground/25 hover:text-primary-foreground hover:bg-primary-foreground/10 transition-all"
+              className="h-7 w-7 rounded-full flex items-center justify-center text-primary-foreground/50 hover:text-primary-foreground hover:bg-primary-foreground/10 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 transition-all"
               title="Administrador"
               aria-label="Administrador"
             >

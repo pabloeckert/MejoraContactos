@@ -41,7 +41,17 @@ def registrar_rutas_api(app: Flask, config: Config, conn: sqlite3.Connection) ->
 
     @app.get("/api/stats")
     def api_stats():
-        return jsonify(_calcular_stats(conn))
+        stats = _calcular_stats(conn)
+        if request.args.get("completo") == "1":
+            return jsonify(stats)
+        return jsonify(
+            {
+                "raw_records": stats["raw_records"],
+                "normalized_records": stats["normalized_records"],
+                "contactos_finales": stats["contactos_finales"],
+                "pendientes": stats["pendientes"],
+            }
+        )
 
     @app.get("/api/cuentas-google")
     def api_cuentas_google():

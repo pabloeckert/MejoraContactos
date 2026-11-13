@@ -3,7 +3,7 @@ import { Download, FileSpreadsheet, FileText, File, BarChart3, Brain, Layers } f
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { exportCSV, exportExcel, exportVCF, exportJSON, exportJSONL, exportGoogleContactsCSV, exportHubSpotCSV, exportSalesforceCSV, exportZohoCSV, exportAirtableCSV, generateHTMLReport, exportSegmentedCSV, downloadFile } from "@/lib/export-utils";
+import { exportCSV, exportExcel, exportVCF, exportJSON, exportJSONL, exportGoogleContactsCSV, exportHubSpotCSV, exportSalesforceCSV, exportZohoCSV, exportAirtableCSV, generateHTMLReport, exportSegmentedCSV, exportProspeccionCSV, downloadFile } from "@/lib/export-utils";
 import { analytics } from "@/lib/analytics";
 import type { UnifiedContact } from "@/types/contact";
 import { toast } from "sonner";
@@ -75,8 +75,13 @@ export const ExportPanel = memo(function ExportPanel({ contacts }: ExportPanelPr
         downloadFile(data, `airtable_${timestamp}.csv`, "text/csv;charset=utf-8");
         break;
       }
+      case "prospeccion": {
+        const data = exportProspeccionCSV(clean);
+        downloadFile(data, `prospeccion_${timestamp}.csv`, "text/csv;charset=utf-8-bom");
+        break;
+      }
     }
-    const label = { csv: 'CSV', excel: 'Excel', vcf: 'VCF', json: 'JSON', jsonl: 'JSONL', report: 'HTML', google: 'Google Contacts', hubspot: 'HubSpot', salesforce: 'Salesforce', zoho: 'Zoho', airtable: 'Airtable' }[format] || format;
+    const label = { csv: 'CSV', excel: 'Excel', vcf: 'VCF', json: 'JSON', jsonl: 'JSONL', report: 'HTML', google: 'Google Contacts', hubspot: 'HubSpot', salesforce: 'Salesforce', zoho: 'Zoho', airtable: 'Airtable', prospeccion: 'Base de Prospección' }[format] || format;
     analytics.exportCompleted(format, clean.length);
     toast.success(`Exportado ${clean.length} contactos en formato ${label}`);
   };
@@ -114,6 +119,31 @@ export const ExportPanel = memo(function ExportPanel({ contacts }: ExportPanelPr
         <StatCard label="Descartados" value={discarded.length} icon="✕" color="text-red-500" />
         <StatCard label="IA Limpiados" value={contacts.filter((c) => c.aiCleaned).length} icon="✨" color="text-blue-500" />
       </div>
+
+      {/* Base de Prospección Directa */}
+      <Card className="border-primary/40 bg-primary/5">
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm font-bold flex items-center gap-2 text-primary">
+              <span className="text-lg">🎯</span> Base de Datos de Prospección
+            </CardTitle>
+            <Badge variant="accent">6 Campos Exactos</Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            Formato limpio y optimizado para prospección comercial: <strong className="text-foreground">Nombre, Apellido, Empresa, Cargo, WhatsApp y Referencia</strong> (notas, etiquetas y contexto original de contacto).
+          </p>
+          <Button
+            className="w-full bg-primary text-primary-foreground hover:bg-primary/90 h-10 font-semibold gap-2 shadow-sm"
+            onClick={() => handleExport("prospeccion")}
+            aria-label="Descargar Base de Datos de Prospección"
+          >
+            <Download className="h-4 w-4" />
+            Descargar Base de Prospección CSV
+          </Button>
+        </CardContent>
+      </Card>
 
       {/* Contact export */}
       <Card>
@@ -191,6 +221,7 @@ export const ExportPanel = memo(function ExportPanel({ contacts }: ExportPanelPr
               }
               toast.info(`Inyectando ${clean.length} contactos a MejoraNucleo/CRM...`);
               let exitosos = 0;
+              let fallidos = 0;
               for (const c of clean.slice(0, 100)) {
                 try {
                   const res = await fetch("http://127.0.0.1:4002/api/prospectos", {
@@ -199,17 +230,26 @@ export const ExportPanel = memo(function ExportPanel({ contacts }: ExportPanelPr
                     body: JSON.stringify({
                       nombre: `${c.firstName || ""} ${c.lastName || ""}`.trim() || "Contacto Depurado",
                       email: c.email || `contacto-${c.id || Math.random().toString(36).slice(2, 8)}@sin-email.com`,
-                      telefono: c.whatsapp || c.phone || "",
+                      telefono: c.whatsapp || "",
                       canalOrigen: "base_propia_contactos",
-                      mensaje: `Importado y depurado desde MejoraContactos. Score IA: ${c.aiRelevanceScore || "N/A"}. Segmento: ${c.segment || "B"}.`,
+                      mensaje: `Importado y depurado desde MejoraContactos. Score IA: ${c.relevanceScore ?? "N/A"}. Segmento: ${c.segment || "B"}.`,
                     }),
                   });
-                  if (res.ok) exitosos++;
-                } catch {
-                  // fail-soft
+                  if (res.ok) {
+                    exitosos++;
+                  } else {
+                    fallidos++;
+                  }
+                } catch (err) {
+                  fallidos++;
+                  console.warn("[MejoraNucleo] Error al conectar con el servidor local:", err);
                 }
               }
-              toast.success(`Inyección completada: ${exitosos} prospectos ingresados a MejoraNucleo.`);
+              if (exitosos > 0) {
+                toast.success(`Inyección completada: ${exitosos} prospectos ingresados a MejoraNucleo${fallidos > 0 ? ` (${fallidos} fallidos)` : ""}.`);
+              } else {
+                toast.error(`No se pudo conectar con MejoraNucleo en http://127.0.0.1:4002 (${fallidos} intentos). Verifique que el servicio esté activo.`);
+              }
             }}
             aria-label="Inyectar contactos limpios a MejoraNucleo"
           >

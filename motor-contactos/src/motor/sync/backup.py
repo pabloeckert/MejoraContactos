@@ -191,3 +191,207 @@ def listar_backups(config: Config) -> list[dict[str, Any]]:
             continue
 
     return resultado
+
+
+def hacer_backup_previo(config: Config, motivo: str = "auto") -> dict[str, Any]:
+    """Flujo de backup automático antes de cada proceso:
+    1. Guarda en 'Data/Backups/ultimo_backup/' (carpeta fija que se pisa/actualiza con la versión previa más reciente).
+    2. Guarda en 'Data/Backups/historico/' con timestamp y motivo para auditoría permanente.
+    Respalda lista-maestra.xlsx y contactos-whatsapp.csv.
+    """
+    carpeta_backups = _obtener_carpeta_backups(config)
+    carpeta_ultimo = carpeta_backups / "ultimo_backup"
+    carpeta_historico = carpeta_backups / "historico"
+    carpeta_ultimo.mkdir(parents=True, exist_ok=True)
+    carpeta_historico.mkdir(parents=True, exist_ok=True)
+
+    ahora = datetime.now(timezone.utc)
+    estampa = ahora.strftime("%Y%m%d_%H%M%S")
+    salida_dir = config.rutas.carpeta_salida
+
+    respaldados: list[str] = []
+
+    archivos_objetivo = ["lista-maestra.xlsx", "contactos-whatsapp.csv"]
+    for nombre in archivos_objetivo:
+        origen = salida_dir / nombre
+        if origen.exists() and origen.stat().st_size > 0:
+            # 1. Copia fija que se pisa/actualiza con el último estado previo
+            destino_fijo = carpeta_ultimo / nombre
+            shutil.copy2(origen, destino_fijo)
+
+            # 2. Copia histórica versionada
+            ext = origen.suffix
+            stem = origen.stem
+            destino_historico = carpeta_historico / f"{stem}_{estampa}_{motivo}{ext}"
+            shutil.copy2(origen, destino_historico)
+
+            respaldados.append(nombre)
+
+    if respaldados:
+        info_txt = (
+            f"ÚLTIMO BACKUP PREVIO\n"
+            f"Fecha: {ahora.strftime('%d/%m/%Y %H:%M:%S')} UTC\n"
+            f"Motivo: {motivo}\n"
+            f"Archivos respaldados: {', '.join(respaldados)}\n"
+            f"\nNota: Esta carpeta se actualiza/pisa automáticamente en cada proceso con el estado previo más reciente.\n"
+            f"En la carpeta contigua 'historico' se conservan todas las versiones históricas fechadas.\n"
+        )
+        try:
+            (carpeta_ultimo / "info_ultimo_backup.txt").write_text(info_txt, encoding="utf-8")
+        except Exception:
+            pass
+
+    logger.info("Backup previo completado (%s): %s", motivo, respaldados)
+    return {
+        "ok": True,
+        "fecha": ahora.strftime("%d/%m/%Y %H:%M:%S"),
+        "archivos_respaldados": respaldados,
+        "carpeta_ultimo": str(carpeta_ultimo),
+        "carpeta_historico": str(carpeta_historico),
+    }
+
+
+def restaurar_ultimo_backup(config: Config) -> dict[str, Any]:
+    """Restaura los archivos del último backup previo (Data/Backups/ultimo_backup/)
+    hacia la carpeta de salida activa (Data/Salida/).
+    """
+    carpeta_backups = _obtener_carpeta_backups(config)
+    carpeta_ultimo = carpeta_backups / "ultimo_backup"
+    if not carpeta_ultimo.exists():
+        return {"ok": False, "error": "No existe la carpeta de último backup previo."}
+
+    salida_dir = config.rutas.carpeta_salida
+    salida_dir.mkdir(parents=True, exist_ok=True)
+
+    restaurados = []
+    for f in carpeta_ultimo.iterdir():
+        if f.is_file() and not f.name.endswith(".txt") and not f.name.endswith(".json"):
+            dest = salida_dir / f.name
+            shutil.copy2(str(f), str(dest))
+            restaurados.append(f.name)
+
+    if not restaurados:
+        return {"ok": False, "error": "No se encontraron archivos de planilla para restaurar en 'ultimo_backup'."}
+
+    logger.info("Último backup restaurado hacia Salida: %s", restaurados)
+    return {
+        "ok": True,
+        "archivos_restaurados": restaurados,
+    }
+
+
+def archivar_base_actual(config: Config, etiqueta: str = "") -> dict[str, Any]:
+    """Caso 2: Archiva la base actual (staging.sqlite y exportaciones) para
+    permitir iniciar una base fresca independiente para un nuevo directorio.
+    Mueve los archivos a 'Data/Backups/bases_archivadas/base_{etiqueta}_{timestamp}/'
+    de forma casi instantánea y segura.
+    """
+    carpeta_backups = _obtener_carpeta_backups(config)
+    ahora = datetime.now(timezone.utc)
+    estampa = ahora.strftime("%Y%m%d_%H%M%S")
+    sufijo = f"_{etiqueta.strip()}" if etiqueta.strip() else ""
+    carpeta_archivo = carpeta_backups / "bases_archivadas" / f"base{sufijo}_{estampa}"
+    carpeta_archivo.mkdir(parents=True, exist_ok=True)
+
+    salida_dir = config.rutas.carpeta_salida
+    archivos_movidos: list[str] = []
+
+    # Copiar primero al último backup de seguridad
+    hacer_backup_previo(config, motivo="antes_de_archivar")
+
+    # Mover archivos de salida y base sqlite
+    for f in salida_dir.iterdir():
+        if f.is_file():
+            dest = carpeta_archivo / f.name
+            try:
+                shutil.move(str(f), str(dest))
+                archivos_movidos.append(f.name)
+            except Exception as e:
+                logger.warning("No se pudo mover %s a archivo: %s", f.name, e)
+
+    # Si base_sqlite no estaba en salida_dir, moverla también
+    db_file = config.rutas.base_sqlite
+    if db_file.exists() and db_file.parent != salida_dir:
+        dest = carpeta_archivo / db_file.name
+        try:
+            shutil.move(str(db_file), str(dest))
+            archivos_movidos.append(db_file.name)
+        except Exception as e:
+            logger.warning("No se pudo mover %s a archivo: %s", db_file.name, e)
+
+    manifiesto = {
+        "etiqueta": etiqueta or "base_archivada",
+        "archivado_en": ahora.isoformat(),
+        "archivos": archivos_movidos,
+    }
+    (carpeta_archivo / "manifiesto.json").write_text(
+        json.dumps(manifiesto, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+
+    logger.info("Base archivada en %s con %d archivos", carpeta_archivo, len(archivos_movidos))
+    return {
+        "ok": True,
+        "carpeta_archivo": str(carpeta_archivo),
+        "nombre_carpeta": carpeta_archivo.name,
+        "archivos_movidos": archivos_movidos,
+        "fecha": ahora.strftime("%d/%m/%Y %H:%M:%S"),
+    }
+
+
+def listar_bases_archivadas(config: Config) -> list[dict[str, Any]]:
+    """Lista las bases archivadas disponibles para consultar o restaurar."""
+    carpeta_bases = _obtener_carpeta_backups(config) / "bases_archivadas"
+    if not carpeta_bases.exists():
+        return []
+
+    resultado = []
+    for d in sorted(carpeta_bases.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True):
+        if d.is_dir():
+            manifiesto_file = d / "manifiesto.json"
+            meta = {}
+            if manifiesto_file.exists():
+                try:
+                    meta = json.loads(manifiesto_file.read_text(encoding="utf-8"))
+                except Exception:
+                    pass
+            mtime = datetime.fromtimestamp(d.stat().st_mtime, tz=timezone.utc)
+            resultado.append({
+                "nombre": d.name,
+                "ruta": str(d),
+                "etiqueta": meta.get("etiqueta", d.name),
+                "fecha": mtime.strftime("%d/%m/%Y %H:%M"),
+                "archivos": meta.get("archivos", [f.name for f in d.glob("*.*")]),
+            })
+    return resultado
+
+
+def restaurar_base_archivada(config: Config, nombre_carpeta: str) -> dict[str, Any]:
+    """Restaura una base archivada previamente como la base activa en Data/Salida/."""
+    carpeta_bases = _obtener_carpeta_backups(config) / "bases_archivadas"
+    origen_dir = carpeta_bases / nombre_carpeta
+    if not origen_dir.exists() or not origen_dir.is_dir():
+        return {"ok": False, "error": f"No se encontró la base archivada '{nombre_carpeta}'"}
+
+    # Resguardar la actual antes de sobreescribir
+    hacer_backup_previo(config, motivo="antes_de_restaurar")
+
+    salida_dir = config.rutas.carpeta_salida
+    salida_dir.mkdir(parents=True, exist_ok=True)
+
+    restaurados = []
+    db_file = config.rutas.base_sqlite
+    for f in origen_dir.iterdir():
+        if f.is_file() and f.name != "manifiesto.json":
+            if f.name == db_file.name and db_file.parent != salida_dir:
+                dest = db_file
+            else:
+                dest = salida_dir / f.name
+            shutil.copy2(str(f), str(dest))
+            restaurados.append(f.name)
+
+    return {
+        "ok": True,
+        "base_restaurada": nombre_carpeta,
+        "archivos_restaurados": restaurados,
+    }
+

@@ -71,4 +71,7 @@ MejoraContactos.md
 .venv/
 pytest_tmp/
 **/pytest_tmp/
+*.egg-info/
+.history/
+scratch/
 

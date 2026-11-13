@@ -9,7 +9,7 @@ export default tseslint.config(
   // reglas distintas) -- sin este ignore, el glob "**/*.{ts,tsx}" de acá
   // abajo intentaría lintearlo también con el parser/reglas del repo
   // raíz y rompería CI.
-  { ignores: ["dist", "motor-contactos"] },
+  { ignores: ["dist", "motor-contactos", ".history"] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ["**/*.{ts,tsx}"],
@@ -25,6 +25,12 @@ export default tseslint.config(
       ...reactHooks.configs.recommended.rules,
       "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
       "@typescript-eslint/no-unused-vars": "off",
+    },
+  },
+  {
+    files: ["src/components/ui/**/*.{ts,tsx}", "src/lib/**/*.{ts,tsx}"],
+    rules: {
+      "react-refresh/only-export-components": "off",
     },
   },
 );

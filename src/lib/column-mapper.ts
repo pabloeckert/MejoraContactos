@@ -3,12 +3,12 @@ import type { ColumnMapping, ContactField } from "@/types/contact";
 const PATTERNS: Record<ContactField, RegExp> = {
   firstName: /^(first?.?name|nombre|given.?name|primer.?nombre|name|nom)$/i,
   lastName: /^(last?.?name|apellido|family.?name|surname|ape)$/i,
-  whatsapp: /^(phone|tel|tel[eé]fono|mobile|celular|cel|whatsapp|wsp|wa|phone?.?1|primary?.?phone|telf|telefono|teléfono|f[eé]l[eé]fono|mobile?.?phone|cell?.?phone|cell|móvil|movil)$/i,
-  company: /^(company|org|organization|empresa|organizaci[oó]n|compa[ñn][ií]a|compania)$/i,
-  jobTitle: /^(job?.?title|title|cargo|puesto|position|rol)$/i,
-  email: /^(e?.?mail|correo|email?.?address|e-mail)$/i,
+  whatsapp: /^(phone|tel|tel[eé]fono|mobile|celular|cel|whatsapp|wsp|wa|phone?.?1|primary?.?phone|telf|telefono|teléfono|f[eé]l[eé]fono|mobile?.?phone|cell?.?phone|cell|móvil|movil|phone\s*1\s*-\s*value|teléfono\s*1\s*-\s*valor)$/i,
+  company: /^(company|org|organization|empresa|organizaci[oó]n|compa[ñn][ií]a|compania|organization\s*1\s*-\s*name|organization\s*name|org\s*1\s*-\s*name)$/i,
+  jobTitle: /^(job?.?title|title|cargo|puesto|position|rol|organization\s*1\s*-\s*title|organization\s*title)$/i,
+  email: /^(e?.?mail|correo|email?.?address|e-mail|e-mail\s*1\s*-\s*value|email\s*1\s*-\s*value)$/i,
   city: /^(city|ciudad|locality|localidad|location|ubicaci[oó]n|ubicacion)$/i,
-  notes: /^(notes|notas|note|comments|comentarios|observaciones|obs)$/i,
+  notes: /^(notes|notas|note|comments|comentarios|observaciones|obs|referencia|referencias|group\s*membership|grupos|etiquetas)$/i,
   origin: /^(origin|origen|source|fuente|canal|procedencia)$/i,
   ignore: /^$/,
 };

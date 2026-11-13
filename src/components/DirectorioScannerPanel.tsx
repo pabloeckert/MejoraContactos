@@ -88,6 +88,8 @@ export function DirectorioScannerPanel() {
   const [isScanning, setIsScanning] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [isDryRun, setIsDryRun] = useState(false);
+  const [isSelectingFolder, setIsSelectingFolder] = useState(false);
   const [status, setStatus] = useState<ScanStatus>(ESTADO_INICIAL_STATUS);
 
   const [calidad, setCalidad] = useState<CalidadResumen | null>(null);
@@ -186,6 +188,27 @@ export function DirectorioScannerPanel() {
     }
   }, [status?.actividad_reciente, autoScroll]);
 
+  // Diálogo nativo para seleccionar carpeta en el explorador de Windows
+  const handleSeleccionarCarpetaDialog = async () => {
+    setIsSelectingFolder(true);
+    try {
+      const res = await fetch("/api/seleccionar-carpeta-dialog", { method: "POST" });
+      const data = await res.json();
+      if (data?.ok && data?.ruta) {
+        setRutaCarpeta(data.ruta);
+        toast.success(`Carpeta seleccionada: ${data.ruta}`);
+      } else if (data?.cancelado) {
+        // Usuario canceló la selección
+      } else {
+        toast.info("Ingresá la ruta manualmente si el diálogo del sistema no se abrió");
+      }
+    } catch {
+      toast.info("Ingresá la ruta manualmente o verificá que el servidor esté activo");
+    } finally {
+      setIsSelectingFolder(false);
+    }
+  };
+
   // Iniciar Escaneo de Carpeta
   const handleIniciarEscaneo = async (rutaPersonalizada?: string) => {
     const destino = (rutaPersonalizada ?? rutaCarpeta).trim();
@@ -195,13 +218,16 @@ export function DirectorioScannerPanel() {
     }
 
     setIsScanning(true);
-    toast.info(`Iniciando escáner en: ${destino}`);
+    const mensajeInicio = isDryRun
+      ? `Iniciando simulación (Dry-Run) en: ${destino}`
+      : `Iniciando escáner en: ${destino}`;
+    toast.info(mensajeInicio);
 
     try {
       const res = await fetch("/api/scan-folder", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ruta: destino }),
+        body: JSON.stringify({ ruta: destino, dry_run: isDryRun }),
       });
 
       const data = await res.json();
@@ -456,6 +482,20 @@ export function DirectorioScannerPanel() {
                   className="font-mono text-xs"
                 />
                 <Button
+                  variant="outline"
+                  onClick={handleSeleccionarCarpetaDialog}
+                  disabled={isScanning || isSelectingFolder}
+                  title="Abrir explorador de carpetas de Windows"
+                  className="gap-1.5 shrink-0 text-xs"
+                >
+                  {isSelectingFolder ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <FolderOpen className="h-3.5 w-3.5 text-primary" />
+                  )}
+                  <span className="hidden sm:inline">Examinar...</span>
+                </Button>
+                <Button
                   onClick={() => handleIniciarEscaneo()}
                   disabled={isScanning || !rutaCarpeta.trim()}
                   className="gap-1.5 shrink-0 bg-primary text-primary-foreground hover:bg-primary/90"
@@ -463,15 +503,31 @@ export function DirectorioScannerPanel() {
                   {isScanning ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      <span>Escaneando</span>
+                      <span>{isDryRun ? "Simulando" : "Escaneando"}</span>
                     </>
                   ) : (
                     <>
                       <Play className="h-4 w-4 fill-current" />
-                      <span>Escanear</span>
+                      <span>{isDryRun ? "Simular" : "Escanear"}</span>
                     </>
                   )}
                 </Button>
+              </div>
+
+              {/* Toggle de Modo Simulación (Dry-Run) */}
+              <div className="flex items-center justify-between pt-1">
+                <label className="flex items-center gap-2 cursor-pointer text-xs text-muted-foreground hover:text-foreground">
+                  <input
+                    type="checkbox"
+                    checked={isDryRun}
+                    onChange={(e) => setIsDryRun(e.target.checked)}
+                    disabled={isScanning}
+                    className="rounded border-muted-foreground/30 text-primary focus:ring-primary h-3.5 w-3.5 cursor-pointer"
+                  />
+                  <span className={isDryRun ? "font-semibold text-amber-600 dark:text-amber-400" : "font-normal"}>
+                    Modo Simulación (Dry-Run: analiza y cuenta sin guardar ni modificar la base)
+                  </span>
+                </label>
               </div>
             </div>
 

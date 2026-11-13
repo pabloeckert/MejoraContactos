@@ -334,3 +334,48 @@ def test_endpoints_server_sync_and_backup(mock_entorno, monkeypatch):
         assert data_u["ok"] is True
         assert data_u["restaurados"] == 2
 
+
+def test_hacer_backup_previo_y_archivar(mock_entorno):
+    from motor.sync.backup import (
+        archivar_base_actual,
+        hacer_backup_previo,
+        listar_bases_archivadas,
+        restaurar_base_archivada,
+        restaurar_ultimo_backup,
+    )
+
+    config, tmp_path, _ = mock_entorno
+
+    # 1. Backup previo automático
+    res_b = hacer_backup_previo(config, motivo="test_run")
+    assert res_b["ok"] is True
+    assert "lista-maestra.xlsx" in res_b["archivos_respaldados"]
+    ultimo_file = Path(res_b["carpeta_ultimo"]) / "lista-maestra.xlsx"
+    assert ultimo_file.exists()
+
+    # 1b. Test restaurar ultimo backup
+    # Borrar lista-maestra de salida y restaurarla
+    (config.rutas.carpeta_salida / "lista-maestra.xlsx").unlink()
+    assert not (config.rutas.carpeta_salida / "lista-maestra.xlsx").exists()
+    res_ru = restaurar_ultimo_backup(config)
+    assert res_ru["ok"] is True
+    assert (config.rutas.carpeta_salida / "lista-maestra.xlsx").exists()
+
+    # 2. Archivar base actual (Caso 2)
+    res_arch = archivar_base_actual(config, etiqueta="lote_previo")
+    assert res_arch["ok"] is True
+    assert "test_staging.sqlite" in res_arch["archivos_movidos"]
+    # El archivo en Salida fue movido
+    assert not config.rutas.base_sqlite.exists()
+
+    # Verificar que aparece en la lista de bases archivadas
+    bases = listar_bases_archivadas(config)
+    assert len(bases) >= 1
+    assert any("lote_previo" in b["etiqueta"] for b in bases)
+
+    # 3. Restaurar base archivada
+    res_rest = restaurar_base_archivada(config, bases[0]["nombre"])
+    assert res_rest["ok"] is True
+    assert config.rutas.base_sqlite.exists()
+
+

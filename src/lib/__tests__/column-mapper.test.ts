@@ -76,4 +76,24 @@ describe("autoDetectMappings", () => {
     const mappings = autoDetectMappings(["organization"]);
     expect(mappings[0].target).toBe("company");
   });
+
+  it("should detect Google Contacts CSV export headers", () => {
+    const mappings = autoDetectMappings([
+      "First Name",
+      "Last Name",
+      "E-mail 1 - Value",
+      "Phone 1 - Value",
+      "Organization 1 - Name",
+      "Organization 1 - Title",
+      "Notes",
+    ]);
+    const targets = Object.fromEntries(mappings.map(m => [m.source, m.target]));
+    expect(targets["First Name"]).toBe("firstName");
+    expect(targets["Last Name"]).toBe("lastName");
+    expect(targets["E-mail 1 - Value"]).toBe("email");
+    expect(targets["Phone 1 - Value"]).toBe("whatsapp");
+    expect(targets["Organization 1 - Name"]).toBe("company");
+    expect(targets["Organization 1 - Title"]).toBe("jobTitle");
+    expect(targets["Notes"]).toBe("notes");
+  });
 });

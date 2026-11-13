@@ -32,6 +32,34 @@ EXTENSIONES_TEXTO = {".docx", ".pdf", ".txt", ".md", ".log"}
 EXTENSIONES_CONTACTOS = {".vcf"}
 EXTENSIONES_SOPORTADAS = EXTENSIONES_TABLA | EXTENSIONES_TEXTO | EXTENSIONES_CONTACTOS
 
+DIRECTORIOS_IGNORADOS = {
+    "node_modules",
+    ".git",
+    ".venv",
+    "venv",
+    "env",
+    "__pycache__",
+    ".history",
+    ".idea",
+    ".vscode",
+    "dist",
+    "build",
+    "appdata",
+    "local settings",
+    "temp",
+    "tmp",
+    "$recycle.bin",
+    "system volume information",
+}
+
+
+def _debe_ignorar_directorio(nombre_dir: str) -> bool:
+    """Detecta si una subcarpeta debe excluirse del escaneo recursivo para no saturar memoria ni CPU."""
+    nombre_clean = str(nombre_dir).strip().lower()
+    if nombre_clean.startswith(".") or nombre_clean.startswith("~$"):
+        return True
+    return nombre_clean in DIRECTORIOS_IGNORADOS
+
 
 def _hash_archivo(path: Path) -> str:
     h = hashlib.sha256()
@@ -67,10 +95,11 @@ def escanear_directorio(
     config: Config,
     conn: sqlite3.Connection,
     callback_progreso: Any = None,
+    dry_run: bool = False,
 ) -> dict[str, Any]:
     """Recorre `ruta` recursivamente, extrae contactos estructurados y texto libre,
     captura atributos elásticos y ejecuta el pipeline de normalización y deduplicación.
-    Devuelve un informe con métricas de la corrida."""
+    Si `dry_run=True`, solo cuantifica y simula sin modificar la base de datos."""
     carpeta = Path(ruta).resolve()
     if not carpeta.exists():
         raise FileNotFoundError(f"La ruta especificada no existe: {carpeta}")
@@ -83,7 +112,8 @@ def escanear_directorio(
     atributos_descubiertos: set[str] = set()
 
     archivos_candidatos: list[Path] = []
-    for root, _dirs, files in os.walk(carpeta):
+    for root, dirs, files in os.walk(carpeta):
+        dirs[:] = [d for d in dirs if not _debe_ignorar_directorio(d)]
         for f in sorted(files):
             if f.startswith("~$") or f.startswith("."):
                 continue
@@ -150,39 +180,50 @@ def escanear_directorio(
 
         try:
             registros = extraer_archivo_universal(path)
-            for r in registros:
-                conn.execute(
-                    "INSERT INTO raw_records "
-                    "(source_file, source_row, raw_json, confianza_extraccion, creado_en) "
-                    "VALUES (?, ?, ?, ?, ?)",
-                    (
-                        r.source_file,
-                        r.source_row,
-                        json.dumps(r.campos, ensure_ascii=False),
-                        r.confianza_extraccion,
-                        datetime.now(timezone.utc).isoformat(),
-                    ),
-                )
-                if "atributos_dinamicos" in r.campos:
-                    try:
-                        dinamicos = json.loads(r.campos["atributos_dinamicos"])
-                        atributos_descubiertos.update(dinamicos.keys())
-                    except Exception:
-                        pass
+            if not dry_run:
+                for r in registros:
+                    conn.execute(
+                        "INSERT INTO raw_records "
+                        "(source_file, source_row, raw_json, confianza_extraccion, creado_en) "
+                        "VALUES (?, ?, ?, ?, ?)",
+                        (
+                            r.source_file,
+                            r.source_row,
+                            json.dumps(r.campos, ensure_ascii=False),
+                            r.confianza_extraccion,
+                            datetime.now(timezone.utc).isoformat(),
+                        ),
+                    )
+                    if "atributos_dinamicos" in r.campos:
+                        try:
+                            dinamicos = json.loads(r.campos["atributos_dinamicos"])
+                            atributos_descubiertos.update(dinamicos.keys())
+                        except Exception:
+                            pass
 
-            _marcar_procesado(conn, path)
-            conn.commit()
+                _marcar_procesado(conn, path)
+                conn.commit()
+            else:
+                for r in registros:
+                    if "atributos_dinamicos" in r.campos:
+                        try:
+                            dinamicos = json.loads(r.campos["atributos_dinamicos"])
+                            atributos_descubiertos.update(dinamicos.keys())
+                        except Exception:
+                            pass
+
             total_raw_nuevos += len(registros)
 
             if callback_progreso:
                 try:
+                    prefijo = "🔍 [Simulación] " if dry_run else "✓ "
                     callback_progreso("archivo_fin", {
                         "archivo": path.name,
                         "indice": idx + 1,
                         "totales": total_archivos,
                         "raw_nuevos": len(registros),
                         "total_raw": total_raw_nuevos,
-                        "mensaje": f"✓ '{path.name}': {len(registros)} registros crudos extraídos",
+                        "mensaje": f"{prefijo}'{path.name}': {len(registros)} registros crudos extraídos",
                     })
                 except Exception:
                     pass
@@ -200,7 +241,44 @@ def escanear_directorio(
                 except Exception:
                     pass
 
-    # Procesar etapas subsecuentes con los nuevos datos
+    # Si es dry-run, no alteramos la base de datos con normalización ni deduplicación
+    if dry_run:
+        total_personas = 0
+        try:
+            fila_p = conn.execute("SELECT COUNT(*) FROM personas").fetchone()
+            if fila_p:
+                total_personas = fila_p[0]
+        except Exception:
+            pass
+
+        resultado = {
+            "ruta_escaneada": str(carpeta),
+            "dry_run": True,
+            "archivos_analizados": archivos_analizados,
+            "formatos_detectados": formatos_detectados,
+            "raw_records_nuevos": total_raw_nuevos,
+            "normalized_records_nuevos": 0,
+            "deduplicacion": "Modo simulación (sin alteraciones en base de datos)",
+            "total_personas_unificadas": total_personas,
+            "atributos_dinamicos_descubiertos": sorted(atributos_descubiertos),
+            "archivos_salida": {
+                "lista_maestra": "(Simulación: archivo no generado)",
+                "whatsapp_csv": "(Simulación: archivo no generado)",
+            },
+        }
+
+        if callback_progreso:
+            try:
+                callback_progreso("completado", {
+                    "resultado": resultado,
+                    "mensaje": f"🔍 [SIMULACIÓN COMPLETADA] Se identificaron {total_raw_nuevos} contactos en {archivos_analizados} archivos. Base de datos intacta.",
+                })
+            except Exception:
+                pass
+
+        return resultado
+
+    # Procesar etapas subsecuentes con los nuevos datos (Modo real)
     if callback_progreso:
         try:
             callback_progreso("normalizando", {
@@ -290,8 +368,9 @@ class UniversalScanner:
         config: Config,
         conn: sqlite3.Connection,
         callback_progreso: Any = None,
+        dry_run: bool = False,
     ) -> dict[str, Any]:
-        return escanear_directorio(ruta, config, conn, callback_progreso=callback_progreso)
+        return escanear_directorio(ruta, config, conn, callback_progreso=callback_progreso, dry_run=dry_run)
 
 
 def _extraer_delimitado(path: Path, separador: str = ",") -> list[RawContactRecord]:

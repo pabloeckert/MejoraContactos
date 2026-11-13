@@ -16,14 +16,49 @@ reviewer_app.py)."""
 
 from __future__ import annotations
 
+import logging
+import os
 import subprocess
+import sys
 from pathlib import Path
 
-_TIMEOUT_SEGUNDOS = 300  # 5 minutos para elegir -- no cuelga para siempre si el usuario se distrae
+logger = logging.getLogger(__name__)
+
+_TIMEOUT_SEGUNDOS = 120  # 2 minutos para elegir
 
 
 def elegir_carpeta(titulo: str = "Elegí una carpeta para importar") -> Path | None:
     """Devuelve la carpeta elegida, o None si el usuario canceló el diálogo."""
+    # 1. Intentar diálogo nativo rápido con Tkinter en subproceso limpio
+    script_tk = (
+        "import os, sys, tkinter as tk\n"
+        "from tkinter import filedialog\n"
+        "try:\n"
+        "    root = tk.Tk()\n"
+        "    root.withdraw()\n"
+        "    root.attributes('-topmost', True)\n"
+        "    root.focus_force()\n"
+        f"    ruta = filedialog.askdirectory(title={repr(titulo)})\n"
+        "    root.destroy()\n"
+        "    if ruta and str(ruta).strip():\n"
+        "        sys.stdout.write(os.path.normpath(os.path.abspath(ruta.strip())))\n"
+        "except Exception:\n"
+        "    pass\n"
+    )
+    try:
+        res = subprocess.run(
+            [sys.executable, "-c", script_tk],
+            capture_output=True,
+            text=True,
+            timeout=_TIMEOUT_SEGUNDOS,
+        )
+        ruta = res.stdout.strip()
+        if ruta:
+            return Path(ruta).resolve()
+    except Exception as exc:
+        logger.debug("Fallo tkinter para carpeta: %s", exc)
+
+    # 2. Fallback PowerShell interactivo (sin -NonInteractive para permitir GUI)
     script = f"""
 Add-Type -AssemblyName System.Windows.Forms
 $dialogo = New-Object System.Windows.Forms.FolderBrowserDialog
@@ -33,13 +68,41 @@ if ($dialogo.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {{
 }}
 """
     ruta = _ejecutar_dialogo(script)
-    return Path(ruta) if ruta else None
+    return Path(ruta).resolve() if ruta else None
 
 
 def elegir_archivo(titulo: str = "Elegí un archivo para importar") -> Path | None:
-    """Devuelve el archivo elegido (cualquier formato, sin filtrar por
-    extensión acá -- extraer_archivo() en ingest.py es quien valida si hay
-    un extractor disponible), o None si el usuario canceló."""
+    """Devuelve el archivo elegido, o None si el usuario canceló."""
+    # 1. Intentar diálogo nativo rápido con Tkinter en subproceso limpio
+    script_tk = (
+        "import os, sys, tkinter as tk\n"
+        "from tkinter import filedialog\n"
+        "try:\n"
+        "    root = tk.Tk()\n"
+        "    root.withdraw()\n"
+        "    root.attributes('-topmost', True)\n"
+        "    root.focus_force()\n"
+        f"    ruta = filedialog.askopenfilename(title={repr(titulo)})\n"
+        "    root.destroy()\n"
+        "    if ruta and str(ruta).strip():\n"
+        "        sys.stdout.write(os.path.normpath(os.path.abspath(ruta.strip())))\n"
+        "except Exception:\n"
+        "    pass\n"
+    )
+    try:
+        res = subprocess.run(
+            [sys.executable, "-c", script_tk],
+            capture_output=True,
+            text=True,
+            timeout=_TIMEOUT_SEGUNDOS,
+        )
+        ruta = res.stdout.strip()
+        if ruta:
+            return Path(ruta).resolve()
+    except Exception as exc:
+        logger.debug("Fallo tkinter para archivo: %s", exc)
+
+    # 2. Fallback PowerShell interactivo (sin -NonInteractive para permitir GUI)
     script = f"""
 Add-Type -AssemblyName System.Windows.Forms
 $dialogo = New-Object System.Windows.Forms.OpenFileDialog
@@ -51,7 +114,7 @@ if ($dialogo.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {{
 }}
 """
     ruta = _ejecutar_dialogo(script)
-    return Path(ruta) if ruta else None
+    return Path(ruta).resolve() if ruta else None
 
 
 def _escapar(texto: str) -> str:
@@ -59,10 +122,14 @@ def _escapar(texto: str) -> str:
 
 
 def _ejecutar_dialogo(script: str) -> str:
-    resultado = subprocess.run(
-        ["powershell.exe", "-NoProfile", "-NonInteractive", "-Sta", "-Command", script],
-        capture_output=True,
-        text=True,
-        timeout=_TIMEOUT_SEGUNDOS,
-    )
-    return resultado.stdout.strip()
+    try:
+        resultado = subprocess.run(
+            ["powershell.exe", "-NoProfile", "-Sta", "-Command", script],
+            capture_output=True,
+            text=True,
+            timeout=_TIMEOUT_SEGUNDOS,
+        )
+        return resultado.stdout.strip()
+    except Exception as exc:
+        logger.warning("Error ejecutando diálogo powershell: %s", exc)
+        return ""

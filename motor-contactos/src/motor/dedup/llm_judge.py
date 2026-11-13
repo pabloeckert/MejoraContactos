@@ -193,35 +193,6 @@ class LlmJudge:
         logger.info("Ollama/Anthropic/Gemini no disponibles. Fallback a resolución local determinista.")
         return None
 
-        proveedor_config = self._config.primario.proveedor if self._config and self._config.primario else None
-
-        # Si el config solicita explícitamente Gemini como primario
-        if proveedor_config == "gemini":
-            _cargar_dotenv()
-            api_key = os.environ.get("GEMINI_API_KEY", "").strip()
-            if api_key:
-                veredicto_gemini = _decidir_con_gemini(api_key, contacto_a, contacto_b)
-                if veredicto_gemini is not None:
-                    return veredicto_gemini
-            return None
-
-        # 1. Proveedor prioritario por defecto: Ollama local
-        veredicto_ollama = _decidir_con_ollama(contacto_a, contacto_b)
-        if veredicto_ollama is not None:
-            return veredicto_ollama
-
-        # 2. Fallback secundario: Gemini Flash (si está configurada la API key)
-        _cargar_dotenv()
-        api_key = os.environ.get("GEMINI_API_KEY", "").strip()
-        if api_key:
-            veredicto_gemini = _decidir_con_gemini(api_key, contacto_a, contacto_b)
-            if veredicto_gemini is not None:
-                return veredicto_gemini
-
-        # 3. Fallback a reglas locales (retorna None para resolución determinista / revisión en SQLite)
-        logger.info("Ollama/Gemini no disponibles. Fallback a resolución local determinista.")
-        return None
-
 
 # ----------------------------------------------------------------------
 # 1. IMPLEMENTACIÓN OLLAMA LOCAL (PRIORITARIO)
@@ -572,7 +543,7 @@ def _consultar_gemini(api_key: str, prompt_usuario: str, prompt_sistema: str = _
     de 429/503/ReadTimeout para no bloquear la ejecución."""
     time.sleep(_THROTTLE_GEMINI_SEGUNDOS)
 
-    modelos = (_MODELO_GEMINI_DEFAULT, "gemini-3.6-flash", "gemini-flash-lite-latest")
+    modelos = ("gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.0-flash-lite", _MODELO_GEMINI_DEFAULT, "gemini-flash-latest")
 
     for modelo in modelos:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent?key={api_key}"

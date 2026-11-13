@@ -12,6 +12,7 @@ from motor.text_cleaning import desglosar_compuesto_nombre, clasificar_identidad
 from motor.google_contacts_source import _RUTA_CREDENCIALES, _ruta_token
 
 
+@pytest.mark.skipif(not _RUTA_CREDENCIALES.exists(), reason="credentials.json no configurado en entorno local")
 def test_credentials_file_exists():
     assert _RUTA_CREDENCIALES.exists(), "credentials.json debe existir en motor-contactos/"
     with _RUTA_CREDENCIALES.open("r", encoding="utf-8") as f:

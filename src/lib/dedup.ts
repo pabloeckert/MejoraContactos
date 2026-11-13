@@ -84,7 +84,10 @@ export class DedupIndex {
   // nombre normalizado → [contactIds] (para fuzzy matching limitado)
   private nameIndex = new Map<string, string[]>();
 
-  // Todos los contactos para fallback
+  // Map rápido de id → contacto para lookup O(1)
+  private contactMap = new Map<string, ContactForDedup>();
+
+  // Todos los contactos para tracking y compatibilidad
   private contacts: ContactForDedup[] = [];
 
   /**
@@ -121,7 +124,7 @@ export class DedupIndex {
       const candidates = this.nameIndex.get(bucket) || [];
 
       for (const candidateId of candidates) {
-        const candidate = this.contacts.find(c => c.id === candidateId);
+        const candidate = this.contactMap.get(candidateId);
         if (!candidate) continue;
         const candidateName = normalize(`${candidate.firstName}${candidate.lastName}`);
         if (candidateName.length < 3) continue;
@@ -135,6 +138,7 @@ export class DedupIndex {
 
     // No es duplicado — agregar al índice
     this.contacts.push(contact);
+    this.contactMap.set(contact.id, contact);
 
     if (contact.email) {
       const normalizedEmail = normalize(contact.email);
@@ -172,6 +176,7 @@ export class DedupIndex {
     this.emailIndex.clear();
     this.phoneIndex.clear();
     this.nameIndex.clear();
+    this.contactMap.clear();
     this.contacts = [];
   }
 }

@@ -119,23 +119,29 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  [OK] Export WhatsApp generado: {ruta_wa}")
         elif comando in ("scan-dir", "escanear-directorio"):
             if len(argv) < 2:
-                print("uso: python -m motor.cli scan-dir <ruta_directorio>")
+                print("uso: python -m motor.cli scan-dir <ruta_directorio> [--dry-run]")
                 return 1
             from motor.extractors.universal_scanner import escanear_directorio
 
             ruta_dir = argv[1]
-            print(f"=== Escáner Universal de Documentos: {ruta_dir} ===")
+            dry_run = any(flag in argv[2:] for flag in ("--dry-run", "--simulacion", "-d"))
+            prefijo = " [MODO SIMULACIÓN / DRY-RUN]" if dry_run else ""
+            print(f"=== Escáner Universal de Documentos{prefijo}: {ruta_dir} ===")
             try:
-                res = escanear_directorio(ruta_dir, config, conn)
+                res = escanear_directorio(ruta_dir, config, conn, dry_run=dry_run)
                 print(f"  Archivos analizados: {res['archivos_analizados']}")
                 print(f"  Formatos: {res['formatos_detectados']}")
-                print(f"  Raw records nuevos: {res['raw_records_nuevos']}")
-                print(f"  Normalized records nuevos: {res['normalized_records_nuevos']}")
-                print(f"  Deduplicación: {res['deduplicacion']}")
-                print(f"  Total personas unificadas: {res['total_personas_unificadas']}")
-                if res['atributos_dinamicos_descubiertos']:
+                print(f"  Raw records {'potenciales' if dry_run else 'nuevos'}: {res['raw_records_nuevos']}")
+                if not dry_run:
+                    print(f"  Normalized records nuevos: {res['normalized_records_nuevos']}")
+                    print(f"  Deduplicación: {res['deduplicacion']}")
+                    print(f"  Total personas unificadas: {res['total_personas_unificadas']}")
+                if res.get('atributos_dinamicos_descubiertos'):
                     print(f"  Atributos elásticos descubiertos: {', '.join(res['atributos_dinamicos_descubiertos'])}")
-                print(f"  [OK] Export final: {res['archivos_salida']['lista_maestra']}")
+                if dry_run:
+                    print(f"  [OK] Simulación exitosa. Base de datos intacta (ningún registro insertado).")
+                else:
+                    print(f"  [OK] Export final: {res['archivos_salida']['lista_maestra']}")
             except Exception as exc:
                 print(f"[ERROR] Error escaneando directorio: {exc}")
                 return 1

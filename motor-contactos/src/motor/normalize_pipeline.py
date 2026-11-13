@@ -28,7 +28,7 @@ from motor.tagging import auto_etiquetar
 from motor.text_cleaning import clasificar_identidad, limpiar_lugar, limpiar_texto_libre
 
 
-def normalizar_todo(config: Config, conn: sqlite3.Connection) -> int:
+def normalizar_todo(config: Config, conn: sqlite3.Connection, callback_progreso: Any = None) -> int:
     """Devuelve la cantidad de normalized_records nuevos."""
     pendientes = conn.execute(
         "SELECT r.id, r.raw_json FROM raw_records r "
@@ -36,11 +36,16 @@ def normalizar_todo(config: Config, conn: sqlite3.Connection) -> int:
         "WHERE n.id IS NULL"
     ).fetchall()
 
-    for fila in pendientes:
+    total = len(pendientes)
+    for idx, fila in enumerate(pendientes, start=1):
         campos = json.loads(fila["raw_json"])
         _normalizar_registro(config, conn, fila["id"], campos)
+        if idx % 500 == 0 or idx == total:
+            conn.commit()
+            if callback_progreso:
+                callback_progreso(idx, total)
     conn.commit()
-    return len(pendientes)
+    return total
 
 
 def _normalizar_registro(

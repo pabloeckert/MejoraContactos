@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Calendar, Clock, Users, Share2 } from "lucide-react";
-import { BLOG_POSTS } from "./Blog";
+import { BLOG_POSTS } from "@/lib/blog-data";
 
 const ARTICLES: Record<string, { content: string }> = {
   "como-limpiar-contactos-google": {

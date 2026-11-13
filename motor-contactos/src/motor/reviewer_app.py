@@ -1048,7 +1048,10 @@ _PLANTILLA_DASHBOARD = _ESTILO + """
             <p id="progreso-subtitulo" style="margin:2px 0 0; color:var(--text-tertiary); font-size:0.85rem;">No cierres esta ventana. Tu proceso se ejecuta de forma segura.</p>
           </div>
         </div>
-        <span class="live-tag">● EN VIVO</span>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span class="live-tag">● EN VIVO</span>
+          <button type="button" onclick="cerrarModalProgreso()" style="background:transparent; border:none; color:var(--text-tertiary); font-size:1.3rem; cursor:pointer; padding:2px 8px; line-height:1;" title="Cerrar ventana">✕</button>
+        </div>
       </div>
 
       <!-- Barra de progreso -->
@@ -1181,7 +1184,7 @@ _PLANTILLA_DASHBOARD = _ESTILO + """
 
       let html = '<ul style="list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:6px;">';
       colaCarpetas.forEach(function(ruta, idx) {
-        const nombreCarpeta = ruta.replace(/\\\\/g, '/').split('/').filter(Boolean).pop() || ruta;
+        const nombreCarpeta = ruta.split('\\\\').join('/').split('/').filter(Boolean).pop() || ruta;
         html += '<li style="display:flex; justify-content:space-between; align-items:center; background:var(--surface-elevated); padding:6px 10px; border-radius:6px; border:1px solid var(--border-subtle);">' +
           '<div style="display:flex; align-items:center; gap:8px; overflow:hidden;">' +
             '<span style="font-size:0.95rem;">📁</span>' +
@@ -1201,12 +1204,12 @@ _PLANTILLA_DASHBOARD = _ESTILO + """
       if (!ruta) return;
       ruta = ruta.trim();
       if (!ruta) return;
-      const normalizada = ruta.replace(/\\/g, '/');
+      const normalizada = ruta.split('\\\\').join('/');
       const yaExiste = colaCarpetas.some(function(r) {
-        return r.replace(/\\/g, '/').toLowerCase() === normalizada.toLowerCase();
+        return r.split('\\\\').join('/').toLowerCase() === normalizada.toLowerCase();
       });
       if (yaExiste) {
-        alert('La carpeta ya está en la cola:\\n' + ruta);
+        alert('La carpeta ya está en la cola: ' + ruta);
         return;
       }
       colaCarpetas.push(ruta);
@@ -1227,24 +1230,42 @@ _PLANTILLA_DASHBOARD = _ESTILO + """
 
     function encolarDesdeInput() {
       const inp = document.getElementById('input-ruta-cola');
-      if (!inp || !inp.value.trim()) return;
+      if (!inp || !inp.value.trim()) {
+        alert('Por favor escribí o pegá una ruta de carpeta antes de tocar "+ Encolar".');
+        return;
+      }
       agregarACola(inp.value.trim());
       inp.value = '';
     }
 
     function explorarYEncolar() {
+      const btn = document.getElementById('btn-explorar-encolar');
+      const txtOrig = btn ? btn.innerText : '';
+      if (btn) btn.innerText = '⏳ Abriendo selector...';
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(function() { controller.abort(); }, 3500);
+
       fetch('/api/dialogo/elegir-carpeta', {
         method: 'POST',
-        headers: { 'Accept': 'application/json' }
+        headers: { 'Accept': 'application/json' },
+        signal: controller.signal
       })
-      .then(function(r) { return r.json(); })
+      .then(function(r) { clearTimeout(timeoutId); return r.json(); })
       .then(function(data) {
+        if (btn) btn.innerText = txtOrig;
         if (data && data.ok && data.ruta) {
           agregarACola(data.ruta);
+        } else if (!data || !data.cancelado) {
+          const manual = prompt('Ingresá o pegá la ruta de la carpeta a escanear (Ej: C:/MisContactos):', 'Data/Crudos');
+          if (manual && manual.trim()) agregarACola(manual.trim());
         }
       })
       .catch(function(err) {
-        console.error('Error al abrir diálogo de carpeta:', err);
+        clearTimeout(timeoutId);
+        if (btn) btn.innerText = txtOrig;
+        const manual = prompt('Ingresá o pegá la ruta de la carpeta a escanear (Ej: C:/MisContactos):', 'Data/Crudos');
+        if (manual && manual.trim()) agregarACola(manual.trim());
       });
     }
 
@@ -1294,6 +1315,11 @@ _PLANTILLA_DASHBOARD = _ESTILO + """
           agregarACola(inp.value.trim());
           inp.value = '';
         }
+        if (colaCarpetas.length === 0) {
+          e.preventDefault();
+          alert('⚠️ Por favor agregá al menos una carpeta a la cola (usando "Explorar", pegando la ruta o arrastrando) antes de presionar el botón de escaneo.');
+          return false;
+        }
         iniciarMonitoreoProgreso();
       });
     }
@@ -1302,10 +1328,16 @@ _PLANTILLA_DASHBOARD = _ESTILO + """
     let evtSource = null;
     let pollTimer = null;
 
+    function cerrarModalProgreso() {
+      const modal = document.getElementById("progreso-modal");
+      if (modal) modal.style.display = "none";
+      if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+    }
+
     function actualizarUIProgreso(data) {
       if (!data) return;
       const modal = document.getElementById("progreso-modal");
-      if (modal && (data.activo || data.progreso_pct > 0)) {
+      if (modal && data.activo) {
         modal.style.display = "flex";
       }
 

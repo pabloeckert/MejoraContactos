@@ -442,4 +442,38 @@ def test_api_dialogo_elegir_carpeta(tmp_path):
         assert datos["nombre"] == "mi_carpeta_elegida"
 
 
+def test_accion_resetear_base_vacia_tablas_y_salidas(tmp_path):
+    config = _config_prueba(tmp_path)
+    (config.rutas.carpeta_raiz / "a.csv").write_text(
+        "Nombre,Telefono\nCarlos Gomez,3743504517\n", encoding="utf-8"
+    )
+    conn = conectar(config.rutas.base_sqlite)
+    cliente = crear_app(config, conn).test_client()
+
+    # Correr para poblar la base
+    cliente.post("/accion/run")
+    assert (config.rutas.carpeta_salida / "lista-maestra.xlsx").exists()
+    assert (config.rutas.carpeta_salida / "contactos-whatsapp.csv").exists()
+    assert conn.execute("SELECT count(*) FROM raw_records").fetchone()[0] == 1
+
+    # Ejecutar resetear-base
+    resp = cliente.post("/accion/resetear-base", follow_redirects=True)
+    assert resp.status_code == 200
+    assert "Base de datos reseteada a cero".encode() in resp.data
+
+    # Verificar que las tablas están vacías
+    assert conn.execute("SELECT count(*) FROM raw_records").fetchone()[0] == 0
+    assert conn.execute("SELECT count(*) FROM normalized_records").fetchone()[0] == 0
+    assert conn.execute("SELECT count(*) FROM clusters").fetchone()[0] == 0
+
+    # Verificar que las salidas anteriores fueron limpiadas
+    assert not (config.rutas.carpeta_salida / "lista-maestra.xlsx").exists()
+    assert not (config.rutas.carpeta_salida / "contactos-whatsapp.csv").exists()
+
+    # Verificar que se guardó el backup previo de seguridad
+    carpeta_backup = config.rutas.carpeta_salida.parent / "Backups" / "ultimo_backup"
+    assert (carpeta_backup / "lista-maestra.xlsx").exists()
+
+
+
 

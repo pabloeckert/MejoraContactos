@@ -796,6 +796,11 @@ _PLANTILLA_DASHBOARD = _ESTILO + """
             </button>
           </form>
         </div>
+        <form method="post" action="/accion/resetear-base" style="margin:0; width:100%; margin-top:6px;" onsubmit="return confirm('⚠️ ATENCIÓN: ¿Seguro que querés vaciar la base de datos y comenzar completamente de cero? Se guardará una copia previa de seguridad en Data/Backups/ antes de vaciar.');">
+          <button class="secundario" style="width:100%; font-size:0.75rem; padding:5px 6px; color:#DC2626 !important; border-color:#DC2626 !important;" type="submit">
+            🗑️ Resetear Base (Dejar en blanco)
+          </button>
+        </form>
       </div>
     </div>
 
@@ -1013,6 +1018,18 @@ _PLANTILLA_DASHBOARD = _ESTILO + """
               <li>Abrí <a href="https://sheets.google.com/create" target="_blank" rel="noopener">un Google Sheet nuevo</a> y subí <code>lista-maestra.xlsx</code> (Archivo → Importar).</li>
               <li>En cada cuenta: Extensiones → Apps Script → pegar código de <code>google-apps-script/Sync.gs</code> → correr <code>sincronizarContactos</code>.</li>
             </ol>
+          </div>
+          <!-- RESETEAR BASE A CERO -->
+          <div class="card-modo" style="border-left: 4px solid #DC2626; background: rgba(220, 38, 38, 0.05); margin-top:1.2rem;">
+            <strong style="color: #DC2626; font-size: 0.92rem;">🗑️ Resetear Base de Datos y Salidas a Cero</strong>
+            <p style="color: var(--text-secondary); font-size: 0.82rem; margin: 0.3rem 0 0.7rem;">
+              Vacía todas las tablas de contactos, elimina las planillas exportadas y deja el sistema completamente limpio para pruebas desde cero. Guarda un respaldo previo automático para resguardar tus datos.
+            </p>
+            <form method="post" action="/accion/resetear-base" onsubmit="return confirm('⚠️ ATENCIÓN: ¿Seguro que querés vaciar la base de datos y comenzar completamente de cero? Se guardará una copia previa de seguridad en Data/Backups/ antes de vaciar.');">
+              <button style="background: #DC2626 !important; border-color: #DC2626 !important; font-size: 0.82rem; padding: 6px 12px; color:#FFFFFF !important;" type="submit">
+                🗑️ Resetear y Dejar en Blanco
+              </button>
+            </form>
           </div>
         </div>
       </details>
@@ -1747,6 +1764,64 @@ def _ejecutar_accion(config: Config, conn: sqlite3.Connection, nombre: str) -> s
             res = hacer_backup_previo(config, motivo="manual")
             archivos = ", ".join(res.get("archivos_respaldados", [])) or "sin archivos previos"
             msg = f"✓ Copia de seguridad guardada ({archivos}) en 'Data/Backups/ultimo_backup/' y 'Data/Backups/historico/'."
+            tracker.finalizar(exito=True, mensaje=msg)
+            return msg
+        if nombre == "resetear-base":
+            tracker.actualizar(paso=1, pct=25, etapa_nombre="Respaldo Previo", mensaje="Guardando copia de seguridad previa...")
+            res_b = hacer_backup_previo(config, motivo="antes_de_resetear_base")
+            archivos_b = ", ".join(res_b.get("archivos_respaldados", [])) or "sin archivos previos"
+            tracker.log(f"✓ Respaldo previo guardado ({archivos_b}) en Data/Backups/ultimo_backup/")
+
+            tracker.actualizar(paso=2, pct=60, etapa_nombre="Vaciando Tablas", mensaje="Vaciando base de datos y recreando tablas...")
+            from motor.staging_db import crear_esquema
+            tablas = [
+                "decisiones_log",
+                "clusters",
+                "personas",
+                "telefono_index",
+                "email_index",
+                "normalized_records",
+                "raw_records",
+                "fuentes_procesadas",
+                "ediciones_manuales",
+                "aprendizaje_umbrales",
+            ]
+            conn.execute("PRAGMA foreign_keys=OFF")
+            with conn:
+                for t in tablas:
+                    try:
+                        conn.execute(f"DROP TABLE IF EXISTS {t}")
+                    except sqlite3.OperationalError:
+                        pass
+                try:
+                    conn.execute("DROP TABLE IF EXISTS busqueda_fts")
+                except sqlite3.OperationalError:
+                    pass
+            conn.execute("PRAGMA foreign_keys=ON")
+            crear_esquema(conn)
+            try:
+                conn.execute("VACUUM")
+            except Exception:
+                pass
+            tracker.log("✓ Base de datos SQLite vaciada y tablas recreadas desde cero")
+
+            tracker.actualizar(paso=3, pct=85, etapa_nombre="Limpiando Salidas", mensaje="Eliminando planillas de salida...")
+            excel_p = config.rutas.carpeta_salida / "lista-maestra.xlsx"
+            if excel_p.exists():
+                try:
+                    excel_p.unlink(missing_ok=True)
+                except Exception:
+                    pass
+            wa_p = config.rutas.carpeta_salida / "contactos-whatsapp.csv"
+            if wa_p.exists():
+                try:
+                    wa_p.unlink(missing_ok=True)
+                except Exception:
+                    pass
+            tracker.log("✓ Planillas Excel y WhatsApp eliminadas de Data/Salida/")
+
+            invalidar_cache_stats()
+            msg = "✓ Base de datos reseteada a cero con éxito. El sistema está 100% en blanco para comenzar nuevas pruebas."
             tracker.finalizar(exito=True, mensaje=msg)
             return msg
         if nombre == "completar-pendientes":

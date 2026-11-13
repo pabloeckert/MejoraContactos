@@ -9,6 +9,7 @@ minutos, incluso con los ~35.000 contactos reales."""
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 import time
 from datetime import datetime
@@ -558,6 +559,83 @@ _ESTILO = """
 
   .barra-contenedor { margin: 1.2rem 0; text-align: left; }
   .barra-fondo { width: 100%; height: 10px; background: var(--border-subtle); border-radius: 5px; overflow: hidden; margin: 8px 0; }
+
+  /* Explorador Web de Carpetas y Archivos */
+  #explorador-modal {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(15, 23, 42, 0.78);
+    z-index: 999990;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    align-items: center;
+    justify-content: center;
+  }
+  .exp-box {
+    background: var(--surface-card);
+    border: 1px solid var(--border-glass);
+    border-radius: 16px;
+    padding: 1.5rem;
+    max-width: 780px;
+    width: 94%;
+    max-height: 86vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.45);
+    text-align: left;
+  }
+  .exp-lista {
+    flex: 1;
+    min-height: 220px;
+    max-height: 390px;
+    overflow-y: auto;
+    border: 1px solid var(--border-subtle);
+    border-radius: 10px;
+    background: var(--surface-elevated);
+    padding: 6px;
+  }
+  .exp-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 7px 10px;
+    border-radius: 8px;
+    border-bottom: 1px solid var(--border-subtle);
+    font-size: 0.88rem;
+  }
+  .exp-item:last-child { border-bottom: none; }
+  .exp-item:hover { background: var(--surface-card); }
+  .exp-nombre {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+  .exp-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+  .exp-chip {
+    background: var(--surface-elevated) !important;
+    color: var(--text-primary) !important;
+    border: 1px solid var(--border-subtle) !important;
+    padding: 5px 10px !important;
+    font-size: 0.8rem !important;
+    border-radius: 8px !important;
+    box-shadow: none !important;
+  }
+  .exp-chip:hover {
+    border-color: var(--brand-accent) !important;
+    background: var(--surface-card) !important;
+  }
   .barra-fill { height: 100%; background: linear-gradient(90deg, #1A3D84, #059669); border-radius: 5px; transition: width 0.3s ease; }
 
   .modal-stepper { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 1.2rem 0; }
@@ -617,7 +695,21 @@ _PLANTILLA_DASHBOARD = _ESTILO + """
 
   <!-- COPILOTO CONTEXTUAL IA (Interfaces Nativas de IA y Asistente Contextual) -->
   <div class="copiloto-banner">
-    {% if not stats.al_dia %}
+    {% if stats.raw_records == 0 %}
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:14px;">
+        <div>
+          <span class="copiloto-badge">✨ Copiloto IA · Base en Blanco Lista</span>
+          <div class="copiloto-text">
+            La base de datos está limpia (<strong>0 contactos</strong>). Explorá y encolá tus carpetas o elegí un archivo suelto abajo para comenzar una prueba real desde cero.
+          </div>
+          <div class="copiloto-pills">
+            <span class="copiloto-pill">🟢 Listo para primera carga</span>
+            <span class="copiloto-pill">🛡️ Respaldo automático antes de cada corrida</span>
+          </div>
+        </div>
+        <span class="badge badge-ok" style="font-size:0.9rem; padding:6px 14px;">✨ Base Vacía</span>
+      </div>
+    {% elif not stats.al_dia %}
       <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:14px;">
         <div style="flex:1; min-width:280px;">
           <span class="copiloto-badge">✨ Copiloto IA · Alerta de Sincronización</span>
@@ -692,11 +784,15 @@ _PLANTILLA_DASHBOARD = _ESTILO + """
 
         <!-- CONTROLES PARA AGREGAR A LA COLA -->
         <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:10px;">
-          <button type="button" id="btn-explorar-encolar" onclick="explorarYEncolar()" style="background:#2563EB !important; border-color:#2563EB !important; color:#FFFFFF !important; font-size:0.86rem; padding:7px 14px;">
+          <button type="button" id="btn-explorar-encolar" onclick="abrirExploradorModal('carpeta')" style="background:#2563EB !important; border-color:#2563EB !important; color:#FFFFFF !important; font-size:0.86rem; padding:7px 14px;">
             📁 Explorar y Encolar Carpeta...
           </button>
-          <form method="post" action="/accion/actualizar-y-respaldar-archivo" style="display:inline; margin:0;">
-            <button class="secundario" type="submit" style="font-size:0.86rem; padding:7px 12px;">📄 Archivo suelto directo</button>
+          <form id="form-archivo-directo" method="post" action="/accion/subir-archivo" enctype="multipart/form-data" data-no-progress="1" style="display:inline; margin:0;">
+            <input type="file" id="input-archivo-directo" name="archivo" style="display:none;" accept=".csv,.tsv,.txt,.xls,.xlsx,.xlsm,.ods,.vcf,.json,.html,.htm,.md,.log,.docx,.pdf,.png,.jpg,.jpeg" onchange="enviarArchivoDirecto(this)">
+            <button type="button" id="btn-archivo-directo" class="secundario" onclick="document.getElementById('input-archivo-directo').click()" style="font-size:0.86rem; padding:7px 12px;">📄 Archivo suelto directo</button>
+          </form>
+          <form id="form-archivo-ruta" method="post" action="/accion/actualizar-y-respaldar-archivo" data-no-progress="1" style="display:none;">
+            <input type="hidden" name="ruta_archivo" id="input-ruta-archivo-directo" value="">
           </form>
         </div>
 
@@ -1037,6 +1133,48 @@ _PLANTILLA_DASHBOARD = _ESTILO + """
 
   </div> <!-- FIN BENTO GRID -->
 
+  <!-- EXPLORADOR WEB DE CARPETAS Y ARCHIVOS (Nativo del navegador, funciona en cualquier sesión) -->
+  <div id="explorador-modal" onclick="if(event.target===this) cerrarExploradorModal()">
+    <div class="exp-box">
+      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-subtle); padding-bottom:0.8rem; margin-bottom:0.9rem;">
+        <div>
+          <h3 style="margin:0; font-size:1.15rem; color:var(--text-primary);">📁 Explorar Carpetas y Archivos</h3>
+          <div style="font-size:0.8rem; color:var(--text-tertiary); margin-top:2px;">Navegá por tu PC y encolá una o varias carpetas antes de escanear.</div>
+        </div>
+        <button type="button" class="btn-icon" onclick="cerrarExploradorModal()" title="Cerrar explorador">✕</button>
+      </div>
+
+      <!-- Barra de ruta y navegación -->
+      <div style="display:flex; gap:6px; align-items:center; margin-bottom:10px; flex-wrap:wrap;">
+        <button type="button" class="btn secundario" onclick="cargarRutaExplorador('')" style="padding:6px 10px; font-size:0.82rem;">🏠 Inicio</button>
+        <button type="button" id="exp-btn-subir" class="btn secundario" onclick="subirCarpetaExplorador()" style="padding:6px 10px; font-size:0.82rem;">⬆️ Subir</button>
+        <input type="text" id="exp-input-ruta" placeholder="Escribí o pegá una ruta (ej: C:/MisContactos)" style="flex:1; min-width:200px; padding:6px 10px; font-size:0.84rem; border:1px solid var(--border-subtle); border-radius:6px; background:var(--surface-elevated); color:var(--text-primary);" onkeydown="if(event.key==='Enter'){event.preventDefault(); navegarInputExplorador();}">
+        <button type="button" class="btn secundario" onclick="navegarInputExplorador()" style="padding:6px 12px; font-size:0.82rem;">Ir</button>
+      </div>
+
+      <!-- Atajos y Unidades rápidas -->
+      <div id="exp-atajos" class="exp-chips"></div>
+
+      <!-- Estado / Toast dentro del explorador -->
+      <div id="exp-status" style="display:none; background:var(--success-surface); color:var(--success); border:1px solid var(--success-border); border-radius:8px; padding:6px 10px; font-size:0.82rem; font-weight:600; margin-bottom:8px;"></div>
+
+      <!-- Lista de carpetas y archivos -->
+      <div id="exp-lista" class="exp-lista">
+        <div style="padding:1.5rem; text-align:center; color:var(--text-tertiary); font-size:0.86rem;">Cargando carpetas...</div>
+      </div>
+
+      <!-- Footer acciones -->
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-top:1rem; padding-top:0.85rem; border-top:1px solid var(--border-subtle);">
+        <div id="exp-info-pie" style="font-size:0.8rem; color:var(--text-secondary);">Seleccioná una carpeta o hacé clic en "+ Encolar".</div>
+        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+          <button type="button" class="btn secundario" onclick="cerrarExploradorModal()" style="font-size:0.84rem; padding:7px 14px;">Cerrar</button>
+          <button type="button" id="exp-btn-encolar-actual" onclick="encolarCarpetaActual(false)" class="btn secundario" style="display:none; font-size:0.84rem; padding:7px 14px;">+ Encolar esta carpeta</button>
+          <button type="button" id="exp-btn-encolar-cerrar" onclick="encolarCarpetaActual(true)" style="display:none; background:#2563EB !important; border-color:#2563EB !important; color:#FFFFFF !important; font-size:0.86rem; padding:7px 14px;">✓ Encolar y Listo</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- MONITOR DE PROGRESO EN VIVO (CON SSE Y CONSOLA EMBEBIDA) -->
   <div id="progreso-modal">
     <div class="modal-box">
@@ -1238,35 +1376,203 @@ _PLANTILLA_DASHBOARD = _ESTILO + """
       inp.value = '';
     }
 
+    let expEstado = { ruta_actual: '', padre: null, en_raiz: true };
+    let expAtajosLista = [];
+    let expCarpetasLista = [];
+    let expArchivosLista = [];
+
+    function abrirExploradorModal() {
+      const modal = document.getElementById('explorador-modal');
+      if (!modal) return;
+      modal.style.display = 'flex';
+      const st = document.getElementById('exp-status');
+      if (st) st.style.display = 'none';
+      cargarRutaExplorador(expEstado.ruta_actual || '');
+    }
+
+    function cerrarExploradorModal() {
+      const modal = document.getElementById('explorador-modal');
+      if (modal) modal.style.display = 'none';
+    }
+
     function explorarYEncolar() {
-      const btn = document.getElementById('btn-explorar-encolar');
-      const txtOrig = btn ? btn.innerText : '';
-      if (btn) btn.innerText = '⏳ Abriendo selector...';
+      abrirExploradorModal();
+    }
 
-      const controller = new AbortController();
-      const timeoutId = setTimeout(function() { controller.abort(); }, 3500);
+    function mostrarToastExplorador(texto) {
+      const st = document.getElementById('exp-status');
+      if (!st) return;
+      st.innerText = texto;
+      st.style.display = 'block';
+    }
 
-      fetch('/api/dialogo/elegir-carpeta', {
-        method: 'POST',
-        headers: { 'Accept': 'application/json' },
-        signal: controller.signal
-      })
-      .then(function(r) { clearTimeout(timeoutId); return r.json(); })
-      .then(function(data) {
-        if (btn) btn.innerText = txtOrig;
-        if (data && data.ok && data.ruta) {
-          agregarACola(data.ruta);
-        } else if (!data || !data.cancelado) {
-          const manual = prompt('Ingresá o pegá la ruta de la carpeta a escanear (Ej: C:/MisContactos):', 'Data/Crudos');
-          if (manual && manual.trim()) agregarACola(manual.trim());
+    function cargarRutaExplorador(ruta) {
+      const lista = document.getElementById('exp-lista');
+      if (lista) {
+        lista.innerHTML = '<div style="padding:1.5rem; text-align:center; color:var(--text-tertiary); font-size:0.86rem;">⏳ Leyendo carpetas...</div>';
+      }
+      fetch('/api/explorar?ruta=' + encodeURIComponent(ruta || ''))
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (!data || !data.ok) {
+            if (lista) {
+              lista.innerHTML = '<div style="padding:1.2rem; color:var(--danger); font-size:0.86rem;">⚠️ ' + escapeHtml((data && data.error) || 'No se pudo abrir la ruta solicitada.') + '</div>';
+            }
+            return;
+          }
+          renderizarExplorador(data);
+        })
+        .catch(function() {
+          if (lista) {
+            lista.innerHTML = '<div style="padding:1.2rem; color:var(--danger); font-size:0.86rem;">⚠️ Error de conexión leyendo carpetas locales.</div>';
+          }
+        });
+    }
+
+    function renderizarExplorador(data) {
+      expEstado = {
+        ruta_actual: data.ruta_actual || '',
+        padre: data.padre === undefined ? null : data.padre,
+        en_raiz: !!data.en_raiz
+      };
+      const inp = document.getElementById('exp-input-ruta');
+      if (inp) inp.value = expEstado.ruta_actual;
+
+      const btnSubir = document.getElementById('exp-btn-subir');
+      if (btnSubir) btnSubir.disabled = expEstado.en_raiz;
+
+      const btnEncolarAct = document.getElementById('exp-btn-encolar-actual');
+      const btnEncolarCer = document.getElementById('exp-btn-encolar-cerrar');
+      const mostrarEncolarActual = !expEstado.en_raiz && !!expEstado.ruta_actual;
+      if (btnEncolarAct) btnEncolarAct.style.display = mostrarEncolarActual ? 'inline-flex' : 'none';
+      if (btnEncolarCer) btnEncolarCer.style.display = mostrarEncolarActual ? 'inline-flex' : 'none';
+
+      // Renderizar atajos y unidades arriba
+      expAtajosLista = [];
+      (data.atajos || []).forEach(function(a) { expAtajosLista.push(a); });
+      (data.unidades || []).forEach(function(u) { expAtajosLista.push(u); });
+
+      const atajosEl = document.getElementById('exp-atajos');
+      if (atajosEl) {
+        atajosEl.innerHTML = expAtajosLista.map(function(a, i) {
+          const ico = a.es_unidad ? '💽 ' : '📌 ';
+          return '<button type="button" class="exp-chip" onclick="abrirAtajoIdx(' + i + ')">' + ico + escapeHtml(a.nombre) + '</button>';
+        }).join('');
+      }
+
+      const listaEl = document.getElementById('exp-lista');
+      const pieEl = document.getElementById('exp-info-pie');
+      if (!listaEl) return;
+
+      if (expEstado.en_raiz) {
+        expCarpetasLista = expAtajosLista.slice();
+        expArchivosLista = [];
+        if (expCarpetasLista.length === 0) {
+          listaEl.innerHTML = '<div style="padding:1.5rem; text-align:center; color:var(--text-tertiary);">No se detectaron unidades o atajos. Pegá una ruta arriba.</div>';
+        } else {
+          listaEl.innerHTML = expCarpetasLista.map(function(c, idx) {
+            const ico = c.es_unidad ? '💽 ' : '📁 ';
+            return '<div class="exp-item">' +
+              '<div class="exp-nombre" onclick="abrirCarpetaIdx(' + idx + ')">' + ico + escapeHtml(c.nombre) + ' <span style="font-weight:400; font-size:0.76rem; color:var(--text-tertiary);">(' + escapeHtml(c.ruta) + ')</span></div>' +
+              '<div style="display:flex; gap:6px;">' +
+                '<button type="button" class="btn secundario" style="padding:4px 10px; font-size:0.78rem;" onclick="abrirCarpetaIdx(' + idx + ')">Abrir</button>' +
+                (c.es_unidad ? '' : '<button type="button" class="btn secundario" style="padding:4px 10px; font-size:0.78rem;" onclick="encolarCarpetaIdx(' + idx + ')">+ Encolar</button>') +
+              '</div>' +
+            '</div>';
+          }).join('');
         }
-      })
-      .catch(function(err) {
-        clearTimeout(timeoutId);
-        if (btn) btn.innerText = txtOrig;
-        const manual = prompt('Ingresá o pegá la ruta de la carpeta a escanear (Ej: C:/MisContactos):', 'Data/Crudos');
-        if (manual && manual.trim()) agregarACola(manual.trim());
-      });
+        if (pieEl) pieEl.innerText = 'Elegí un atajo o unidad para navegar por tus carpetas.';
+        return;
+      }
+
+      expCarpetasLista = data.carpetas || [];
+      expArchivosLista = data.archivos || [];
+
+      let html = '';
+      html += expCarpetasLista.map(function(c, idx) {
+        return '<div class="exp-item">' +
+          '<div class="exp-nombre" onclick="abrirCarpetaIdx(' + idx + ')" title="Abrir carpeta">📁 ' + escapeHtml(c.nombre) + '</div>' +
+          '<div style="display:flex; gap:6px;">' +
+            '<button type="button" class="btn secundario" style="padding:4px 10px; font-size:0.78rem;" onclick="abrirCarpetaIdx(' + idx + ')">Abrir</button>' +
+            '<button type="button" class="btn secundario" style="padding:4px 10px; font-size:0.78rem;" onclick="encolarCarpetaIdx(' + idx + ')">+ Encolar</button>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+
+      html += expArchivosLista.map(function(f, idx) {
+        return '<div class="exp-item">' +
+          '<div class="exp-nombre" style="cursor:default; font-weight:500;" title="' + escapeHtml(f.ruta) + '">📄 ' + escapeHtml(f.nombre) + ' <span style="font-size:0.76rem; color:var(--text-tertiary);">(' + f.tamano_kb + ' KB)</span></div>' +
+          '<button type="button" class="btn secundario" style="padding:4px 10px; font-size:0.78rem;" onclick="procesarArchivoIdx(' + idx + ')">⚡ Procesar archivo</button>' +
+        '</div>';
+      }).join('');
+
+      if (!html) {
+        html = '<div style="padding:1.5rem; text-align:center; color:var(--text-tertiary); font-size:0.86rem;">Carpeta vacía o sin archivos de contactos compatibles. Podés encolarla igual o subir de nivel.</div>';
+      }
+      listaEl.innerHTML = html;
+
+      if (pieEl) {
+        const msgC = expCarpetasLista.length + ' subcarpeta(s)';
+        const msgA = expArchivosLista.length + ' archivo(s) compatible(s)';
+        pieEl.innerText = msgC + ' · ' + msgA + (data.truncado ? ' (mostrando primeros 500)' : '');
+      }
+    }
+
+    function abrirAtajoIdx(idx) {
+      if (expAtajosLista[idx]) cargarRutaExplorador(expAtajosLista[idx].ruta);
+    }
+
+    function abrirCarpetaIdx(idx) {
+      if (expCarpetasLista[idx]) cargarRutaExplorador(expCarpetasLista[idx].ruta);
+    }
+
+    function encolarCarpetaIdx(idx) {
+      if (!expCarpetasLista[idx]) return;
+      agregarACola(expCarpetasLista[idx].ruta);
+      mostrarToastExplorador('✓ Agregada a la cola: ' + expCarpetasLista[idx].nombre + ' (' + colaCarpetas.length + ' en cola)');
+    }
+
+    function encolarCarpetaActual(cerrarDespues) {
+      if (!expEstado.ruta_actual) return;
+      agregarACola(expEstado.ruta_actual);
+      if (cerrarDespues) {
+        cerrarExploradorModal();
+      } else {
+        mostrarToastExplorador('✓ Carpeta encolada (' + colaCarpetas.length + ' en cola)');
+      }
+    }
+
+    function subirCarpetaExplorador() {
+      if (expEstado.en_raiz) return;
+      cargarRutaExplorador(expEstado.padre || '');
+    }
+
+    function navegarInputExplorador() {
+      const inp = document.getElementById('exp-input-ruta');
+      cargarRutaExplorador(inp ? inp.value.trim() : '');
+    }
+
+    function procesarArchivoIdx(idx) {
+      const f = expArchivosLista[idx];
+      if (!f || !f.ruta) return;
+      cerrarExploradorModal();
+      const inp = document.getElementById('input-ruta-archivo-directo');
+      const form = document.getElementById('form-archivo-ruta');
+      if (inp && form) {
+        inp.value = f.ruta;
+        iniciarMonitoreoProgreso();
+        form.submit();
+      }
+    }
+
+    function enviarArchivoDirecto(input) {
+      if (!input || !input.files || input.files.length === 0) return;
+      const form = document.getElementById('form-archivo-directo');
+      if (!form) return;
+      const det = document.getElementById('progreso-detalle-txt');
+      if (det) det.innerText = 'Subiendo y procesando: ' + input.files[0].name;
+      iniciarMonitoreoProgreso();
+      form.submit();
     }
 
     // Zero UI: Drag and Drop Handler
@@ -1414,7 +1720,8 @@ _PLANTILLA_DASHBOARD = _ESTILO + """
     document.addEventListener("DOMContentLoaded", function() {
       const forms = document.querySelectorAll("form");
       forms.forEach(function(f) {
-        f.addEventListener("submit", function() {
+        f.addEventListener("submit", function(e) {
+          if (e.defaultPrevented || f.dataset.noProgress === "1") return;
           iniciarMonitoreoProgreso();
         });
       });
@@ -1659,6 +1966,94 @@ def crear_app(config: Config, conn: sqlite3.Connection) -> Flask:
         if carpeta is None:
             return jsonify({"ok": False, "cancelado": True})
         return jsonify({"ok": True, "ruta": str(carpeta), "nombre": carpeta.name})
+
+    @app.get("/api/explorar")
+    def api_explorar():
+        ruta_raw = request.args.get("ruta", "").strip()
+        atajos = _construir_atajos_explorador(config)
+        unidades = _listar_unidades_explorador()
+
+        if not ruta_raw:
+            return jsonify(
+                {
+                    "ok": True,
+                    "en_raiz": True,
+                    "ruta_actual": "",
+                    "nombre_actual": "Inicio",
+                    "padre": None,
+                    "atajos": atajos,
+                    "unidades": unidades,
+                    "carpetas": [],
+                    "archivos": [],
+                }
+            )
+
+        try:
+            objetivo = Path(ruta_raw.strip("\"' ")).expanduser().resolve()
+        except Exception as exc:
+            return jsonify({"ok": False, "error": f"Ruta inválida: {exc}"}), 400
+
+        if not objetivo.exists():
+            return jsonify({"ok": False, "error": f"La ruta '{ruta_raw}' no existe."}), 404
+        if not objetivo.is_dir():
+            return jsonify({"ok": False, "error": f"'{objetivo.name}' no es una carpeta."}), 400
+
+        ext_permitidas = {e.lower().lstrip(".") for e in config.extensiones_permitidas}
+        carpetas: list[dict[str, Any]] = []
+        archivos: list[dict[str, Any]] = []
+        omitidas = {"$recycle.bin", "system volume information", "recovery"}
+        truncado = False
+
+        try:
+            entradas = sorted(objetivo.iterdir(), key=lambda p: (not p.is_dir(), p.name.lower()))
+        except PermissionError:
+            return jsonify({"ok": False, "error": f"Sin permisos de lectura en '{objetivo}'."}), 403
+        except OSError as exc:
+            return jsonify({"ok": False, "error": f"No se pudo leer '{objetivo}': {exc}"}), 400
+
+        for item in entradas:
+            nombre_low = item.name.lower()
+            if nombre_low in omitidas:
+                continue
+            try:
+                if item.is_dir():
+                    if len(carpetas) < 500:
+                        carpetas.append({"nombre": item.name, "ruta": str(item)})
+                    else:
+                        truncado = True
+                elif item.is_file():
+                    ext = item.suffix.lower().lstrip(".")
+                    if ext in ext_permitidas:
+                        if len(archivos) < 500:
+                            tam_kb = round(item.stat().st_size / 1024, 1)
+                            archivos.append(
+                                {
+                                    "nombre": item.name,
+                                    "ruta": str(item),
+                                    "ext": f".{ext}",
+                                    "tamano_kb": tam_kb,
+                                }
+                            )
+                        else:
+                            truncado = True
+            except OSError:
+                continue
+
+        padre = str(objetivo.parent) if objetivo.parent != objetivo else ""
+        return jsonify(
+            {
+                "ok": True,
+                "en_raiz": False,
+                "ruta_actual": str(objetivo),
+                "nombre_actual": objetivo.name or str(objetivo),
+                "padre": padre,
+                "atajos": atajos,
+                "unidades": unidades,
+                "carpetas": carpetas,
+                "archivos": archivos,
+                "truncado": truncado,
+            }
+        )
 
     @app.post("/accion/<nombre>")
     def accion(nombre: str):
@@ -1918,15 +2313,40 @@ def _ejecutar_accion(config: Config, conn: sqlite3.Connection, nombre: str) -> s
             msg = f"✓ Importado de Google ({cuenta}) — raw_records nuevos: {nuevos}"
             tracker.finalizar(exito=True, mensaje=msg)
             return msg
-        if nombre in ("actualizar-y-respaldar", "actualizar-y-respaldar-archivo"):
+        if nombre in ("actualizar-y-respaldar", "actualizar-y-respaldar-archivo", "subir-archivo"):
             from motor.file_dialogs import elegir_archivo, elegir_carpeta
 
             tracker.actualizar(paso=1, pct=10, etapa_nombre="Respaldo Previo", mensaje="Guardando copia de seguridad previa...")
             res_b = hacer_backup_previo(config, motivo="antes_de_actualizar")
             tracker.log("✓ Respaldo previo guardado en Data/Backups/ultimo_backup/")
 
-            if nombre == "actualizar-y-respaldar-archivo":
-                archivo = elegir_archivo()
+            if nombre == "subir-archivo":
+                archivo_subido = request.files.get("archivo")
+                if archivo_subido is None or not (archivo_subido.filename or "").strip():
+                    tracker.finalizar(exito=False, error="Cancelado — no se subió ningún archivo")
+                    return "Cancelado — no se seleccionó ningún archivo para subir."
+                nombre_seguro = Path(archivo_subido.filename).name
+                carpeta_subidos = config.rutas.carpeta_raiz.resolve() / "_subidos"
+                carpeta_subidos.mkdir(parents=True, exist_ok=True)
+                destino_subido = carpeta_subidos / nombre_seguro
+                archivo_subido.save(destino_subido)
+                try:
+                    tracker.actualizar(paso=1, pct=20, etapa_nombre="Extracción", mensaje=f"Extrayendo archivo '{destino_subido.name}'...")
+                    nuevos_crudos = extraer_archivo(conn, destino_subido)
+                    origen_desc = f"archivo subido '{destino_subido.name}'"
+                except ValueError as exc:
+                    tracker.finalizar(exito=False, error=str(exc))
+                    return str(exc)
+            elif nombre == "actualizar-y-respaldar-archivo":
+                ruta_archivo_param = request.form.get("ruta_archivo", "").strip()
+                if ruta_archivo_param:
+                    archivo = Path(ruta_archivo_param.strip("\"' ")).expanduser().resolve()
+                    if not archivo.exists() or not archivo.is_file():
+                        msg = f"Error: El archivo '{ruta_archivo_param}' no existe."
+                        tracker.finalizar(exito=False, error=msg)
+                        return msg
+                else:
+                    archivo = elegir_archivo()
                 if archivo is None:
                     tracker.finalizar(exito=False, error="Cancelado — no se eligió ningún archivo")
                     return "Cancelado — no se eligió ningún archivo."
@@ -2326,3 +2746,53 @@ def _resumen_normalized(conn: sqlite3.Connection, normalized_id: int) -> dict | 
         "fuente": fila["source_file"],
         "foto_url": fila["foto_url"] or "",
     }
+
+
+def _construir_atajos_explorador(config: Config) -> list[dict[str, Any]]:
+    """Lista de accesos rápidos existentes en el equipo para el explorador web."""
+    candidatos: list[tuple[str, Path]] = [
+        ("Data/Crudos", config.rutas.carpeta_raiz.resolve()),
+    ]
+    home = Path.home()
+    candidatos.extend(
+        [
+            ("Escritorio", home / "Desktop"),
+            ("Descargas", home / "Downloads"),
+            ("Documentos", home / "Documents"),
+            ("OneDrive", home / "OneDrive"),
+            ("Inicio (Usuario)", home),
+        ]
+    )
+    resultado: list[dict[str, Any]] = []
+    vistos: set[str] = set()
+    for nombre, ruta in candidatos:
+        try:
+            resuelta = ruta.resolve()
+            clave = str(resuelta).lower()
+            if clave not in vistos and resuelta.exists() and resuelta.is_dir():
+                vistos.add(clave)
+                resultado.append({"nombre": nombre, "ruta": str(resuelta), "es_unidad": False})
+        except OSError:
+            continue
+    return resultado
+
+
+def _listar_unidades_explorador() -> list[dict[str, Any]]:
+    """Lista unidades de disco disponibles (sin bloquear en Windows)."""
+    if os.name != "nt":
+        return [{"nombre": "Raíz (/)", "ruta": "/", "es_unidad": True}]
+    unidades: list[dict[str, Any]] = []
+    try:
+        import ctypes
+        import string
+
+        mascara = ctypes.windll.kernel32.GetLogicalDrives()
+        for idx, letra in enumerate(string.ascii_uppercase):
+            if mascara & (1 << idx):
+                raiz = f"{letra}:\\"
+                unidades.append({"nombre": f"Disco {letra}:", "ruta": raiz, "es_unidad": True})
+    except Exception:
+        if Path("C:\\").exists():
+            unidades.append({"nombre": "Disco C:", "ruta": "C:\\", "es_unidad": True})
+    return unidades
+

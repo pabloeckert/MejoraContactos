@@ -1,3 +1,4 @@
+import io
 import json
 from dataclasses import replace
 from unittest.mock import patch
@@ -473,6 +474,80 @@ def test_accion_resetear_base_vacia_tablas_y_salidas(tmp_path):
     # Verificar que se guardó el backup previo de seguridad
     carpeta_backup = config.rutas.carpeta_salida.parent / "Backups" / "ultimo_backup"
     assert (carpeta_backup / "lista-maestra.xlsx").exists()
+
+
+def test_dashboard_base_vacia_muestra_banner_limpio(tmp_path):
+    config = _config_prueba(tmp_path)
+    conn = conectar(config.rutas.base_sqlite)
+    cliente = crear_app(config, conn).test_client()
+
+    resp = cliente.get("/")
+    assert resp.status_code == 200
+    html = resp.data.decode("utf-8")
+    assert "Base en Blanco Lista" in html
+    assert "Detecté <strong>0 contactos nuevos</strong>" not in html
+    assert "id=\"explorador-modal\"" in html
+    assert "id=\"input-archivo-directo\"" in html
+
+
+def test_api_explorar_lista_carpetas_y_archivos(tmp_path):
+    config = _config_prueba(tmp_path)
+    sub = config.rutas.carpeta_raiz / "LoteClientes"
+    sub.mkdir()
+    (config.rutas.carpeta_raiz / "contactos.csv").write_text("Nombre,Telefono\nAna,3764112233\n", encoding="utf-8")
+    (config.rutas.carpeta_raiz / "ignorar.exe").write_bytes(b"MZ")
+
+    conn = conectar(config.rutas.base_sqlite)
+    cliente = crear_app(config, conn).test_client()
+
+    resp_raiz = cliente.get("/api/explorar")
+    assert resp_raiz.status_code == 200
+    d_raiz = resp_raiz.get_json()
+    assert d_raiz["ok"] is True
+    assert d_raiz["en_raiz"] is True
+    assert any(a["nombre"] == "Data/Crudos" for a in d_raiz["atajos"])
+
+    resp_dir = cliente.get(f"/api/explorar?ruta={config.rutas.carpeta_raiz}")
+    assert resp_dir.status_code == 200
+    d_dir = resp_dir.get_json()
+    assert d_dir["ok"] is True
+    assert d_dir["en_raiz"] is False
+    assert [c["nombre"] for c in d_dir["carpetas"]] == ["LoteClientes"]
+    assert [a["nombre"] for a in d_dir["archivos"]] == ["contactos.csv"]
+
+
+def test_accion_subir_archivo_y_ruta_archivo(tmp_path):
+    config = _config_prueba(tmp_path)
+    conn = conectar(config.rutas.base_sqlite)
+    cliente = crear_app(config, conn).test_client()
+
+    csv_bytes = io.BytesIO("Nombre,Telefono\nElena Ruiz,3764556677\n".encode("utf-8"))
+    resp = cliente.post(
+        "/accion/subir-archivo",
+        data={"archivo": (csv_bytes, "clientes_prueba.csv")},
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+    assert resp.status_code == 200
+    html = resp.data.decode("utf-8")
+    assert "Proceso completado con" in html
+    assert "clientes_prueba.csv" in html
+    assert conn.execute("SELECT count(*) FROM raw_records").fetchone()[0] == 1
+    assert (config.rutas.carpeta_salida / "lista-maestra.xlsx").exists()
+
+    # También probar /accion/actualizar-y-respaldar-archivo con ruta_archivo directo sin diálogo SO
+    otro = tmp_path / "suelto.csv"
+    otro.write_text("Nombre,Telefono\nPedro Paz,3764889900\n", encoding="utf-8")
+    with patch("motor.file_dialogs.elegir_archivo") as mock_dlg:
+        resp2 = cliente.post(
+            "/accion/actualizar-y-respaldar-archivo",
+            data={"ruta_archivo": str(otro)},
+            follow_redirects=True,
+        )
+        assert resp2.status_code == 200
+        mock_dlg.assert_not_called()
+    assert conn.execute("SELECT count(*) FROM raw_records").fetchone()[0] == 2
+
 
 
 

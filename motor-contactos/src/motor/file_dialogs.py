@@ -27,8 +27,40 @@ logger = logging.getLogger(__name__)
 _TIMEOUT_SEGUNDOS = 120  # 2 minutos para elegir
 
 
+def _en_desktop_interactivo() -> bool:
+    """Detecta si el proceso corre en el escritorio interactivo visible ('Default').
+
+    Cuando el servidor se inicia desde entornos sandboxed o servicios en segundo
+    plano (p. ej. Desktop 'exebox-...'), los diálogos GUI de Windows se abren
+    en un escritorio invisible al usuario y bloquean Flask durante minutos.
+    """
+    if os.name != "nt":
+        return True
+    try:
+        import ctypes
+
+        user32 = ctypes.windll.user32
+        kernel32 = ctypes.windll.kernel32
+        hdesk = user32.GetThreadDesktop(kernel32.GetCurrentThreadId())
+        if not hdesk:
+            return True
+        buf = ctypes.create_unicode_buffer(256)
+        needed = ctypes.c_uint(0)
+        # UOI_NAME = 2
+        if user32.GetUserObjectInformationW(hdesk, 2, buf, ctypes.sizeof(buf), ctypes.byref(needed)):
+            nombre = (buf.value or "").strip()
+            if nombre and nombre.lower() != "default":
+                logger.info("Desktop no interactivo (%s); omitiendo diálogo GUI del SO.", nombre)
+                return False
+    except Exception as exc:
+        logger.debug("No se pudo verificar el desktop actual: %s", exc)
+    return True
+
+
 def elegir_carpeta(titulo: str = "Elegí una carpeta para importar") -> Path | None:
     """Devuelve la carpeta elegida, o None si el usuario canceló el diálogo."""
+    if not _en_desktop_interactivo():
+        return None
     # 1. Intentar diálogo nativo rápido con Tkinter en subproceso limpio
     script_tk = (
         "import os, sys, tkinter as tk\n"
@@ -73,6 +105,8 @@ if ($dialogo.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {{
 
 def elegir_archivo(titulo: str = "Elegí un archivo para importar") -> Path | None:
     """Devuelve el archivo elegido, o None si el usuario canceló."""
+    if not _en_desktop_interactivo():
+        return None
     # 1. Intentar diálogo nativo rápido con Tkinter en subproceso limpio
     script_tk = (
         "import os, sys, tkinter as tk\n"

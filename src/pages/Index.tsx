@@ -19,7 +19,6 @@ import type { ParsedFile, UnifiedContact } from "@/types/contact";
 import { Upload, Zap, Users, Download, BarChart3, Settings, Moon, Sun, Activity, History, Sparkles, Settings2, Globe, FolderSearch } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { DirectorioScannerPanel } from "@/components/DirectorioScannerPanel";
-import { HealthCheckPanel } from "@/components/HealthCheckPanel";
 import { HistoryPanel } from "@/components/HistoryPanel";
 import { Button } from "@/components/ui/button";
 import { CookieConsent } from "@/components/CookieConsent";
@@ -427,8 +426,24 @@ const Index = () => {
 
             <TabsContent value="settings">
               <div className="grid gap-4 lg:grid-cols-2">
-                <HealthCheckPanel />
                 <HistoryPanel onRestore={handleRestoreFromHistory} />
+                <div className="rounded-lg border bg-card p-6 space-y-4 h-fit">
+                  <div className="space-y-1">
+                    <h2 className="text-sm font-semibold">Mantenimiento de Base Local</h2>
+                    <p className="text-xs text-muted-foreground">
+                      Limpiá los archivos en memoria y vaciá la base local del navegador para iniciar una prueba desde cero. Se guarda una copia automática en el historial antes de reiniciar.
+                    </p>
+                  </div>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={handleResetAll}
+                    title="Reiniciar base local a cero"
+                    aria-label="Reiniciar base local a cero"
+                  >
+                    Reiniciar base local a cero
+                  </Button>
+                </div>
               </div>
             </TabsContent>
           </Tabs>

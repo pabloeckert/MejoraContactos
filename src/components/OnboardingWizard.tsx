@@ -15,7 +15,7 @@ const STEPS = [
   {
     icon: <Upload className="h-8 w-8" />,
     title: "Importá tus contactos",
-    description: "Subí archivos CSV, Excel, VCF o JSON. También podés conectar tu cuenta de Google Contacts.",
+    description: "Escaneá directorios y subcarpetas en todos los niveles o subí archivos CSV, Excel, VCF, DOCX, PDF o JSON.",
     tip: "Arrastrá y soltás tus archivos — es así de fácil.",
     color: "text-blue-500",
     bg: "bg-blue-500/10",

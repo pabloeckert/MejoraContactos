@@ -21,6 +21,7 @@ el código."""
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytesseract
@@ -32,11 +33,20 @@ from motor.extractors.freetext_extractor import extraer_contactos_de_texto
 _avisado_tesseract_faltante = False
 
 
+def _asegurar_tesseract() -> None:
+    if pytesseract.pytesseract.tesseract_cmd in ("tesseract", None, ""):
+        portable = Path(__file__).resolve().parents[3] / "bin" / "tesseract" / "tesseract.exe"
+        if portable.exists():
+            pytesseract.pytesseract.tesseract_cmd = str(portable)
+            os.environ.setdefault("TESSDATA_PREFIX", str(portable.parent / "tessdata"))
+
+
 @registrar("png", "jpg", "jpeg")
 def extraer_imagen(path: Path) -> list[RawContactRecord]:
     global _avisado_tesseract_faltante
     if _avisado_tesseract_faltante:
         return []
+    _asegurar_tesseract()
     try:
         texto = pytesseract.image_to_string(Image.open(path), lang="spa+eng")
     except pytesseract.TesseractNotFoundError:

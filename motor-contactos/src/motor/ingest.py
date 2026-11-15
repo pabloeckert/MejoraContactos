@@ -104,19 +104,36 @@ def _procesar_un_archivo(conn: sqlite3.Connection, path: Path, extension: str) -
     if extension in _EXTS_IMAGEN and _img_ocr._avisado_tesseract_faltante:
         return 0
 
+    batch = []
+    ahora_str = _ahora()
     for r in registros:
-        conn.execute(
-            "INSERT INTO raw_records "
-            "(source_file, source_row, raw_json, confianza_extraccion, creado_en) "
-            "VALUES (?, ?, ?, ?, ?)",
+        batch.append(
             (
                 r.source_file,
                 r.source_row,
                 json.dumps(r.campos, ensure_ascii=False),
                 r.confianza_extraccion,
-                _ahora(),
-            ),
+                ahora_str,
+            )
         )
+        if len(batch) >= 5000:
+            conn.executemany(
+                "INSERT INTO raw_records "
+                "(source_file, source_row, raw_json, confianza_extraccion, creado_en) "
+                "VALUES (?, ?, ?, ?, ?)",
+                batch,
+            )
+            batch.clear()
+
+    if batch:
+        conn.executemany(
+            "INSERT INTO raw_records "
+            "(source_file, source_row, raw_json, confianza_extraccion, creado_en) "
+            "VALUES (?, ?, ?, ?, ?)",
+            batch,
+        )
+        batch.clear()
+
     _marcar_procesado(conn, path, hash_actual)
     conn.commit()
     return len(registros)

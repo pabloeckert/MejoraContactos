@@ -82,10 +82,9 @@ revisor:
   puerto: 5000
   tamano_lote: 25
 
-# Fase 3 — solo hace falta si el instalador de Tesseract-OCR no agregó el
-# binario al PATH de Windows. Ejemplo de ruta típica, comentado:
-# ocr:
-#   tesseract_cmd: "C:\\Program Files\\Tesseract-OCR\\tesseract.exe"
+# Fase 3 — OCR para imágenes (.png, .jpg, .jpeg)
+ocr:
+  tesseract_cmd: "bin/tesseract/tesseract.exe"
 
 # Fuente de datos: Google Contacts en vivo (People API) en vez de exports
 # CSV manuales -- decisión explícita del usuario (2026-08-11): no quiere

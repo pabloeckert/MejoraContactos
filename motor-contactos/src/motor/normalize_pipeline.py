@@ -30,20 +30,36 @@ from motor.text_cleaning import clasificar_identidad, limpiar_lugar, limpiar_tex
 
 def normalizar_todo(config: Config, conn: sqlite3.Connection, callback_progreso: Any = None) -> int:
     """Devuelve la cantidad de normalized_records nuevos."""
-    pendientes = conn.execute(
-        "SELECT r.id, r.raw_json FROM raw_records r "
+    total_fila = conn.execute(
+        "SELECT COUNT(*) FROM raw_records r "
         "LEFT JOIN normalized_records n ON n.raw_record_id = r.id "
         "WHERE n.id IS NULL"
-    ).fetchall()
+    ).fetchone()
+    total = total_fila[0] if total_fila else 0
 
-    total = len(pendientes)
-    for idx, fila in enumerate(pendientes, start=1):
-        campos = json.loads(fila["raw_json"])
-        _normalizar_registro(config, conn, fila["id"], campos)
-        if idx % 500 == 0 or idx == total:
-            conn.commit()
-            if callback_progreso:
-                callback_progreso(idx, total)
+    if total == 0:
+        return 0
+
+    BATCH_SIZE = 1000
+    procesados = 0
+    ultimo_id = 0
+    while True:
+        lote = conn.execute(
+            "SELECT r.id, r.raw_json FROM raw_records r "
+            "LEFT JOIN normalized_records n ON n.raw_record_id = r.id "
+            "WHERE n.id IS NULL AND r.id > ? ORDER BY r.id ASC LIMIT ?",
+            (ultimo_id, BATCH_SIZE),
+        ).fetchall()
+        if not lote:
+            break
+        for fila in lote:
+            ultimo_id = fila["id"]
+            campos = json.loads(fila["raw_json"])
+            _normalizar_registro(config, conn, fila["id"], campos)
+            procesados += 1
+        conn.commit()
+        if callback_progreso:
+            callback_progreso(procesados, total)
     conn.commit()
     return total
 

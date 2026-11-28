@@ -1,7 +1,7 @@
 {
   "name": "MejoraContactos",
   "short_name": "MejoraContactos",
-  "description": "Limpieza, deduplicación y unificación de contactos con IA",
+  "description": "Limpieza, deduplicación y unificación local de contactos sin conexiones externas",
   "start_url": "/MejoraContactos/",
   "scope": "/MejoraContactos/",
   "display": "standalone",

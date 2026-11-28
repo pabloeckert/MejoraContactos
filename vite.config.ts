@@ -11,12 +11,6 @@ export default defineConfig(({ mode }) => ({
     hmr: {
       overlay: false,
     },
-    proxy: {
-      "/api": {
-        target: "http://127.0.0.1:5000",
-        changeOrigin: true,
-      },
-    },
   },
   plugins: [react()].filter(Boolean),
   resolve: {
@@ -34,7 +28,6 @@ export default defineConfig(({ mode }) => ({
         manualChunks: {
           react: ["react", "react-dom"],
           router: ["react-router-dom"],
-          supabase: ["@supabase/supabase-js"],
           query: ["@tanstack/react-query"],
           "phone-lib": ["libphonenumber-js"],
           ui: [

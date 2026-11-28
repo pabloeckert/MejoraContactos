@@ -1,16 +1,6 @@
 /**
- * Error reporting utility — Enhanced v2
- *
- * Captures unhandled errors, stores locally, and optionally sends
- * to a Supabase Edge Function for centralized logging.
- *
- * To upgrade to Sentry later:
- * 1. npm install @sentry/react
- * 2. Add SENTRY_DSN to .env
- * 3. Replace captureError() with Sentry.captureException()
+ * Error reporting utility — local-only buffer in sessionStorage (zero network calls).
  */
-
-import { getSupabase } from "@/integrations/supabase/client";
 
 interface ErrorContext {
   component?: string;
@@ -35,7 +25,6 @@ const SESSION_ID = crypto.randomUUID();
 export const APP_VERSION = "v12.9";
 const MAX_STORED_ERRORS = 20;
 const STORAGE_KEY = "__mc_errors__";
-const WEBHOOK_KEY = "__mc_error_webhook__";
 
 // ── Storage ──────────────────────────────────────────────
 
@@ -61,64 +50,6 @@ function storeError(report: ErrorReport) {
   }
 }
 
-// ── Webhook (optional) ──────────────────────────────────
-
-function getWebhookUrl(): string | null {
-  try {
-    return localStorage.getItem(WEBHOOK_KEY);
-  } catch {
-    return null;
-  }
-}
-
-export function setErrorWebhook(url: string) {
-  try {
-    localStorage.setItem(WEBHOOK_KEY, url);
-  } catch { /* ignore */ }
-}
-
-async function sendToWebhook(report: ErrorReport) {
-  const webhook = getWebhookUrl();
-  if (!webhook) return;
-
-  try {
-    await fetch(webhook, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        text: `🔴 **MejoraContactos Error**\n\`${report.message}\`\n📍 ${report.component || "unknown"} → ${report.action || "unknown"}\n🔗 ${report.url}\n⏰ ${report.timestamp}`,
-        // Discord/Slack webhook format
-        embeds: [{
-          title: report.message.slice(0, 256),
-          description: report.stack?.slice(0, 2000) || "No stack trace",
-          color: 0xFF0000,
-          fields: [
-            { name: "Component", value: report.component || "N/A", inline: true },
-            { name: "Action", value: report.action || "N/A", inline: true },
-            { name: "URL", value: report.url, inline: false },
-          ],
-          timestamp: report.timestamp,
-        }],
-      }),
-    });
-  } catch {
-    // Webhook failed — silently ignore (don't create error loop)
-  }
-}
-
-// ── Supabase Edge Function (optional) ───────────────────
-
-async function sendToSupabase(report: ErrorReport) {
-  try {
-    // Import estático: otros 5 módulos ya importan supabase/client de forma
-    // estática, así que el import dinámico no lograba separar esto en su
-    // propio chunk de todos modos (Vite avisaba esto en cada build).
-    await (await getSupabase()).functions.invoke("log-error", { body: report });
-  } catch {
-    // Edge Function not deployed yet — ignore
-  }
-}
-
 // ── Main API ────────────────────────────────────────────
 
 export function captureError(error: Error, context?: ErrorContext) {
@@ -135,29 +66,8 @@ export function captureError(error: Error, context?: ErrorContext) {
     appVersion: APP_VERSION,
   };
 
-  // 1. Console log (always)
   console.error("[ErrorReporter]", report);
-
-  // 2. Store locally
   storeError(report);
-
-  // 3. Send to webhook (Discord/Slack — optional, async, non-blocking)
-  sendToWebhook(report);
-
-  // 4. Send to Supabase Edge Function (optional, async, non-blocking)
-  sendToSupabase(report);
-
-  // 5. Send to Sentry (structured tags, dedup, source maps)
-  // Dynamic import to avoid loading Sentry if not configured
-  import("./sentry").then(({ captureToSentry }) => {
-    captureToSentry(error, {
-      component: context?.component,
-      action: context?.action,
-      category: context?.extra?.category as string,
-      severity: context?.extra?.severity as string,
-      extra: context?.extra,
-    });
-  }).catch(() => { /* sentry not available */ });
 }
 
 export function getRecentErrors(): ErrorReport[] {
@@ -178,17 +88,6 @@ export function initErrorReporting() {
   if (initialized) return;
   initialized = true;
 
-  // If Sentry is configured, it handles unhandled errors globally
-  // with better stack traces and source maps. Skip our own handlers
-  // to avoid duplicate reports. captureError() still sends to Sentry
-  // for manually reported errors (from handleError, ErrorBoundary, etc).
-  const hasSentryDsn = !!import.meta.env.VITE_SENTRY_DSN;
-  if (hasSentryDsn) {
-    console.log("[ErrorReporter] Sentry active — skipping global error handlers (Sentry handles them)");
-    return;
-  }
-
-  // Fallback: capture unhandled errors when Sentry is not configured
   window.addEventListener("error", (event) => {
     captureError(event.error || new Error(event.message), {
       component: "window",

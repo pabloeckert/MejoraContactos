@@ -12,12 +12,6 @@ vi.mock("@/lib/export-utils", () => ({
   exportExcel: vi.fn().mockReturnValue(new ArrayBuffer(8)),
   exportVCF: vi.fn().mockReturnValue("vcf-data"),
   exportJSON: vi.fn().mockReturnValue("{}"),
-  exportJSONL: vi.fn().mockReturnValue("{}\n"),
-  exportGoogleContactsCSV: vi.fn().mockReturnValue("google-csv-data"),
-  exportHubSpotCSV: vi.fn().mockReturnValue("hubspot-csv-data"),
-  exportSalesforceCSV: vi.fn().mockReturnValue("salesforce-csv-data"),
-  exportZohoCSV: vi.fn().mockReturnValue("zoho-csv-data"),
-  exportAirtableCSV: vi.fn().mockReturnValue("airtable-csv-data"),
   generateHTMLReport: vi.fn().mockReturnValue("<html></html>"),
   downloadFile: vi.fn(),
 }));
@@ -49,36 +43,15 @@ describe("ExportPanel", () => {
     render(<ExportPanel contacts={contacts} />);
     expect(screen.getByText("Limpios")).toBeTruthy();
     expect(screen.getByText("Descartados")).toBeTruthy();
-    expect(screen.getByText("IA Limpiados")).toBeTruthy();
   });
 
-  it("should show correct counts", () => {
-    const contacts = [
-      makeContact(),
-      makeContact({ isDuplicate: true }),
-      makeContact({ aiCleaned: true }),
-    ];
-    render(<ExportPanel contacts={contacts} />);
-    // 2 clean (not duplicate), 1 discarded, 1 ai cleaned
-    expect(screen.getByText("Limpios")).toBeTruthy();
-    expect(screen.getByText("Descartados")).toBeTruthy();
-    expect(screen.getByText("IA Limpiados")).toBeTruthy();
-  });
-
-  it("should render export format buttons", () => {
+  it("should render standalone export format buttons", () => {
     render(<ExportPanel contacts={[makeContact()]} />);
     expect(screen.getByText("CSV")).toBeTruthy();
     expect(screen.getByText("Excel")).toBeTruthy();
     expect(screen.getByText("VCF")).toBeTruthy();
     expect(screen.getByText("JSON")).toBeTruthy();
-    expect(screen.getByText("JSONL")).toBeTruthy();
     expect(screen.getByText("Informe")).toBeTruthy();
-    // CRM formats
-    expect(screen.getByText("Google Contacts")).toBeTruthy();
-    expect(screen.getByText("HubSpot")).toBeTruthy();
-    expect(screen.getByText("Salesforce")).toBeTruthy();
-    expect(screen.getByText("Zoho CRM")).toBeTruthy();
-    expect(screen.getByText("Airtable")).toBeTruthy();
   });
 
   it("should show duplicates section when duplicates exist", () => {
@@ -95,15 +68,9 @@ describe("ExportPanel", () => {
     expect(screen.queryByText("Duplicados detectados")).toBeNull();
   });
 
-  it("should show error toast when exporting empty contacts", () => {
+  it("should handle empty contacts export cleanly", () => {
     render(<ExportPanel contacts={[]} />);
-    const csvButton = screen.getByText("CSV");
-    fireEvent.click(csvButton);
-    // toast.error is called (mocked)
-  });
-
-  it("should render training section", () => {
-    render(<ExportPanel contacts={[makeContact()]} />);
-    expect(screen.getByText("Entrenamiento e informes")).toBeTruthy();
+    fireEvent.click(screen.getByText("CSV"));
+    expect(screen.getByText("CSV")).toBeTruthy();
   });
 });

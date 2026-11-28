@@ -1,23 +1,5 @@
-import { getActiveKeys } from "./api-keys";
 import { handleParseError } from "./error-handler";
 import type { ParsedFile, RawContact } from "@/types/contact";
-
-const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
-const GROQ_MODEL = "llama-3.3-70b-versatile";
-
-const SYSTEM_PROMPT = `Eres un parser de contactos. Recibirás texto libre con datos de una persona de negocio.
-Extrae SOLO los datos que existan. NO inventes ni inferas datos que no estén presentes.
-Devuelve JSON con estos campos (omitir los vacíos):
-firstName, lastName, company, jobTitle, email, phone, city, notes
-
-Reglas:
-- Si hay un email válido, va en email
-- Si hay un número de teléfono, va en phone (formato original, se normalizará después)
-- Si hay una empresa, va en company
-- Si hay un cargo/rol laboral, va en jobTitle
-- Si hay una ciudad o localidad, va en city
-- El resto que no encaje en ningún campo va en notes
-- Responde SOLO con el JSON, sin explicaciones`;
 
 interface TxtContactResult {
   firstName?: string;
@@ -64,45 +46,7 @@ function extractFallback(text: string): TxtContactResult {
 
 export async function parseTxtContact(rawText: string): Promise<TxtContactResult> {
   if (!rawText.trim()) return {};
-
-  const keys = getActiveKeys();
-  const apiKey = keys["groq"];
-
-  if (!apiKey) {
-    return extractFallback(rawText);
-  }
-
-  try {
-    const response = await fetch(GROQ_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: GROQ_MODEL,
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: rawText },
-        ],
-        temperature: 0.1,
-        response_format: { type: "json_object" },
-        max_tokens: 300,
-      }),
-    });
-
-    if (!response.ok) {
-      return extractFallback(rawText);
-    }
-
-    const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
-    const content = data.choices?.[0]?.message?.content;
-    if (!content) return extractFallback(rawText);
-
-    return JSON.parse(content) as TxtContactResult;
-  } catch {
-    return extractFallback(rawText);
-  }
+  return extractFallback(rawText);
 }
 
 function resultToRaw(r: TxtContactResult): RawContact {

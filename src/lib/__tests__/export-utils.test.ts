@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { exportCSV, exportVCF, exportJSON, exportJSONL, generateHTMLReport } from "@/lib/export-utils";
+import { exportCSV, exportVCF, exportJSON, generateHTMLReport } from "@/lib/export-utils";
 import type { UnifiedContact } from "@/types/contact";
 
 function makeContact(overrides: Partial<UnifiedContact> = {}): UnifiedContact {
@@ -77,24 +77,6 @@ describe("exportJSON", () => {
     const parsed = JSON.parse(json);
     expect(parsed).toHaveLength(1);
     expect(parsed[0].firstName).toBe("Juan");
-  });
-});
-
-describe("exportJSONL", () => {
-  it("should produce valid JSONL", () => {
-    const jsonl = exportJSONL([makeContact()]);
-    const lines = jsonl.split("\n");
-    expect(lines).toHaveLength(1);
-    const parsed = JSON.parse(lines[0]);
-    expect(parsed.messages).toHaveLength(2);
-    expect(parsed.messages[0].role).toBe("user");
-    expect(parsed.messages[1].role).toBe("assistant");
-  });
-
-  it("should handle multiple contacts", () => {
-    const jsonl = exportJSONL([makeContact(), makeContact({ id: "2" })]);
-    const lines = jsonl.split("\n");
-    expect(lines).toHaveLength(2);
   });
 });
 

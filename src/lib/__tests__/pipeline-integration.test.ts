@@ -8,7 +8,7 @@ import { describe, it, expect } from "vitest";
 import { batchRuleClean } from "@/lib/rule-cleaner";
 import { DedupIndex } from "@/lib/dedup";
 import { validateContactFields } from "@/lib/field-validator";
-import { exportCSV, exportVCF, exportJSON, exportGoogleContactsCSV } from "@/lib/export-utils";
+import { exportCSV, exportVCF, exportJSON } from "@/lib/export-utils";
 import { autoDetectMappings } from "@/lib/column-mapper";
 import type { UnifiedContact } from "@/types/contact";
 
@@ -162,10 +162,6 @@ describe("Pipeline integration", () => {
     const json = exportJSON(unique);
     const parsed = JSON.parse(json);
     expect(parsed).toHaveLength(unique.length);
-
-    // Google Contacts CSV
-    const googleCsv = exportGoogleContactsCSV(unique);
-    expect(googleCsv).toContain("Given Name");
   });
 
   it("handles real-world messy CSV from Google Contacts export", () => {

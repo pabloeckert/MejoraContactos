@@ -1,12 +1,5 @@
 /**
- * Lightweight analytics — no external dependencies.
- * Stores events in localStorage. Integrates with Plausible when configured.
- *
- * To enable Plausible:
- * 1. Set VITE_PLAUSIBLE_DOMAIN env var (e.g. "pabloeckert.github.io")
- * 2. Optionally set VITE_PLAUSIBLE_URL if self-hosted (default: https://plausible.io)
- *
- * Plausible is GDPR-compliant, no cookies, no personal data.
+ * Local-only analytics — stores events in localStorage with zero network calls.
  */
 
 interface AnalyticsEvent {
@@ -17,36 +10,6 @@ interface AnalyticsEvent {
 
 const STORAGE_KEY = "__mc_analytics__";
 const MAX_EVENTS = 500;
-
-// ─── Plausible integration ──────────────────────────────────────────
-
-const PLAUSIBLE_DOMAIN = import.meta.env.VITE_PLAUSIBLE_DOMAIN as string | undefined;
-const PLAUSIBLE_URL = (import.meta.env.VITE_PLAUSIBLE_URL as string) || "https://plausible.io";
-
-function plausibleTrack(name: string, props?: Record<string, string | number>): void {
-  if (!PLAUSIBLE_DOMAIN) return;
-  try {
-    const body = JSON.stringify({
-      name,
-      url: window.location.href,
-      domain: PLAUSIBLE_DOMAIN,
-      props: props || {},
-    });
-    // Use sendBeacon for non-blocking (survives page unload)
-    if (navigator.sendBeacon) {
-      navigator.sendBeacon(`${PLAUSIBLE_URL}/api/event`, new Blob([body], { type: "application/json" }));
-    } else {
-      fetch(`${PLAUSIBLE_URL}/api/event`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body,
-        keepalive: true,
-      }).catch(() => {});
-    }
-  } catch {
-    // Silent fail — analytics should never break the app
-  }
-}
 
 // ─── Local storage ──────────────────────────────────────────────────
 
@@ -77,9 +40,6 @@ export function trackEvent(name: string, props?: Record<string, string | number>
   if (import.meta.env.DEV) {
     console.log(`[Analytics] ${name}`, props || "");
   }
-
-  // Send to Plausible if configured
-  plausibleTrack(name, props);
 }
 
 // ─── Funnel events ──────────────────────────────────────────────────

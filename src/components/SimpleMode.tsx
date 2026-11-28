@@ -92,19 +92,19 @@ export function SimpleMode({
             </CardHeader>
             <CardContent className="space-y-3">
               <p className="text-sm text-muted-foreground">
-                La IA normalizará nombres, teléfonos y emails. Eliminará duplicados.
-                Todo automático con los mejores proveedores.
+                Se normalizarán nombres, teléfonos E.164 y emails, y se eliminarán duplicados
+                100% en tu navegador sin enviar datos afuera.
               </p>
               <div className="flex gap-2">
                 <Button
                   className="flex-1"
                   onClick={() => {
-                    analytics.processingStarted("auto", files.reduce((s, f) => s + f.rows.length, 0));
+                    analytics.processingStarted("local", files.reduce((s, f) => s + f.rows.length, 0));
                     setStep("processing");
                   }}
                 >
                   <Sparkles className="h-4 w-4 mr-2" />
-                  Limpiar con IA
+                  Limpiar y unificar
                   <ArrowRight className="h-4 w-4 ml-2" />
                 </Button>
                 <Button variant="outline" onClick={() => setStep("upload")}>

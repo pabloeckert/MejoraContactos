@@ -1,7 +1,6 @@
 import { useState, useMemo, useRef, memo } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { Search, Edit, Trash2, Sparkles, Phone, Mail, Shield, MessageCircle, Loader2 } from "lucide-react";
-import { toast } from "sonner";
+import { Search, Edit, Trash2, Sparkles, Phone, Mail, Shield } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -12,7 +11,6 @@ import { Label } from "@/components/ui/label";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { validateContactFields, getScoreColor, getFieldIcon } from "@/lib/field-validator";
 import { validatePhone, getPhoneBadge } from "@/lib/phone-validator";
-import { loadBridgeToken, sendViaWhatsApp } from "@/lib/mejoraws-bridge";
 import type { UnifiedContact, FieldValidation } from "@/types/contact";
 
 interface ContactsTableProps {
@@ -25,25 +23,7 @@ export const ContactsTable = memo(function ContactsTable({ contacts, onUpdateCon
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState<string>("unique");
   const [editContact, setEditContact] = useState<UnifiedContact | null>(null);
-  const [sendingId, setSendingId] = useState<string | null>(null);
   const parentRef = useRef<HTMLDivElement>(null);
-
-  const handleSendWhatsapp = async (c: UnifiedContact) => {
-    const token = await loadBridgeToken();
-    if (!token) {
-      toast.error("Conectá MejoraWS primero en Ajustes para poder mandar por WhatsApp");
-      return;
-    }
-    setSendingId(c.id);
-    const nombre = `${c.firstName} ${c.lastName}`.trim();
-    const result = await sendViaWhatsApp(token, c.whatsapp, nombre);
-    setSendingId(null);
-    if (result.ok) {
-      toast.success(`Envío disparado a ${nombre || c.whatsapp} vía MejoraWS`);
-    } else {
-      toast.error(result.error || "No se pudo enviar por WhatsApp");
-    }
-  };
 
   const filtered = useMemo(() => {
     let result = contacts;
@@ -194,23 +174,6 @@ export const ContactsTable = memo(function ContactsTable({ contacts, onUpdateCon
                       </span>
 
                       <div className="flex gap-0.5">
-                        {c.whatsapp && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6 text-green-600"
-                                disabled={sendingId === c.id}
-                                onClick={() => handleSendWhatsapp(c)}
-                                aria-label={`Enviar WhatsApp a ${c.firstName} ${c.lastName}`}
-                              >
-                                {sendingId === c.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <MessageCircle className="h-3 w-3" />}
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent><p>Enviar por WhatsApp (vía MejoraWS)</p></TooltipContent>
-                          </Tooltip>
-                        )}
                         <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setEditContact(c)} aria-label={`Editar ${c.firstName} ${c.lastName}`}>
                           <Edit className="h-3 w-3" />
                         </Button>

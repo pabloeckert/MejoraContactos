@@ -1,15 +1,13 @@
-// Service Worker for MejoraContactos PWA
-// Cache-first for static assets, network-first for API calls
+// Service Worker offline-first para MejoraContactos (sin llamadas externas)
 
-const CACHE_NAME = "mejoracontactos-v1";
+const CACHE_NAME = "mejoracontactos-local-v2";
 const STATIC_ASSETS = [
-  "/mejoracontactos/",
-  "/mejoracontactos/index.html",
-  "/mejoracontactos/manifest.json",
-  "/mejoracontactos/placeholder.svg",
+  "./",
+  "./index.html",
+  "./manifest.json",
+  "./placeholder.svg",
 ];
 
-// Install: cache static shell
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
@@ -17,7 +15,6 @@ self.addEventListener("install", (event) => {
   self.skipWaiting();
 });
 
-// Activate: clean old caches
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
@@ -29,36 +26,18 @@ self.addEventListener("activate", (event) => {
   self.clients.claim();
 });
 
-// Fetch: cache-first for same-origin, network-first for APIs
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Only handle GET requests
-  if (request.method !== "GET") return;
+  if (request.method !== "GET" || url.origin !== self.location.origin) return;
 
-  // Network-first for API calls (Supabase, AI providers)
   if (
-    url.hostname.includes("supabase.co") ||
-    url.hostname.includes("supabase.io") ||
-    url.hostname.includes("groq.com") ||
-    url.hostname.includes("openrouter.ai") ||
-    url.hostname.includes("googleapis.com")
-  ) {
-    event.respondWith(
-      fetch(request).catch(() => caches.match(request))
-    );
-    return;
-  }
-
-  // Cache-first for static assets (JS, CSS, images)
-  if (
-    url.pathname.startsWith("/mejoracontactos/") &&
-    (url.pathname.endsWith(".js") ||
-      url.pathname.endsWith(".css") ||
-      url.pathname.endsWith(".svg") ||
-      url.pathname.endsWith(".ico") ||
-      url.pathname.endsWith(".woff2"))
+    url.pathname.endsWith(".js") ||
+    url.pathname.endsWith(".css") ||
+    url.pathname.endsWith(".svg") ||
+    url.pathname.endsWith(".ico") ||
+    url.pathname.endsWith(".woff2")
   ) {
     event.respondWith(
       caches.match(request).then((cached) => {
@@ -75,20 +54,18 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Stale-while-revalidate for HTML pages
-  if (url.pathname.startsWith("/mejoracontactos/")) {
-    event.respondWith(
-      caches.match(request).then((cached) => {
-        const fetchPromise = fetch(request).then((response) => {
+  event.respondWith(
+    caches.match(request).then((cached) => {
+      const fetchPromise = fetch(request)
+        .then((response) => {
           if (response.ok) {
             const clone = response.clone();
             caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
           }
           return response;
-        }).catch(() => cached);
-        return cached || fetchPromise;
-      })
-    );
-    return;
-  }
+        })
+        .catch(() => cached);
+      return cached || fetchPromise;
+    })
+  );
 });

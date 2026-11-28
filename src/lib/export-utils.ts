@@ -1,4 +1,3 @@
-import { handleError } from "./error-handler";
 import type { UnifiedContact } from "@/types/contact";
 
 interface ContactRow {
@@ -13,11 +12,11 @@ interface ContactRow {
 /** Escapa HTML para prevenir XSS en reportes */
 function escapeHtml(str: string): string {
   return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#x27;');
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#x27;");
 }
 
 function contactToRow(c: UnifiedContact): ContactRow {
@@ -39,20 +38,14 @@ function csvEscape(val: string): string {
     : v;
 }
 
-/** Genera CSV genérico a partir de headers y filas de strings */
 function buildCSV(headers: string[], rows: string[][]): string {
-  return [
-    headers.join(","),
-    ...rows.map(row => row.map(csvEscape).join(",")),
-  ].join("\n");
+  return [headers.join(","), ...rows.map((row) => row.map(csvEscape).join(","))].join("\n");
 }
-
-// ── Core exports ──────────────────────────────────────────
 
 export function exportCSV(contacts: UnifiedContact[]): string {
   const rows = contacts.map(contactToRow);
   const headers = Object.keys(rows[0] || {});
-  const data = rows.map(r => headers.map(h => String((r as unknown as Record<string, string>)[h] || "")));
+  const data = rows.map((r) => headers.map((h) => String((r as unknown as Record<string, string>)[h] || "")));
   return buildCSV(headers, data);
 }
 
@@ -91,53 +84,25 @@ export function exportJSON(contacts: UnifiedContact[]): string {
   return JSON.stringify(contacts, null, 2);
 }
 
-/**
- * Exporta contactos como JSONL para fine-tuning de IA.
- * Compatible con OpenAI, HuggingFace, Axolotl.
- */
-export function exportJSONL(contacts: UnifiedContact[]): string {
-  return contacts
-    .map((c) => {
-      const input = {
-        firstName: c.firstName || "",
-        lastName: c.lastName || "",
-        whatsapp: c.whatsapp || "",
-        email: c.email || "",
-        company: c.company || "",
-        jobTitle: c.jobTitle || "",
-      };
-      const output = { ...input };
-      return JSON.stringify({
-        messages: [
-          { role: "user", content: JSON.stringify(input) },
-          { role: "assistant", content: JSON.stringify(output) },
-        ],
-      });
-    })
-    .join("\n");
-}
-
-/**
- * Genera un informe HTML del trabajo realizado.
- */
 export function generateHTMLReport(contacts: UnifiedContact[]): string {
   const clean = contacts.filter((c) => !c.isDuplicate);
   const dupes = contacts.filter((c) => c.isDuplicate);
-  const aiCleaned = contacts.filter((c) => c.aiCleaned);
+  const denom = clean.length || 1;
   const withEmail = clean.filter((c) => c.email).length;
   const withWhatsApp = clean.filter((c) => c.whatsapp).length;
   const withCompany = clean.filter((c) => c.company).length;
   const withJob = clean.filter((c) => c.jobTitle).length;
 
-  // Sources breakdown
   const sources = new Map<string, number>();
   for (const c of clean) sources.set(c.source, (sources.get(c.source) || 0) + 1);
   const sourceRows = [...sources.entries()]
     .sort((a, b) => b[1] - a[1])
-    .map(([src, count]) => `<tr><td>${escapeHtml(src)}</td><td>${count}</td><td>${((count / clean.length) * 100).toFixed(1)}%</td></tr>`)
+    .map(
+      ([src, count]) =>
+        `<tr><td>${escapeHtml(src)}</td><td>${count}</td><td>${((count / denom) * 100).toFixed(1)}%</td></tr>`
+    )
     .join("\n");
 
-  // Top companies
   const companies = new Map<string, number>();
   for (const c of clean) if (c.company) companies.set(c.company, (companies.get(c.company) || 0) + 1);
   const companyRows = [...companies.entries()]
@@ -146,8 +111,8 @@ export function generateHTMLReport(contacts: UnifiedContact[]): string {
     .map(([comp, count]) => `<tr><td>${escapeHtml(comp)}</td><td>${count}</td></tr>`)
     .join("\n");
 
-  const date = new Date().toLocaleDateString('es-AR', { year: 'numeric', month: 'long', day: 'numeric' });
-  const time = new Date().toLocaleTimeString('es-AR');
+  const date = new Date().toLocaleDateString("es-AR", { year: "numeric", month: "long", day: "numeric" });
+  const time = new Date().toLocaleTimeString("es-AR");
 
   return `<!DOCTYPE html>
 <html lang="es">
@@ -162,7 +127,7 @@ export function generateHTMLReport(contacts: UnifiedContact[]): string {
   .header { text-align: center; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 3px solid #1B4332; }
   .header h1 { font-size: 28px; color: #1B4332; margin-bottom: 4px; }
   .header p { color: #666; font-size: 14px; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; margin-bottom: 32px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 32px; }
   .stat { background: white; border-radius: 12px; padding: 20px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
   .stat-value { font-size: 32px; font-weight: 700; }
   .stat-label { font-size: 12px; color: #888; margin-top: 4px; }
@@ -189,7 +154,6 @@ export function generateHTMLReport(contacts: UnifiedContact[]): string {
   <div class="grid">
     <div class="stat"><div class="stat-value green">${clean.length.toLocaleString()}</div><div class="stat-label">Contactos únicos</div></div>
     <div class="stat"><div class="stat-value red">${dupes.length.toLocaleString()}</div><div class="stat-label">Duplicados</div></div>
-    <div class="stat"><div class="stat-value blue">${aiCleaned.length.toLocaleString()}</div><div class="stat-label">IA limpiados</div></div>
     <div class="stat"><div class="stat-value purple">${contacts.length.toLocaleString()}</div><div class="stat-label">Total procesados</div></div>
   </div>
 
@@ -197,14 +161,14 @@ export function generateHTMLReport(contacts: UnifiedContact[]): string {
     <h2>📋 Cobertura de campos</h2>
     <table>
       <tr><th>Campo</th><th>Cobertura</th><th></th></tr>
-      <tr><td>📧 Email</td><td>${withEmail} / ${clean.length} (${((withEmail / clean.length) * 100).toFixed(1)}%)</td>
-        <td><div class="bar"><div class="bar-fill blue" style="width:${(withEmail / clean.length) * 100}%"></div></div></td></tr>
-      <tr><td>📱 WhatsApp</td><td>${withWhatsApp} / ${clean.length} (${((withWhatsApp / clean.length) * 100).toFixed(1)}%)</td>
-        <td><div class="bar"><div class="bar-fill green" style="width:${(withWhatsApp / clean.length) * 100}%"></div></div></td></tr>
-      <tr><td>🏢 Empresa</td><td>${withCompany} / ${clean.length} (${((withCompany / clean.length) * 100).toFixed(1)}%)</td>
-        <td><div class="bar"><div class="bar-fill purple" style="width:${(withCompany / clean.length) * 100}%"></div></div></td></tr>
-      <tr><td>💼 Cargo</td><td>${withJob} / ${clean.length} (${((withJob / clean.length) * 100).toFixed(1)}%)</td>
-        <td><div class="bar"><div class="bar-fill red" style="width:${(withJob / clean.length) * 100}%"></div></div></td></tr>
+      <tr><td>📧 Email</td><td>${withEmail} / ${clean.length} (${((withEmail / denom) * 100).toFixed(1)}%)</td>
+        <td><div class="bar"><div class="bar-fill blue" style="width:${(withEmail / denom) * 100}%"></div></div></td></tr>
+      <tr><td>📱 WhatsApp</td><td>${withWhatsApp} / ${clean.length} (${((withWhatsApp / denom) * 100).toFixed(1)}%)</td>
+        <td><div class="bar"><div class="bar-fill green" style="width:${(withWhatsApp / denom) * 100}%"></div></div></td></tr>
+      <tr><td>🏢 Empresa</td><td>${withCompany} / ${clean.length} (${((withCompany / denom) * 100).toFixed(1)}%)</td>
+        <td><div class="bar"><div class="bar-fill purple" style="width:${(withCompany / denom) * 100}%"></div></div></td></tr>
+      <tr><td>💼 Cargo</td><td>${withJob} / ${clean.length} (${((withJob / denom) * 100).toFixed(1)}%)</td>
+        <td><div class="bar"><div class="bar-fill red" style="width:${(withJob / denom) * 100}%"></div></div></td></tr>
     </table>
   </div>
 
@@ -213,13 +177,17 @@ export function generateHTMLReport(contacts: UnifiedContact[]): string {
     <table><tr><th>Fuente</th><th>Contactos</th><th>% del total</th></tr>${sourceRows}</table>
   </div>
 
-  ${companyRows ? `<div class="section">
+  ${
+    companyRows
+      ? `<div class="section">
     <h2>🏢 Top 10 empresas</h2>
     <table><tr><th>Empresa</th><th>Contactos</th></tr>${companyRows}</table>
-  </div>` : ''}
+  </div>`
+      : ""
+  }
 
   <div class="footer">
-    Generado por MejoraContactos v3 — Procesamiento con IA
+    Generado por MejoraContactos — Procesamiento 100% local
   </div>
 </div>
 </body>
@@ -227,9 +195,10 @@ export function generateHTMLReport(contacts: UnifiedContact[]): string {
 }
 
 export function downloadFile(content: string | Uint8Array, filename: string, mimeType: string) {
-  const blob = typeof content === "string"
-    ? new Blob([content], { type: mimeType })
-    : new Blob([content.buffer as ArrayBuffer], { type: mimeType });
+  const blob =
+    typeof content === "string"
+      ? new Blob([content], { type: mimeType })
+      : new Blob([content.buffer as ArrayBuffer], { type: mimeType });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -237,172 +206,3 @@ export function downloadFile(content: string | Uint8Array, filename: string, mim
   a.click();
   URL.revokeObjectURL(url);
 }
-
-// ── CRM Export Factory ──────────────────────────────────────
-
-interface CRMColumnDef {
-  header: string;
-  getValue: (c: UnifiedContact) => string;
-}
-
-function buildCRMCSV(columns: CRMColumnDef[], contacts: UnifiedContact[]): string {
-  const headers = columns.map(col => col.header);
-  const rows = contacts.map(c => columns.map(col => col.getValue(c)));
-  return buildCSV(headers, rows);
-}
-
-/** Columnas estándar de CRM: First Name, Last Name, Email, Phone, Company, Title */
-const STANDARD_CRM_COLUMNS: CRMColumnDef[] = [
-  { header: "First Name", getValue: c => c.firstName },
-  { header: "Last Name", getValue: c => c.lastName },
-  { header: "Email", getValue: c => c.email },
-  { header: "Phone", getValue: c => c.whatsapp },
-  { header: "Company", getValue: c => c.company },
-  { header: "Title", getValue: c => c.jobTitle },
-];
-
-export function exportGoogleContactsCSV(contacts: UnifiedContact[]): string {
-  const columns: CRMColumnDef[] = [
-    { header: "Name", getValue: c => `${c.firstName} ${c.lastName}`.trim() },
-    { header: "Given Name", getValue: c => c.firstName },
-    { header: "Family Name", getValue: c => c.lastName },
-    { header: "E-mail 1 - Value", getValue: c => c.email },
-    { header: "Phone 1 - Type", getValue: c => c.whatsapp ? "Mobile" : "" },
-    { header: "Phone 1 - Value", getValue: c => c.whatsapp },
-    { header: "Organization 1 - Name", getValue: c => c.company },
-    { header: "Organization 1 - Title", getValue: c => c.jobTitle },
-  ];
-  return buildCRMCSV(columns, contacts);
-}
-
-export function exportHubSpotCSV(contacts: UnifiedContact[]): string {
-  const columns: CRMColumnDef[] = [
-    { header: "First Name", getValue: c => c.firstName },
-    { header: "Last Name", getValue: c => c.lastName },
-    { header: "Email", getValue: c => c.email },
-    { header: "Phone Number", getValue: c => c.whatsapp },
-    { header: "Company", getValue: c => c.company },
-    { header: "Job Title", getValue: c => c.jobTitle },
-  ];
-  return buildCRMCSV(columns, contacts);
-}
-
-export function exportSalesforceCSV(contacts: UnifiedContact[]): string {
-  return buildCRMCSV(STANDARD_CRM_COLUMNS, contacts);
-}
-
-export function exportZohoCSV(contacts: UnifiedContact[]): string {
-  return buildCRMCSV(STANDARD_CRM_COLUMNS, contacts);
-}
-
-export function exportAirtableCSV(contacts: UnifiedContact[]): string {
-  const columns: CRMColumnDef[] = [
-    { header: "Name", getValue: c => `${c.firstName} ${c.lastName}`.trim() },
-    { header: "Email", getValue: c => c.email },
-    { header: "Phone", getValue: c => c.whatsapp },
-    { header: "Company", getValue: c => c.company },
-    { header: "Job Title", getValue: c => c.jobTitle },
-  ];
-  return buildCRMCSV(columns, contacts);
-}
-
-/**
- * Base de datos limpia optimizada para prospección comercial directa B2B/B2C.
- * Estructura solicitada: Nombre, Apellido, Empresa, Cargo, WhatsApp y Referencia.
- */
-export function exportProspeccionCSV(contacts: UnifiedContact[]): string {
-  const BOM = "\uFEFF";
-  const columns: CRMColumnDef[] = [
-    { header: "Nombre", getValue: c => c.firstName || "" },
-    { header: "Apellido", getValue: c => c.lastName || "" },
-    { header: "Empresa", getValue: c => c.company || "" },
-    { header: "Cargo", getValue: c => c.jobTitle || "" },
-    { header: "WhatsApp", getValue: c => c.whatsapp || "" },
-    { header: "Referencia", getValue: c => c.notes || c.origin || "" },
-  ];
-  return BOM + buildCRMCSV(columns, contacts.filter(c => !c.isDuplicate));
-}
-
-// ── Segmented Export ────────────────────────────────────────────
-
-const SEGMENT_HEADERS = ["nombre", "apellido", "empresa", "cargo", "email", "teléfono", "ciudad", "origen", "score", "notas"];
-
-function buildSegmentCSV(contacts: UnifiedContact[]): string {
-  const BOM = "﻿";
-  const rows = contacts.map(c => [
-    c.firstName || "",
-    c.lastName || "",
-    c.company || "",
-    c.jobTitle || "",
-    c.email || "",
-    c.whatsapp || "",
-    c.city || "",
-    c.origin || "",
-    String(c.relevanceScore ?? ""),
-    c.notes || "",
-  ]);
-  return BOM + buildCSV(SEGMENT_HEADERS, rows);
-}
-
-export interface SegmentSummary {
-  total: number;
-  segmentA: { count: number; avgScore: number };
-  segmentB: { count: number; avgScore: number };
-  segmentC: { count: number; avgScore: number };
-  byOrigin: Record<string, number>;
-  duplicatesRemoved: number;
-}
-
-export function exportSegmentedCSV(contacts: UnifiedContact[]): {
-  segmentA: string;
-  segmentB: string;
-  segmentC: string;
-  summary: SegmentSummary;
-} {
-  const unique = contacts.filter(c => !c.isDuplicate);
-  const duplicatesRemoved = contacts.length - unique.length;
-
-  const segA = unique.filter(c => c.segment === "A");
-  const segB = unique.filter(c => c.segment === "B");
-  const segC = unique.filter(c => c.segment === "C" || !c.segment);
-
-  const avg = (arr: UnifiedContact[]) =>
-    arr.length === 0 ? 0 : Math.round(arr.reduce((s, c) => s + (c.relevanceScore ?? 0), 0) / arr.length);
-
-  const byOrigin: Record<string, number> = {};
-  for (const c of unique) {
-    const o = c.origin || "sin origen";
-    byOrigin[o] = (byOrigin[o] || 0) + 1;
-  }
-
-  const summary: SegmentSummary = {
-    total: unique.length,
-    segmentA: { count: segA.length, avgScore: avg(segA) },
-    segmentB: { count: segB.length, avgScore: avg(segB) },
-    segmentC: { count: segC.length, avgScore: avg(segC) },
-    byOrigin,
-    duplicatesRemoved,
-  };
-
-  return {
-    segmentA: buildSegmentCSV(segA),
-    segmentB: buildSegmentCSV(segB),
-    segmentC: buildSegmentCSV(segC),
-    summary,
-  };
-}
-
-/**
- * Lista de todos los formatos de exportación disponibles.
- */
-export const EXPORT_FORMATS = [
-  { id: "csv", label: "CSV (genérico)", icon: "📄", exportFn: exportCSV },
-  { id: "google", label: "Google Contacts CSV", icon: "🔵", exportFn: exportGoogleContactsCSV },
-  { id: "hubspot", label: "HubSpot CSV", icon: "🟠", exportFn: exportHubSpotCSV },
-  { id: "salesforce", label: "Salesforce CSV", icon: "☁️", exportFn: exportSalesforceCSV },
-  { id: "zoho", label: "Zoho CRM CSV", icon: "🟢", exportFn: exportZohoCSV },
-  { id: "airtable", label: "Airtable CSV", icon: "🟡", exportFn: exportAirtableCSV },
-  { id: "vcf", label: "vCard (VCF)", icon: "📇", exportFn: exportVCF },
-  { id: "json", label: "JSON", icon: "🔧", exportFn: exportJSON },
-  { id: "jsonl", label: "JSONL (fine-tuning)", icon: "🤖", exportFn: exportJSONL },
-] as const;

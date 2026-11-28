@@ -1,23 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { renderHook, act, waitFor } from "@testing-library/react";
-import { useContactProcessing, suggestOptimalConfig, INITIAL_PIPELINE } from "@/hooks/useContactProcessing";
+import { renderHook, act } from "@testing-library/react";
+import { useContactProcessing, INITIAL_PIPELINE } from "@/hooks/useContactProcessing";
 import type { ParsedFile } from "@/types/contact";
-
-// Mock dependencies
-vi.mock("@/lib/api-keys", () => ({
-  getActiveKeysMulti: () => ({ groq: ["key1"], openrouter: ["key2"] }),
-}));
 
 vi.mock("@/lib/db", () => ({
   clearContacts: vi.fn().mockResolvedValue(undefined),
-}));
-
-vi.mock("@/integrations/supabase/client", () => ({
-  supabase: {
-    functions: {
-      invoke: vi.fn().mockResolvedValue({ data: { contacts: [] }, error: null }),
-    },
-  },
+  saveHistorySnapshot: vi.fn().mockResolvedValue(undefined),
+  getAllContacts: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock("sonner", () => ({
@@ -25,108 +14,66 @@ vi.mock("sonner", () => ({
 }));
 
 function makeFiles(overrides?: Partial<ParsedFile>): ParsedFile[] {
-  return [{
-    id: "f1",
-    name: "test.csv",
-    size: 100,
-    type: "text/csv",
-    rows: [
-      { Nombre: "Juan", Apellido: "García", Email: "juan@test.com", Teléfono: "+5491155551234" },
-      { Nombre: "María", Apellido: "López", Email: "maria@test.com", Teléfono: "+5491155555678" },
-    ],
-    columns: ["Nombre", "Apellido", "Email", "Teléfono"],
-    addedAt: new Date(),
-    ...overrides,
-  }];
+  return [
+    {
+      id: "f1",
+      name: "test.csv",
+      size: 100,
+      type: "text/csv",
+      rows: [
+        { Nombre: "Juan", Apellido: "García", Email: "juan@test.com", Teléfono: "+5491155551234" },
+        { Nombre: "María", Apellido: "López", Email: "maria@test.com", Teléfono: "+5491155555678" },
+      ],
+      columns: ["Nombre", "Apellido", "Email", "Teléfono"],
+      addedAt: new Date(),
+      ...overrides,
+    },
+  ];
 }
-
-describe("suggestOptimalConfig", () => {
-  it("should pick 3 different providers when available", () => {
-    const config = suggestOptimalConfig(["groq", "openrouter", "gemini", "together"]);
-    expect(config.clean).toBeTruthy();
-    expect(config.verify).toBeTruthy();
-    expect(config.correct).toBeTruthy();
-    const providers = [config.clean, config.verify, config.correct];
-    expect(new Set(providers).size).toBe(3);
-  });
-
-  it("should fallback to first provider when not enough providers", () => {
-    const config = suggestOptimalConfig(["groq"]);
-    expect(config.clean).toBe("groq");
-    expect(config.verify).toBe("groq");
-    expect(config.correct).toBe("groq");
-  });
-
-  it("should return empty strings when no providers", () => {
-    const config = suggestOptimalConfig([]);
-    expect(config.clean).toBe("groq"); // fallback default
-  });
-
-  it("should prefer groq for cleaning", () => {
-    const config = suggestOptimalConfig(["groq", "openrouter", "gemini"]);
-    expect(config.clean).toBe("groq");
-  });
-});
 
 describe("useContactProcessing", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it("should initialize with correct defaults", async () => {
+  it("should initialize with correct local defaults", () => {
     const { result } = renderHook(() => useContactProcessing([]));
-    await waitFor(() => expect(result.current.activeProviders.length).toBeGreaterThan(0));
-    expect(result.current.mode).toBe("pipeline");
+    expect(result.current.defaultCountry).toBe("AR");
     expect(result.current.pipelineState).toEqual(INITIAL_PIPELINE);
     expect(result.current.stats.status).toBe("idle");
     expect(result.current.logs).toEqual([]);
   });
 
-  it("should auto-detect mappings when files are provided", async () => {
+  it("should auto-detect mappings when files are provided", () => {
     const { result } = renderHook(() => useContactProcessing(makeFiles()));
-    await waitFor(() => expect(result.current.activeProviders.length).toBeGreaterThan(0));
     expect(result.current.mappings.length).toBeGreaterThan(0);
     expect(result.current.allColumns).toEqual(["Nombre", "Apellido", "Email", "Teléfono"]);
   });
 
-  it("should handle mapping changes", async () => {
+  it("should handle mapping changes", () => {
     const { result } = renderHook(() => useContactProcessing(makeFiles()));
-    await waitFor(() => expect(result.current.activeProviders.length).toBeGreaterThan(0));
     act(() => {
       result.current.handleMappingChange(0, "firstName");
     });
     expect(result.current.mappings[0].target).toBe("firstName");
   });
 
-  it("should track active providers", async () => {
+  it("should compute progress correctly", () => {
     const { result } = renderHook(() => useContactProcessing([]));
-    await waitFor(() => {
-      expect(result.current.activeProviders).toContain("groq");
-      expect(result.current.activeProviders).toContain("openrouter");
-    });
-  });
-
-  it("should compute progress correctly", async () => {
-    const { result } = renderHook(() => useContactProcessing([]));
-    await waitFor(() => expect(result.current.activeProviders.length).toBeGreaterThan(0));
     expect(result.current.progress).toBe(0);
   });
 
-  it("should reset state correctly", async () => {
+  it("should reset state correctly", () => {
     const { result } = renderHook(() => useContactProcessing(makeFiles()));
-    await waitFor(() => expect(result.current.activeProviders.length).toBeGreaterThan(0));
     act(() => {
       result.current.resetState();
     });
     expect(result.current.stats.status).toBe("idle");
-    // After reset with files present, auto-detect may re-fire and add an info log.
-    // Verify no error or processing logs remain from previous state.
-    expect(result.current.logs.every(l => l.type === "info")).toBe(true);
+    expect(result.current.logs.every((l) => l.type === "info")).toBe(true);
   });
 
-  it("should toggle pause state", async () => {
+  it("should toggle pause state", () => {
     const { result } = renderHook(() => useContactProcessing(makeFiles()));
-    await waitFor(() => expect(result.current.activeProviders.length).toBeGreaterThan(0));
     act(() => {
       result.current.pause();
     });
@@ -137,17 +84,6 @@ describe("useContactProcessing", () => {
     expect(result.current.stats.status).toBe("processing");
   });
 
-  it("should set stop flag", async () => {
-    const { result } = renderHook(() => useContactProcessing(makeFiles()));
-    await waitFor(() => expect(result.current.activeProviders.length).toBeGreaterThan(0));
-    act(() => {
-      result.current.stop();
-    });
-    // stop sets a ref, no direct state change observable
-    // but subsequent processing would be affected
-    expect(true).toBe(true);
-  });
-
   it("should clean up contacts", async () => {
     const { result } = renderHook(() => useContactProcessing(makeFiles()));
     await act(async () => {
@@ -156,27 +92,8 @@ describe("useContactProcessing", () => {
     expect(result.current.stats.status).toBe("idle");
   });
 
-  it("should switch mode", async () => {
-    const { result } = renderHook(() => useContactProcessing(makeFiles()));
-    await waitFor(() => expect(result.current.activeProviders.length).toBeGreaterThan(0));
-    act(() => {
-      result.current.setMode("single");
-    });
-    expect(result.current.mode).toBe("single");
-  });
-
-  it("should update stage config", async () => {
-    const { result } = renderHook(() => useContactProcessing(makeFiles()));
-    await waitFor(() => expect(result.current.activeProviders.length).toBeGreaterThan(0));
-    act(() => {
-      result.current.setStageConfig({ clean: "together", verify: "mistral", correct: "deepseek" });
-    });
-    expect(result.current.stageConfig.clean).toBe("together");
-  });
-
-  it("should update default country", async () => {
+  it("should update default country", () => {
     const { result } = renderHook(() => useContactProcessing([]));
-    await waitFor(() => expect(result.current.activeProviders.length).toBeGreaterThan(0));
     act(() => {
       result.current.setDefaultCountry("MX");
     });
